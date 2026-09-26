@@ -1,0 +1,4 @@
+# Fake JSON store (copied from seed on first run)
+data/store.json
+# Leftover data dir from the old in-package dev-db script
+.pgdata

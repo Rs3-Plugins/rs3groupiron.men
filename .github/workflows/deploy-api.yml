@@ -1,0 +1,225 @@
+name: Deploy API
+
+# Mirrors how Railway behaved: only the production branch goes live.
+on:
+  push:
+    branches: [production]
+    paths:
+      - 'apps/api/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'deploy/**'
+      - '.github/workflows/deploy-api.yml'
+  workflow_dispatch:
+
+# One deploy at a time. Queue rather than cancel: a half-finished blue/green
+# switch is worse than waiting.
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @rs3/api exec prisma generate
+
+      # Catch a broken build here rather than on the server, where a failure
+      # would mean a release that never passes its health check.
+      - name: Test
+        run: pnpm --filter @rs3/api test
+
+      - name: Build
+        run: pnpm --filter @rs3/api build
+
+      # Self-contained bundle with a real node_modules, so the server needs no
+      # pnpm, no toolchain, and no network at deploy time.
+      - name: Bundle production dependencies
+        run: pnpm --filter @rs3/api --prod deploy build/apps/api
+
+      # The Prisma client is generated into node_modules, so it has to be
+      # regenerated against the pruned tree rather than copied from the build.
+      - name: Generate Prisma client inside the bundle
+        working-directory: build/apps/api
+        run: ./node_modules/.bin/prisma generate
+
+      # pnpm deploy copies the package directory wholesale. Fail loudly here if
+      # anything the server depends on is missing, rather than shipping a
+      # release that cannot pass its health check.
+      - name: Verify bundle
+        run: |
+          set -euo pipefail
+          cd build/apps/api
+          # Source and local env never belong in a release artifact.
+          rm -rf src test tsconfig*.json eslint.config.mjs .env .env.local
+          missing=0
+          for p in dist/main.js package.json prisma/schema.prisma \
+                   node_modules/.bin/prisma node_modules/@prisma/client \
+                   node_modules/@nestjs/core data; do
+            if [ ! -e "$p" ]; then echo "::error::missing $p"; missing=1; fi
+          done
+          [ "$missing" = 0 ] || { echo "bundle incomplete"; exit 1; }
+          node -e "require('@prisma/client'); console.log('prisma client loads')"
+          echo "bundle size: $(du -sh . | cut -f1)"
+
+      - name: Assemble release
+        env:
+          REL: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          cp -r deploy build/deploy
+          echo "$REL" > build/RELEASE
+          tar -C build -czf release.tar.gz .
+          ls -lh release.tar.gz
+
+      # .env.example decides which keys exist; this block supplies the values.
+      #
+      # Listed one by one on purpose. `toJSON(secrets)` would let the step pick
+      # up new keys with no workflow edit, but it hands the job every secret at
+      # once — which GitHub's scanner flags, correctly. Adding a variable is now
+      # a line here and a line in .env.example.
+      - name: Render .env
+        env:
+          CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
+          CDN_BASE_URL: ${{ secrets.CDN_BASE_URL }}
+          SEED_DEMO: ${{ secrets.SEED_DEMO }}
+          ALLOW_DEV_RESET: ${{ secrets.ALLOW_DEV_RESET }}
+          DEMO_WRITABLE: ${{ secrets.DEMO_WRITABLE }}
+          UPLOAD_MAX_BYTES: ${{ secrets.UPLOAD_MAX_BYTES }}
+          GAMEVALS_DIR: ${{ secrets.GAMEVALS_DIR }}
+          QUESTS_FILE: ${{ secrets.QUESTS_FILE }}
+          DB_POOL_SIZE: ${{ secrets.DB_POOL_SIZE }}
+          DB_POOL_TIMEOUT: ${{ secrets.DB_POOL_TIMEOUT }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_BACKUP_BUCKET: ${{ secrets.R2_BACKUP_BUCKET }}
+          OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.OTEL_EXPORTER_OTLP_ENDPOINT }}
+          OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
+          OTEL_EXPORTER_OTLP_PROTOCOL: ${{ secrets.OTEL_EXPORTER_OTLP_PROTOCOL }}
+          OTEL_SERVICE_NAME: ${{ secrets.OTEL_SERVICE_NAME }}
+          OTEL_SERVICE_VERSION: ${{ github.sha }}
+          OTEL_TRACES_SAMPLER: ${{ secrets.OTEL_TRACES_SAMPLER }}
+          OTEL_TRACES_SAMPLER_ARG: ${{ secrets.OTEL_TRACES_SAMPLER_ARG }}
+          OTEL_METRIC_EXPORT_INTERVAL: ${{ secrets.OTEL_METRIC_EXPORT_INTERVAL }}
+          OTEL_LOG_LEVEL: ${{ secrets.OTEL_LOG_LEVEL }}
+        run: |
+          set -euo pipefail
+          node deploy/render-env.mjs apps/api/.env.example rendered.env
+          echo "key count: $(grep -c '^[A-Za-z_][A-Za-z0-9_]*=' rendered.env)"
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          # Scan regardless, so the log can show what the host actually offers
+          # even when a pinned value is in use. Fingerprints are not secret.
+          echo "scanning $SSH_HOST port $SSH_PORT ..."
+          ssh-keyscan -T 10 -p "$SSH_PORT" "$SSH_HOST" > /tmp/scanned 2>/tmp/scanerr || true
+          echo "host offers:"
+          ssh-keygen -lf /tmp/scanned 2>/dev/null || echo "  (scan returned nothing)"
+          [ -s /tmp/scanerr ] && sed 's/^/  scan: /' /tmp/scanerr || true
+
+          if [ -n "$SSH_KNOWN_HOSTS" ]; then
+            # Pinned: the host key cannot be swapped out from under us.
+            printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+            echo "using pinned SSH_KNOWN_HOSTS ($(grep -c . ~/.ssh/known_hosts) entries)"
+          elif [ -s /tmp/scanned ]; then
+            echo "::warning::SSH_KNOWN_HOSTS not set — trusting the key seen now"
+            cp /tmp/scanned ~/.ssh/known_hosts
+          else
+            echo "::error::could not reach $SSH_HOST:$SSH_PORT to read its host key"
+            exit 1
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+          # Fail here with a clear message rather than inside a later scp.
+          if ! ssh -p "$SSH_PORT" -o BatchMode=yes -o ConnectTimeout=10 \
+                 "$SSH_USER@$SSH_HOST" true; then
+            echo "::error::SSH failed. If this says 'Host key verification failed',"
+            echo "SSH_KNOWN_HOSTS does not match the key the host offered above."
+            echo "Fix: set SSH_KNOWN_HOSTS to exactly that scan output, or clear"
+            echo "the secret to accept the current key."
+            exit 1
+          fi
+          echo "SSH OK"
+
+      - name: Upload release
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
+          REL: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "mkdir -p /srv/rs3/releases/$REL"
+          scp -P "$SSH_PORT" release.tar.gz "$SSH_USER@$SSH_HOST:/tmp/$REL.tar.gz"
+          # Mode 600 in transit and at rest; it holds every app secret.
+          scp -P "$SSH_PORT" rendered.env "$SSH_USER@$SSH_HOST:/tmp/$REL.env"
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" bash -s <<EOF
+            set -euo pipefail
+            tar -C /srv/rs3/releases/$REL -xzf /tmp/$REL.tar.gz
+            rm -f /tmp/$REL.tar.gz
+            install -m 600 /tmp/$REL.env /srv/rs3/shared/.env
+            rm -f /tmp/$REL.env
+            chmod +x /srv/rs3/releases/$REL/deploy/*.sh
+          EOF
+
+      - name: Activate release
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
+          REL: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "bash /srv/rs3/releases/$REL/deploy/release.sh $REL"
+
+      # Through the tunnel, so it proves the whole path works, not just the
+      # loopback check release.sh already did.
+      - name: Verify public endpoint
+        if: ${{ vars.API_PUBLIC_URL != '' }}
+        env:
+          API_PUBLIC_URL: ${{ vars.API_PUBLIC_URL }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 20); do
+            if curl -fsS --max-time 5 "$API_PUBLIC_URL/health" \
+                 | tee /dev/stderr | grep -q '"status":"healthy"'; then
+              echo "public health check passed"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "::error::public health check never passed"
+          exit 1

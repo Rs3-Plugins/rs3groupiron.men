@@ -1,0 +1,177 @@
+/* Shared form/page chrome for Login + Get started (layered on HomePage.css). */
+
+.auth-page {
+  height: 100vh;
+  height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.auth-back {
+  display: inline-block;
+  margin-bottom: 0.85rem;
+  color: var(--home-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  letter-spacing: 0.02em;
+}
+
+.auth-back:hover {
+  color: var(--home-gold);
+}
+
+.auth-brand {
+  margin: 0;
+  color: var(--home-gold);
+  font-family: var(--font-display);
+  font-size: clamp(1.2rem, 3vw, 1.55rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.15;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.7);
+}
+
+.auth-title {
+  margin: 0.4rem 0 0;
+  color: var(--home-ink);
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 3.75vw, 1.85rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.65);
+}
+
+.auth-lead {
+  margin: 0.4rem 0 0;
+  color: var(--home-muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.7);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 1rem;
+  padding: 1.05rem 1rem 1.15rem;
+  border: 1px solid rgba(232, 160, 74, 0.22);
+  border-radius: 12px;
+  background: rgba(10, 12, 14, 0.78);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  position: relative;
+  color: var(--home-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.auth-field--grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.auth-field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid rgba(232, 160, 74, 0.28);
+  border-radius: var(--radius-md);
+  background: rgba(18, 22, 26, 0.9);
+  color: var(--home-ink);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.auth-field:has(.auth-count) input,
+.auth-field:has(.auth-field-toggle) input {
+  padding-right: 3.2rem;
+}
+
+.auth-field input:focus {
+  border-color: rgba(232, 160, 74, 0.7);
+}
+
+.auth-count {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 0.65rem;
+  color: rgba(196, 187, 168, 0.65);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  pointer-events: none;
+}
+
+.auth-field-toggle {
+  appearance: none;
+  position: absolute;
+  right: 0.4rem;
+  bottom: 0.38rem;
+  padding: 0.25rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: rgba(196, 187, 168, 0.8);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.auth-field-toggle:hover {
+  color: var(--home-gold);
+  border-color: rgba(232, 160, 74, 0.35);
+}
+
+.auth-hint {
+  margin: 0 0 0.45rem;
+  color: rgba(196, 187, 168, 0.85);
+  font-size: 0.78rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.35;
+}
+
+.auth-error {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(190, 80, 70, 0.45);
+  border-radius: var(--radius-md);
+  background: rgba(60, 22, 18, 0.65);
+  color: #f0c4be;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.auth-submit {
+  width: 100%;
+  min-width: 0;
+  margin-top: 0.1rem;
+  padding: 0.72rem 1.15rem;
+  cursor: pointer;
+}
+
+.auth-submit:disabled {
+  opacity: 0.65;
+  cursor: wait;
+  transform: none;
+}

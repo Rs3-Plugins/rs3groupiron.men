@@ -1,0 +1,35 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "build": {
+    "env": {
+      "VITE_API_ORIGIN": "https://api.rs3groupiron.men"
+    }
+  },
+  "ignoreCommand": "if [ \"${VERCEL_ENV:-production}\" = \"production\" ]; then exit 1; else exit 0; fi",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://api.rs3groupiron.men/api/:path*"
+    },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://raw.githubusercontent.com https://chisel.weirdgloop.org https://cdn.discordapp.com https://cdn.rs3groupiron.men; connect-src 'self' https://api.rs3groupiron.men https://raw.githubusercontent.com https://sheets.googleapis.com; frame-src https://www.youtube-nocookie.com; form-action 'self'; upgrade-insecure-requests"
+        },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
+      ]
+    }
+  ]
+}

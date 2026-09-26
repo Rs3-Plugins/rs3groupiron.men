@@ -1,0 +1,1237 @@
+/**
+ * RS3 / Legacy brown UI — uses game chrome sprites when appearance = rs3.
+ * Scoped via [data-appearance='rs3'] on .gms and portaled modals.
+ */
+
+[data-appearance='rs3'] {
+  --rs3-bg: #1a1510;
+  --rs3-panel: #241c16;
+  --rs3-panel-2: #2c231b;
+  --rs3-modal-fill: #1b1511;
+  --rs3-panel-rgb: 36, 28, 22;
+  --rs3-modal-rgb: 27, 21, 17;
+  --gms-panel-rgb: 36, 28, 22;
+  /* Warm brown palette: intentionally distinct from the base grey/gold tokens,
+     but layout tokens (radii, fonts, z-index) are inherited from :root. */
+  --rs3-ink: #f0e6d2;
+  --rs3-muted: #b5a68a;
+  --rs3-gold: #c4a46a;
+  --rs3-gold-bright: #e0c48a;
+  --rs3-gold-dim: #8a7340;
+  --rs3-border: #5a4a32;
+  --rs3-shadow: rgba(0, 0, 0, 0.65);
+  --rs3-font-display: var(--font-display);
+  --rs3-btn: url('/sprites/button.png');
+  --rs3-btn-hover: url('/sprites/button_hover.png');
+  --rs3-btn-disabled: url('/sprites/button_disabled.png');
+  --rs3-btn-danger: url('/sprites/button_destructive.png');
+  --rs3-btn-danger-hover: url('/sprites/button_destructive_hover.png');
+  --rs3-exit: url('/sprites/exit_button_n.png');
+  --rs3-exit-hover: url('/sprites/exit_button_h.png');
+  --rs3-square: url('/sprites/square_button.png');
+  --rs3-square-hover: url('/sprites/square_button_hover.png');
+  --rs3-square-active: url('/sprites/square_button_clicked.png');
+  --rs3-frame-tl: url('/sprites/left_border.png');
+  --rs3-frame-tm: url('/sprites/middle_border.png');
+  --rs3-frame-tr: url('/sprites/right.png');
+  --rs3-frame-side: url('/sprites/side.png');
+  --rs3-frame-bl: url('/sprites/bottom_left.png');
+  --rs3-frame-bm: url('/sprites/bottom.png');
+  --rs3-frame-top-h: 76px;
+  --rs3-frame-side-w: 32px;
+  --rs3-frame-bot-h: 32px;
+  --rs3-frame-tl-w: 76px;
+  --rs3-frame-tr-w: 116px;
+  --rs3-small-sheet: url('/sprites/buttons_small_sheet.png');
+}
+
+/* —— 9-slice window frame (scale/repeat border parts) —— */
+.gms-rs3-frame {
+  --rs3-frame-crop-x: 16px;
+  --rs3-frame-crop-t: 4px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 0 !important;
+  border-radius: 0 !important;
+  /* Opaque fill behind transparent sprite padding; crop pad so fill doesn’t sit outside gold */
+  background: var(--rs3-modal-fill, #1b1511) !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+  clip-path: inset(
+    var(--rs3-frame-crop-t) var(--rs3-frame-crop-x) 0 var(--rs3-frame-crop-x)
+  );
+  image-rendering: pixelated;
+}
+
+.gms-rs3-frame-top,
+.gms-rs3-frame-mid,
+.gms-rs3-frame-bot {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  min-width: 0;
+  background: var(--rs3-modal-fill, #1b1511);
+}
+
+.gms-rs3-frame-top {
+  position: relative;
+  flex: 0 0 var(--rs3-frame-top-h);
+  height: var(--rs3-frame-top-h);
+  /* Top strip already paints header; keep fill for transparent pad under divider */
+  z-index: 1;
+}
+
+.gms-rs3-frame-tl,
+.gms-rs3-frame-tm,
+.gms-rs3-frame-tr,
+.gms-rs3-frame-ml,
+.gms-rs3-frame-mr,
+.gms-rs3-frame-bl,
+.gms-rs3-frame-bm,
+.gms-rs3-frame-br {
+  display: block;
+  flex-shrink: 0;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-color: transparent;
+}
+
+.gms-rs3-frame-tl {
+  width: var(--rs3-frame-tl-w);
+  background-image: var(--rs3-frame-tl);
+  background-size: 100% 100%;
+}
+
+.gms-rs3-frame-tm {
+  flex: 1 1 auto;
+  min-width: 0;
+  background-image: var(--rs3-frame-tm);
+  background-repeat: repeat-x;
+  background-size: auto 100%;
+  background-position: left center;
+}
+
+.gms-rs3-frame-tr {
+  width: var(--rs3-frame-tr-w);
+  background-image: var(--rs3-frame-tr);
+  background-size: 100% 100%;
+}
+
+.gms-rs3-frame-header {
+  /* Title sits in the top chrome band only (below outer gold, above divider ~y59). */
+  position: absolute;
+  top: 8px;
+  right: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  height: 48px;
+  pointer-events: none;
+}
+
+.gms-rs3-frame-header > * {
+  pointer-events: auto;
+  width: 100%;
+  height: 100%;
+}
+
+.gms-rs3-frame-mid {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  z-index: 0;
+}
+
+.gms-rs3-frame-ml,
+.gms-rs3-frame-mr {
+  width: var(--rs3-frame-side-w);
+  background-image: var(--rs3-frame-side);
+  background-repeat: repeat-y;
+  background-size: 100% auto;
+  background-position: center top;
+}
+
+.gms-rs3-frame-mr {
+  transform: scaleX(-1);
+}
+
+.gms-rs3-frame-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  color: var(--rs3-ink);
+  background: var(--rs3-modal-fill, #1b1511);
+}
+
+.gms-rs3-frame-bot {
+  flex: 0 0 var(--rs3-frame-bot-h);
+  height: var(--rs3-frame-bot-h);
+  position: relative;
+  z-index: 1;
+}
+
+.gms-rs3-frame-bl,
+.gms-rs3-frame-br {
+  width: var(--rs3-frame-side-w);
+  background-image: var(--rs3-frame-bl);
+  background-size: 100% 100%;
+}
+
+.gms-rs3-frame-br {
+  transform: scaleX(-1);
+}
+
+.gms-rs3-frame-bm {
+  flex: 1 1 auto;
+  min-width: 0;
+  background-image: var(--rs3-frame-bm);
+  background-repeat: repeat-x;
+  background-size: auto 100%;
+  background-position: left center;
+}
+
+/* —— Shell / panels (CSS bevel — do NOT stretch border sprites) —— */
+.gms[data-appearance='rs3'] .gms-toolbar,
+.gms[data-appearance='rs3'] .gms-player,
+.gms[data-appearance='rs3'] .gms-side-status,
+.gms[data-appearance='rs3'] .gms-items,
+.gms[data-appearance='rs3'] .gms-panel,
+.gms[data-appearance='rs3'] .gms-settings {
+  border: 1px solid #2a1e12;
+  border-radius: 0;
+  color: var(--rs3-ink);
+  background:
+    linear-gradient(180deg, rgba(255, 240, 200, 0.05) 0%, transparent 22%),
+    rgba(var(--rs3-panel-rgb), var(--gms-panel-alpha));
+  box-shadow:
+    inset 1px 1px 0 rgba(220, 190, 130, 0.55),
+    inset -1px -1px 0 rgba(40, 28, 14, 0.95),
+    inset 2px 2px 0 rgba(90, 70, 40, 0.35),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.45),
+    0 8px 22px var(--rs3-shadow);
+}
+
+.gms[data-appearance='rs3'] .gms-player-nav {
+  border: 1px solid #2a1e12;
+  border-top: none;
+  border-radius: 0;
+  color: var(--rs3-ink);
+  background:
+    linear-gradient(180deg, rgba(255, 240, 200, 0.04) 0%, transparent 40%),
+    rgba(var(--rs3-panel-rgb), var(--gms-panel-alpha));
+  box-shadow:
+    inset 1px 0 0 rgba(220, 190, 130, 0.45),
+    inset -1px -1px 0 rgba(40, 28, 14, 0.95),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.45),
+    0 8px 22px var(--rs3-shadow);
+}
+
+.gms[data-appearance='rs3'] .gms-player-nav-offline {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-player-nav-dot {
+  border-color: var(--rs3-ink);
+}
+
+/* Nested panel inside player card — no second frame */
+.gms[data-appearance='rs3'] .gms-player-panel {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-toolbar {
+  padding: 0.45rem 0.55rem;
+  gap: 0.45rem;
+}
+
+.gms[data-appearance='rs3'] .gms-group-name {
+  color: var(--rs3-gold-bright);
+  text-shadow: 0 1px 0 #000, 0 0 8px rgba(0, 0, 0, 0.8);
+  font-family: var(--rs3-font-display);
+  letter-spacing: 0.03em;
+}
+
+.gms[data-appearance='rs3'] .gms-players {
+  gap: 0.45rem;
+}
+
+/* —— Text / action buttons (stretch width only, lock height to sprite) —— */
+.gms[data-appearance='rs3'] .gms-tab,
+.gms[data-appearance='rs3'] .gms-action,
+.gms[data-appearance='rs3'] .gms-modal-cancel,
+.gms[data-appearance='rs3'] .gms-player-nav-btn,
+.gms[data-appearance='rs3'] .gms-demo-xp-btn,
+[data-appearance='rs3'] .gms-modal-cancel {
+  border: 0 !important;
+  border-radius: 0 !important;
+  height: 23px;
+  min-height: 23px;
+  padding: 0 0.85rem;
+  line-height: 23px;
+  color: var(--rs3-ink) !important;
+  background-color: transparent !important;
+  background-image: var(--rs3-btn) !important;
+  background-size: 100% 23px !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  box-shadow: none !important;
+  text-shadow: 0 1px 0 #000;
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+/* Taller text buttons: repeat/slice the button art without blowing the border */
+.gms[data-appearance='rs3'] .gms-settings-text-btn,
+.gms[data-appearance='rs3'] .gms-settings-save,
+[data-appearance='rs3'] .gms-settings-text-btn,
+[data-appearance='rs3'] .gms-settings-save {
+  border: 0 !important;
+  border-radius: 0 !important;
+  min-height: 28px;
+  padding: 0.35rem 0.75rem;
+  color: var(--rs3-ink) !important;
+  background-color: #3a2a1c !important;
+  background-image: none !important;
+  box-shadow:
+    inset 1px 1px 0 rgba(220, 190, 130, 0.55),
+    inset -1px -1px 0 rgba(30, 18, 8, 0.95),
+    inset 0 0 0 1px rgba(90, 70, 40, 0.5) !important;
+  text-shadow: 0 1px 0 #000;
+  font-weight: 700;
+}
+
+.gms[data-appearance='rs3'] .gms-settings-text-btn:hover,
+.gms[data-appearance='rs3'] .gms-settings-save:hover,
+[data-appearance='rs3'] .gms-settings-text-btn:hover,
+[data-appearance='rs3'] .gms-settings-save:hover {
+  background-color: #4a3824 !important;
+  color: #fff8e8 !important;
+  transform: none;
+}
+
+.gms[data-appearance='rs3'] .gms-tab:hover,
+.gms[data-appearance='rs3'] .gms-action:hover,
+.gms[data-appearance='rs3'] .gms-modal-cancel:hover,
+.gms[data-appearance='rs3'] .gms-player-nav-btn:hover:not(:disabled),
+.gms[data-appearance='rs3'] .gms-demo-xp-btn:hover,
+[data-appearance='rs3'] .gms-modal-cancel:hover {
+  background-image: var(--rs3-btn-hover) !important;
+  color: #fff8e8 !important;
+  transform: none;
+}
+
+.gms[data-appearance='rs3'] .gms-tab--active,
+.gms[data-appearance='rs3'] .gms-player-nav-btn--active {
+  background-image: var(--rs3-btn-hover) !important;
+  color: var(--rs3-gold-bright) !important;
+}
+
+.gms[data-appearance='rs3'] .gms-tab:disabled,
+.gms[data-appearance='rs3'] .gms-action:disabled,
+.gms[data-appearance='rs3'] .gms-player-nav-btn:disabled,
+[data-appearance='rs3'] .gms-modal-cancel:disabled {
+  background-image: var(--rs3-btn-disabled) !important;
+  opacity: 0.85;
+  color: var(--rs3-muted) !important;
+}
+
+.gms[data-appearance='rs3'] .gms-settings-danger,
+[data-appearance='rs3'] .gms-settings-danger {
+  background-color: #4a2218 !important;
+  background-image: none !important;
+}
+
+.gms[data-appearance='rs3'] .gms-settings-danger:hover,
+[data-appearance='rs3'] .gms-settings-danger:hover {
+  background-color: #5c2a1c !important;
+}
+
+.gms[data-appearance='rs3'] .gms-settings-save,
+[data-appearance='rs3'] .gms-settings-save,
+[data-appearance='rs3'] .gms-setup-go {
+  background-color: #4a3824 !important;
+  color: var(--rs3-gold-bright) !important;
+}
+
+/* —— Square / icon buttons —— */
+.gms[data-appearance='rs3'] .gms-icon-btn {
+  border: 0;
+  border-radius: 0;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  background: var(--rs3-square) center / 100% 100% no-repeat;
+  box-shadow: none;
+}
+
+.gms[data-appearance='rs3'] .gms-icon-btn:hover:not(:disabled) {
+  background-image: var(--rs3-square-hover);
+  border-color: transparent;
+}
+
+.gms[data-appearance='rs3'] .gms-icon-btn--active {
+  background-image: var(--rs3-square-active);
+}
+
+.gms[data-appearance='rs3'] .gms-icon-btn:disabled {
+  background-image: url('/sprites/square_button_disabled.png');
+}
+
+.gms[data-appearance='rs3'] .gms-graphs-refresh {
+  width: 32px;
+  height: 32px;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: transparent;
+}
+
+.gms[data-appearance='rs3'] .gms-graphs-refresh:hover {
+  background: transparent !important;
+}
+
+.gms[data-appearance='rs3'] .gms-graphs-refresh-icon {
+  display: none !important;
+}
+
+.gms[data-appearance='rs3'] .gms-graphs-refresh-rs3--n {
+  display: block;
+}
+
+.gms[data-appearance='rs3'] .gms-graphs-refresh-rs3--h {
+  display: none;
+}
+
+.gms[data-appearance='rs3'] .gms-graphs-refresh:hover .gms-graphs-refresh-rs3--n {
+  display: none;
+}
+
+.gms[data-appearance='rs3'] .gms-graphs-refresh:hover .gms-graphs-refresh-rs3--h {
+  display: block;
+}
+
+.gms[data-appearance='rs3'] .gms-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 240, 200, 0.04) 0%, transparent 18%),
+    rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha));
+}
+
+.gms[data-appearance='rs3'] .gms-panel-body,
+.gms[data-appearance='rs3'] .gms-panel-summary-chip,
+.gms[data-appearance='rs3'] .gms-panel-more,
+.gms[data-appearance='rs3'] .gms-panel-day-step,
+.gms[data-appearance='rs3'] .gms-panel-day-all,
+.gms[data-appearance='rs3'] .gms-panel-field select,
+.gms[data-appearance='rs3'] .gms-panel-field input[type='date'],
+.gms[data-appearance='rs3'] .gms-graphs-chart-wrap,
+.gms[data-appearance='rs3'] .gms-graphs-player,
+.gms[data-appearance='rs3'] .gms-graphs-total-chip,
+.gms[data-appearance='rs3'] .gms-ach-thumb-btn,
+.gms[data-appearance='rs3'] .gms-ach-badge {
+  border-radius: 0 !important;
+  border: 1px solid var(--rs3-gold-dim) !important;
+  background: rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha)) !important;
+  box-shadow: none !important;
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-iconselect-trigger,
+.gms[data-appearance='rs3'] .gms-iconselect-list {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background: rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha));
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-iconselect-option {
+  border-radius: 0;
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-iconselect-option--active {
+  background: rgba(138, 115, 64, 0.35);
+}
+
+.gms[data-appearance='rs3'] .gms-iconselect-option--selected {
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-iconselect-caret,
+.gms[data-appearance='rs3'] .gms-member-avatar--all {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-panel-field-label,
+.gms[data-appearance='rs3'] .gms-panel-status,
+.gms[data-appearance='rs3'] .gms-panel-time,
+.gms[data-appearance='rs3'] .gms-panel-ago,
+.gms[data-appearance='rs3'] .gms-ledger-amount,
+.gms[data-appearance='rs3'] .gms-ach-detail,
+.gms[data-appearance='rs3'] .gms-ach-summary-kind,
+.gms[data-appearance='rs3'] .gms-ach-badge {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-panel-summary-name,
+.gms[data-appearance='rs3'] .gms-panel-summary-chip strong,
+.gms[data-appearance='rs3'] .gms-ledger-name,
+.gms[data-appearance='rs3'] .gms-ledger-item,
+.gms[data-appearance='rs3'] .gms-ach-name,
+.gms[data-appearance='rs3'] .gms-graphs-player-head,
+.gms[data-appearance='rs3'] .gms-graphs-total-name,
+.gms[data-appearance='rs3'] .gms-graphs-skill-name {
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-panel-title,
+.gms[data-appearance='rs3'] .gms-ach-headline,
+.gms[data-appearance='rs3'] .gms-graphs-player-total,
+.gms[data-appearance='rs3'] .gms-graphs-skill-gain,
+.gms[data-appearance='rs3'] .gms-graphs-title {
+  color: var(--rs3-gold-bright);
+  text-shadow: 0 1px 0 #000;
+}
+
+.gms[data-appearance='rs3'] .gms-panel-clock,
+.gms[data-appearance='rs3'] .gms-panel-inline-btn {
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-panel-body,
+.gms[data-appearance='rs3'] .gms-graphs-players {
+  scrollbar-color: var(--rs3-gold-dim) #120e0b;
+}
+
+.gms[data-appearance='rs3'] .gms-ledger-row,
+.gms[data-appearance='rs3'] .gms-ach-card {
+  border-bottom-color: rgba(138, 115, 64, 0.35);
+}
+
+.gms[data-appearance='rs3'] .gms-ledger-head {
+  border-bottom-color: var(--rs3-gold-dim);
+  background: #1b1511;
+  color: var(--rs3-gold);
+}
+
+.gms[data-appearance='rs3'] .gms-ach-glyph {
+  color: var(--rs3-gold);
+}
+
+.gms[data-appearance='rs3'] .gms-ach-card--level {
+  border-left-color: var(--rs3-gold-dim);
+}
+
+.gms[data-appearance='rs3'] .gms-graphs-toggle {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background: rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha));
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-graphs-toggle--active {
+  background: rgba(138, 115, 64, 0.35);
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-graphs-hint,
+.gms[data-appearance='rs3'] .gms-graphs-title-tag,
+.gms[data-appearance='rs3'] .gms-spinner-label {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-spinner-ring {
+  border-color: rgba(138, 115, 64, 0.3);
+  border-top-color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-tip {
+  border-radius: 0;
+  border-color: var(--rs3-gold-dim);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-tip-title {
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-tip-value,
+.gms[data-appearance='rs3'] .gms-chart-tip-big {
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-tip-sub {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-menu-pop {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background: rgba(var(--rs3-modal-rgb), 0.98);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-menu-head,
+.gms[data-appearance='rs3'] .gms-chart-menu-desc {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-menu-seg {
+  border-radius: 0;
+  border-color: var(--rs3-gold-dim);
+  background: rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha));
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-menu-seg:hover,
+.gms[data-appearance='rs3'] .gms-chart-menu-seg:focus-visible,
+.gms[data-appearance='rs3'] .gms-chart-menu-seg--on {
+  background: rgba(138, 115, 64, 0.35);
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-menu-label {
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-menu-tick,
+.gms[data-appearance='rs3'] .gms-chart-menu-row--on .gms-chart-menu-label {
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-menu-row:hover,
+.gms[data-appearance='rs3'] .gms-chart-menu-row:focus-visible {
+  background: rgba(138, 115, 64, 0.3);
+}
+
+.gms[data-appearance='rs3'] .gms-graphs-title-tag {
+  border-color: var(--rs3-gold-dim);
+}
+
+.gms[data-appearance='rs3'] .gms-graphs-skill-bar-track {
+  border-radius: 0;
+  background: #0c0a08;
+  border: 1px solid rgba(138, 115, 64, 0.35);
+}
+
+.gms[data-appearance='rs3'] .gms-graphs-skill-bar {
+  border-radius: 0;
+  background: linear-gradient(180deg, #d4b06a 0%, #8a7340 100%);
+}
+
+/* Quests — inherits the achievements chrome; controls and table go brown */
+.gms[data-appearance='rs3'] .gms-quests-subtitle,
+.gms[data-appearance='rs3'] .gms-quests-legend,
+.gms[data-appearance='rs3'] .gms-quests-tag,
+.gms[data-appearance='rs3'] .gms-quests-parent,
+.gms[data-appearance='rs3'] .gms-quests-qp,
+.gms[data-appearance='rs3'] .gms-quests-th,
+.gms[data-appearance='rs3'] .gms-quests-th-stat {
+  color: var(--rs3-muted);
+}
+
+/* Sprite inputs have 20px caps: sit the icon just inside the left cap and
+   push the text past it. Specificity must beat the generic input rule. */
+.gms[data-appearance='rs3'] .gms-search-icon {
+  left: 24px;
+  color: var(--rs3-gold);
+}
+
+.gms[data-appearance='rs3']
+  .gms-search-wrap
+  input:not([type='color']):not([type='checkbox']):not([type='radio']) {
+  padding-left: 22px !important;
+}
+
+.gms[data-appearance='rs3'] .gms-quests-search,
+.gms[data-appearance='rs3'] .gms-quests-select,
+.gms[data-appearance='rs3'] .gms-quests-segmented {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background-color: rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha));
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-quests-seg {
+  border-right-color: var(--rs3-gold-dim);
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-quests-seg[aria-pressed='true'] {
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-quests-tag {
+  border-radius: 0;
+  border-color: var(--rs3-gold-dim);
+}
+
+.gms[data-appearance='rs3'] .gms-quests-th {
+  background: #1a130d;
+  border-bottom-color: var(--rs3-gold-dim);
+}
+
+.gms[data-appearance='rs3'] .gms-quests-th-name,
+.gms[data-appearance='rs3'] .gms-quests-name {
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-quests-th-stat strong,
+.gms[data-appearance='rs3'] .gms-quests-name-text:hover,
+.gms[data-appearance='rs3'] .gms-quests-name-text:focus-visible {
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-quests-name,
+.gms[data-appearance='rs3'] .gms-quests-qp,
+.gms[data-appearance='rs3'] .gms-quests-cell {
+  border-bottom-color: rgba(138, 115, 64, 0.3);
+}
+
+.gms[data-appearance='rs3'] .gms-quests-row:nth-child(even) {
+  background: rgba(255, 230, 180, 0.03);
+}
+
+/* Player quest book */
+.gms[data-appearance='rs3'] .gms-pq-select,
+.gms[data-appearance='rs3'] .gms-pq-list {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background-color: rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha));
+}
+
+.gms[data-appearance='rs3'] .gms-pq-select {
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-pq-count,
+.gms[data-appearance='rs3'] .gms-pq-footer {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-pq-filter-btn,
+.gms[data-appearance='rs3'] .gms-pq-popover {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background: rgba(var(--rs3-modal-rgb), 0.98);
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-pq-filter-btn:hover,
+.gms[data-appearance='rs3'] .gms-pq-filter-btn[aria-expanded='true'] {
+  color: var(--rs3-gold-bright);
+  border-color: var(--rs3-gold);
+}
+
+.gms[data-appearance='rs3'] .gms-pq-check {
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-pq-check-box {
+  border-radius: 0;
+  border-color: var(--rs3-gold-dim);
+}
+
+.gms[data-appearance='rs3'] .gms-pq-heading,
+.gms[data-appearance='rs3'] .gms-pq-footer strong {
+  color: var(--rs3-gold-bright);
+  text-shadow: 0 1px 0 #000;
+}
+
+.gms[data-appearance='rs3'] .gms-pq-footer {
+  border-top-color: var(--rs3-gold-dim);
+}
+
+.gms[data-appearance='rs3'] .gms-settings-opacity-label {
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-settings-opacity-label em {
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-settings-opacity-hints {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-settings-opacity input[type='range'] {
+  accent-color: var(--rs3-gold);
+}
+
+/* Small sheet tiles (24×24 frames in a 24×192 strip) for nav dots / chips */
+.gms[data-appearance='rs3'] .gms-settings-choice,
+.gms[data-appearance='rs3'] .gms-settings-add-card {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background: rgba(var(--rs3-panel-rgb), var(--gms-panel-alpha));
+  box-shadow:
+    inset 1px 1px 0 rgba(220, 190, 130, 0.25),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.45);
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-settings-choice:has(input:checked) {
+  border-color: var(--rs3-gold);
+  background: rgba(60, 42, 22, 0.72);
+}
+
+.gms[data-appearance='rs3'] .gms-settings-choice strong {
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-settings-choice em {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-settings-choice input[type='radio'] {
+  accent-color: var(--rs3-gold);
+}
+
+.gms[data-appearance='rs3'] .gms-settings-section {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background: rgba(var(--rs3-modal-rgb), calc(var(--gms-panel-alpha) * 0.85));
+  box-shadow: none;
+}
+
+.gms[data-appearance='rs3'] .gms-settings-member {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background: rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha));
+  box-shadow:
+    inset 1px 1px 0 rgba(220, 190, 130, 0.18),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.4);
+}
+
+.gms[data-appearance='rs3'] .gms-settings-member--add {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.gms[data-appearance='rs3'] .gms-settings-title,
+.gms[data-appearance='rs3'] .gms-settings-heading,
+.gms[data-appearance='rs3'] .gms-settings-subheading {
+  color: var(--rs3-gold-bright);
+  text-shadow: 0 1px 0 #000;
+  font-family: var(--rs3-font-display);
+}
+
+.gms[data-appearance='rs3'] .gms-settings-hint,
+.gms[data-appearance='rs3'] .gms-settings-member-body label,
+.gms[data-appearance='rs3'] .gms-settings-color > span {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-settings-rsn {
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-settings-color input[type='color'] {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+}
+
+.gms[data-appearance='rs3'] .gms-settings-toggle span {
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-settings-toggle input[type='checkbox'] {
+  border-radius: 0;
+  border-color: var(--rs3-gold-dim);
+  background: #120e0b;
+}
+
+.gms[data-appearance='rs3'] .gms-settings-toggle input[type='checkbox']:checked {
+  border-color: var(--rs3-gold);
+  background: rgba(60, 42, 22, 0.95);
+}
+
+.gms[data-appearance='rs3'] .gms-settings-icon-btn {
+  border-radius: 0;
+}
+
+.gms[data-appearance='rs3'] .gms-settings-banner {
+  border-radius: 0;
+  border-color: var(--rs3-gold-dim);
+  background: rgba(40, 28, 14, 0.75);
+  color: var(--rs3-ink);
+}
+
+/* —— Player card accents —— */
+.gms[data-appearance='rs3'] .gms-player-name {
+  color: var(--rs3-gold-bright);
+  text-shadow: 0 1px 0 #000;
+}
+
+.gms[data-appearance='rs3'] .gms-player-time,
+.gms[data-appearance='rs3'] .gms-player-rsn {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-stat {
+  border-color: var(--rs3-border);
+  background: #120e0b;
+  border-radius: 2px;
+}
+
+.gms[data-appearance='rs3'] .gms-skills-footer {
+  border-top-color: var(--rs3-gold-dim);
+}
+
+.gms[data-appearance='rs3'] .gms-skills-stat strong,
+.gms[data-appearance='rs3'] .gms-skill-levels {
+  color: var(--rs3-gold-bright);
+}
+
+/* —— Inputs (3-slice: caps in border box, middle clipped between them) —— */
+.gms[data-appearance='rs3'] input:not([type='color']):not([type='checkbox']):not([type='radio']),
+.gms[data-appearance='rs3'] .gms-items-search,
+[data-appearance='rs3'] input:not([type='color']):not([type='checkbox']):not([type='radio']) {
+  appearance: none !important;
+  box-sizing: border-box !important;
+  border-style: solid !important;
+  border-color: transparent !important;
+  border-width: 0 20px !important;
+  border-radius: 0 !important;
+  height: 29px !important;
+  min-height: 29px !important;
+  max-height: 29px !important;
+  line-height: 29px;
+  padding: 0 4px !important;
+  color: var(--rs3-ink) !important;
+  caret-color: var(--rs3-gold-bright);
+  background-color: transparent !important;
+  background-image:
+    url('/sprites/input_left_n.png'),
+    url('/sprites/input_right.png'),
+    url('/sprites/input_middle.png') !important;
+  background-repeat: no-repeat, no-repeat, repeat-x !important;
+  background-size: 20px 29px, 20px 29px, 20px 29px !important;
+  background-position: left center, right center, left center !important;
+  background-origin: border-box, border-box, padding-box !important;
+  background-clip: border-box, border-box, padding-box !important;
+  box-shadow: none !important;
+}
+
+.gms[data-appearance='rs3'] input:not([type='color']):not([type='checkbox']):not([type='radio'])::placeholder,
+.gms[data-appearance='rs3'] .gms-items-search::placeholder,
+[data-appearance='rs3'] input:not([type='color']):not([type='checkbox']):not([type='radio'])::placeholder {
+  color: var(--rs3-muted);
+  opacity: 1;
+}
+
+.gms[data-appearance='rs3'] input:not([type='color']):not([type='checkbox']):not([type='radio']):focus,
+.gms[data-appearance='rs3'] .gms-items-search:focus,
+[data-appearance='rs3'] input:not([type='color']):not([type='checkbox']):not([type='radio']):focus {
+  background-image:
+    url('/sprites/input_left_hover.png'),
+    url('/sprites/input_right_hover.png'),
+    url('/sprites/input_middle_hover.png') !important;
+  background-repeat: no-repeat, no-repeat, repeat-x !important;
+  background-size: 20px 29px, 20px 29px, 20px 29px !important;
+  background-position: left center, right center, left center !important;
+  background-origin: border-box, border-box, padding-box !important;
+  background-clip: border-box, border-box, padding-box !important;
+}
+
+/* —— Modals (sprite 9-slice frame via .gms-rs3-frame) —— */
+[data-appearance='rs3'].gms-modal-backdrop {
+  background: rgba(8, 6, 4, 0.72);
+}
+
+[data-appearance='rs3'] .gms-modal.gms-rs3-frame {
+  position: relative;
+  /* Layout width includes cropped sprite pad; keep visible area ~22rem */
+  width: min(calc(22rem + 2 * var(--rs3-frame-crop-x, 16px)), 100%);
+  color: var(--rs3-ink);
+}
+
+[data-appearance='rs3'] .gms-modal--setup.gms-rs3-frame {
+  width: min(calc(28rem + 2 * var(--rs3-frame-crop-x, 16px)), 100%);
+}
+
+/* Map fullscreen control — square brown chrome like the rest of the RS3 UI. */
+.gms[data-appearance='rs3'] .leaflet-control-fullscreen a {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background: rgba(var(--rs3-modal-rgb), 0.92);
+}
+
+.gms[data-appearance='rs3'] .leaflet-control-fullscreen a:hover {
+  border-color: var(--rs3-gold-bright);
+  background: rgba(var(--rs3-panel-rgb), 0.96);
+}
+
+/* Presence chip — square RS3 chrome; the dot still carries the state colour. */
+.gms[data-appearance='rs3'] .gms-player-presence {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background: rgba(var(--rs3-modal-rgb), 0.9);
+}
+
+.gms[data-appearance='rs3'] .gms-player-presence--online {
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-player-presence--offline {
+  color: var(--rs3-muted);
+}
+
+/* —— Toolbar overflow menu —— */
+.gms[data-appearance='rs3'] .gms-menu-list {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background: rgba(var(--rs3-modal-rgb), 0.98);
+  box-shadow: 0 8px 22px var(--rs3-shadow);
+}
+
+.gms[data-appearance='rs3'] .gms-menu-item {
+  border-radius: 0;
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-menu-item:hover,
+.gms[data-appearance='rs3'] .gms-menu-item:focus-visible {
+  background: rgba(60, 42, 22, 0.95);
+  color: var(--rs3-gold-bright);
+}
+
+/* Screenshots need a wide frame; without this the 22rem default clips them.
+   fit-content hugs the image so it can render at native size. */
+[data-appearance='rs3'] .gms-modal--achievement.gms-rs3-frame {
+  width: fit-content;
+  min-width: min(calc(20rem + 2 * var(--rs3-frame-crop-x, 16px)), 92vw);
+  max-width: min(calc(76rem + 2 * var(--rs3-frame-crop-x, 16px)), 94vw);
+}
+
+.gms[data-appearance='rs3'] .gms-ach-download,
+[data-appearance='rs3'] .gms-ach-download {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background: rgba(var(--rs3-modal-rgb), 0.95);
+  color: var(--rs3-ink);
+}
+
+[data-appearance='rs3'] .gms-ach-zoom-dims {
+  color: var(--rs3-muted);
+}
+
+[data-appearance='rs3'] .gms-rs3-frame .gms-modal-head {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 100%;
+  margin: 0;
+  padding: 0 2.75rem 0 1.85rem;
+  border: 0;
+  background: transparent;
+}
+
+[data-appearance='rs3'] .gms-rs3-frame .gms-modal-head h3 {
+  margin: 0;
+  padding: 0;
+  color: var(--rs3-gold-bright);
+  font-family: var(--rs3-font-display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 #000, 0 0 6px rgba(0, 0, 0, 0.85);
+}
+
+[data-appearance='rs3'] .gms-rs3-frame .gms-modal-close {
+  position: absolute;
+  top: 50%;
+  right: 1.65rem;
+  z-index: 4;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  transform: translateY(-50%);
+  background: var(--rs3-exit) center / 22px 22px no-repeat;
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+  box-shadow: none;
+}
+
+[data-appearance='rs3'] .gms-rs3-frame .gms-modal-close:hover:not(:disabled) {
+  background-image: var(--rs3-exit-hover);
+}
+
+[data-appearance='rs3'] .gms-rs3-frame .gms-modal-body {
+  position: relative;
+  z-index: 1;
+  padding: 0.65rem 0.85rem 0.75rem;
+  color: var(--rs3-ink);
+  background: transparent;
+}
+
+[data-appearance='rs3'] .gms-modal-copy,
+[data-appearance='rs3'] .gms-setup-hint,
+[data-appearance='rs3'] .gms-setup-label {
+  color: var(--rs3-muted);
+}
+
+[data-appearance='rs3'] .gms-setup-token-value {
+  border: 1px solid var(--rs3-gold-dim);
+  border-radius: 0;
+  background: #120e0b;
+  color: var(--rs3-gold-bright);
+}
+
+[data-appearance='rs3'] .gms-settings-banner {
+  border-radius: 0;
+  border-color: var(--rs3-gold-dim);
+  background: rgba(40, 28, 14, 0.85);
+  color: var(--rs3-ink);
+}
+
+/* Items / graphs text */
+.gms[data-appearance='rs3'] .gms-items-title,
+.gms[data-appearance='rs3'] .gms-graphs-title,
+.gms[data-appearance='rs3'] .gms-settings h3,
+.gms[data-appearance='rs3'] .gms-player-panel-title {
+  color: var(--rs3-gold-bright);
+  text-shadow: 0 1px 0 #000;
+  font-family: var(--rs3-font-display);
+}
+
+.gms[data-appearance='rs3'] .gms-items {
+  background:
+    linear-gradient(180deg, rgba(255, 240, 200, 0.04) 0%, transparent 18%),
+    rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha));
+}
+
+.gms[data-appearance='rs3'] .gms-item-tile,
+.gms[data-appearance='rs3'] .gms-item-card,
+.gms[data-appearance='rs3'] .gms-inv-slot {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background: rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha));
+  box-shadow: none;
+}
+
+.gms[data-appearance='rs3'] .gms-item-card-name,
+.gms[data-appearance='rs3'] .gms-item-tile-name {
+  color: var(--rs3-gold-bright);
+  text-shadow: 0 1px 0 #000;
+}
+
+.gms[data-appearance='rs3'] .gms-item-card-qty,
+.gms[data-appearance='rs3'] .gms-share-name,
+.gms[data-appearance='rs3'] .gms-share-qty {
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-share-name {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-item-card-prices,
+.gms[data-appearance='rs3'] .gms-item-tile-prices {
+  border-color: rgba(138, 115, 64, 0.45);
+}
+
+.gms[data-appearance='rs3'] .gms-item-price-badge,
+.gms[data-appearance='rs3'] .gms-items-stat {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background: #120e0b;
+  color: var(--rs3-ink);
+  box-shadow: none;
+}
+
+.gms[data-appearance='rs3'] .gms-item-price-badge em,
+.gms[data-appearance='rs3'] .gms-items-stat em {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-item-price-badge strong,
+.gms[data-appearance='rs3'] .gms-items-stat strong {
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-items-stat--qty,
+.gms[data-appearance='rs3'] .gms-item-price-badge--qty {
+  border-color: var(--rs3-gold-dim);
+  background: #120e0b;
+}
+
+.gms[data-appearance='rs3'] .gms-items-stat--qty strong,
+.gms[data-appearance='rs3'] .gms-item-price-badge--qty strong {
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-items-stat--ge,
+.gms[data-appearance='rs3'] .gms-item-price-badge--ge {
+  border-color: var(--rs3-gold);
+  background: rgba(60, 42, 22, 0.85);
+}
+
+.gms[data-appearance='rs3'] .gms-items-stat--ge em,
+.gms[data-appearance='rs3'] .gms-item-price-badge--ge em {
+  color: var(--rs3-gold);
+}
+
+.gms[data-appearance='rs3'] .gms-items-stat--ge strong,
+.gms[data-appearance='rs3'] .gms-item-price-badge--ge strong {
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-items-stat--alch,
+.gms[data-appearance='rs3'] .gms-item-price-badge--alch {
+  border-color: #6a8a55;
+  background: rgba(28, 40, 22, 0.9);
+}
+
+.gms[data-appearance='rs3'] .gms-items-stat--alch em,
+.gms[data-appearance='rs3'] .gms-item-price-badge--alch em {
+  color: #9aaa70;
+}
+
+.gms[data-appearance='rs3'] .gms-items-stat--alch strong,
+.gms[data-appearance='rs3'] .gms-item-price-badge--alch strong {
+  color: #c8d4a0;
+}
+
+.gms[data-appearance='rs3'] .gms-items-price-mode,
+.gms[data-appearance='rs3'] .gms-items-mode-btn,
+.gms[data-appearance='rs3'] .gms-items-select,
+.gms[data-appearance='rs3'] .gms-items-pages button {
+  border-radius: 0;
+  border-color: var(--rs3-gold-dim);
+  background: #120e0b;
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-items-mode-btn--active,
+.gms[data-appearance='rs3'] .gms-items-pages button[aria-current='page'] {
+  border-color: var(--rs3-gold);
+  background: rgba(60, 42, 22, 0.95);
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-share-track {
+  border-radius: 0;
+  background: #0c0a08;
+  border: 1px solid rgba(138, 115, 64, 0.35);
+}
+
+.gms[data-appearance='rs3'] .gms-share-fill {
+  border-radius: 0;
+}
+

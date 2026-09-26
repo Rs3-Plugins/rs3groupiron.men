@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>RS3 Group Ironman — panel</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0f1016">
+<style>
+  /* Roles, not raw hex, so the whole sheet retones from one block.
+     Values are the validated dark steps: series blue passes every check on
+     this surface; the status trio passes CVD (11.3) and normal-vision (27.6)
+     separation at >=3:1 contrast. */
+  :root {
+    --page:      #0f1016;
+    --surface:   #15161c;
+    --raised:    #1b1c24;
+    --ink:       #ffffff;
+    --ink-2:     #c3c2b7;
+    --muted:     #898781;
+    --grid:      #2c2c2a;
+    --border:    rgba(255,255,255,.10);
+    --series:    #3987e5;
+    --good:      #0ca30c;
+    --info:      #898781;
+    --warn:      #fab219;
+    --crit:      #d03b3b;
+    --radius:    10px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 1.75rem 1.25rem 3rem }
+  header { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem }
+  h1 { font-size: 1.05rem; font-weight: 600; margin: 0; letter-spacing: .01em }
+  .status { margin-left: auto; font-size: .8rem; color: var(--muted) }
+  .status.bad { color: var(--crit) }
+  .dot { display:inline-block; width:7px; height:7px; border-radius:50%;
+         background: var(--good); margin-right:.4rem; vertical-align:.05em }
+  .status.bad .dot { background: var(--crit) }
+
+  .kpis { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit,minmax(9.5rem,1fr)); margin-bottom: 1rem }
+  .tile { background: var(--surface); border: 1px solid var(--border);
+          border-radius: var(--radius); padding: .85rem .95rem }
+  /* Tabular figures stop the counters jittering as they tick. */
+  .tile .v { font-size: 1.9rem; font-weight: 650; line-height: 1.05; font-variant-numeric: tabular-nums }
+  .tile .k { font-size: .75rem; color: var(--muted); margin-top: .3rem; letter-spacing: .02em }
+  .tile.live .v { color: #6ee7a0 }
+
+  .panels { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit,minmax(21rem,1fr)) }
+  .panel { background: var(--surface); border: 1px solid var(--border);
+           border-radius: var(--radius); padding: 1rem 1.1rem 1.1rem; min-width: 0 }
+  .panel h2 { font-size: .82rem; font-weight: 600; margin: 0 0 .15rem; letter-spacing: .02em }
+  .panel .sub { font-size: .73rem; color: var(--muted); margin: 0 0 .9rem }
+  .wide { grid-column: 1 / -1 }
+
+  svg { display: block; width: 100%; overflow: visible }
+  .bar { fill: var(--series) }
+  .grid-line { stroke: var(--grid); stroke-width: 1; shape-rendering: crispEdges }
+  .axis { fill: var(--muted); font-size: 10px }
+
+  .legend { display: flex; gap: .9rem; flex-wrap: wrap; font-size: .76rem; color: var(--ink-2); margin-top: .7rem }
+  .legend span { display: inline-flex; align-items: center; gap: .35rem }
+  .sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block }
+
+  table { width: 100%; border-collapse: collapse; font-size: .82rem }
+  th { text-align: left; font-weight: 500; color: var(--muted); font-size: .72rem;
+       padding: 0 .5rem .45rem 0; letter-spacing: .03em; text-transform: uppercase }
+  td { padding: .4rem .5rem .4rem 0; border-top: 1px solid var(--grid);
+       font-variant-numeric: tabular-nums; vertical-align: middle }
+  td.path { max-width: 0; width: 55%; overflow: hidden; text-overflow: ellipsis;
+            white-space: nowrap; color: var(--ink-2); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: .78rem }
+  td.num { text-align: right; white-space: nowrap }
+  .meter { height: 5px; border-radius: 3px; background: var(--series); min-width: 2px }
+
+  .foot { margin-top: 1.5rem; font-size: .78rem; color: var(--muted);
+          display: flex; gap: 1rem; flex-wrap: wrap }
+  .foot a { color: var(--series) }
+  .empty { color: var(--muted); font-size: .8rem; padding: .6rem 0 }
+
+  /* Charts are interactive by default: crosshair tooltip on hover. */
+  #tip { position: fixed; pointer-events: none; opacity: 0; transition: opacity .09s;
+         background: var(--raised); border: 1px solid var(--border); border-radius: 6px;
+         padding: .4rem .55rem; font-size: .76rem; color: var(--ink); z-index: 50;
+         box-shadow: 0 6px 20px rgba(0,0,0,.45); white-space: nowrap }
+  .hit { fill: transparent }
+  .hit:hover + .bar, .bar.on { filter: brightness(1.25) }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>RS3 Group Ironman — panel</h1>
+    <span class="status" id="status"><span class="dot"></span>connecting…</span>
+  </header>
+
+  <section class="kpis" id="kpis">
+    <div class="tile live"><div class="v" id="k-viewers">–</div><div class="k">viewers on site</div></div>
+    <div class="tile live"><div class="v" id="k-players">–</div><div class="k">players in game</div></div>
+    <div class="tile"><div class="v" id="k-requests">–</div><div class="k">requests logged</div></div>
+    <div class="tile"><div class="v" id="k-failed">–</div><div class="k">failed requests</div></div>
+    <div class="tile"><div class="v" id="k-groups">–</div><div class="k">groups</div></div>
+    <div class="tile"><div class="v" id="k-uptime">–</div><div class="k">api uptime</div></div>
+  </section>
+
+  <section class="panels">
+    <div class="panel wide">
+      <h2>Requests by hour</h2>
+      <p class="sub" id="hours-sub">from the API access log</p>
+      <div id="hours"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Response status</h2>
+      <p class="sub">share of all logged responses</p>
+      <div id="status-chart"></div>
+      <div class="legend" id="status-legend"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Top endpoints</h2>
+      <p class="sub">by request count</p>
+      <div id="endpoints"></div>
+    </div>
+  </section>
+
+  <p class="foot">
+    <a href="report.html">Full GoAccess report →</a>
+    <span id="generated"></span>
+  </p>
+</div>
+<div id="tip"></div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var tip = $('tip');
+
+  function fmt(n) {
+    if (n === null || n === undefined || isNaN(n)) return '–';
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e4) return (n / 1e3).toFixed(1) + 'k';
+    return String(n);
+  }
+  function dur(s) {
+    var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+    return d ? d + 'd ' + h + 'h' : h ? h + 'h ' + m + 'm' : m + 'm';
+  }
+  // GoAccess wraps most metrics as {count, percent}; tolerate plain numbers too
+  // so a schema change degrades to a wrong-looking number rather than a crash.
+  function num(v) {
+    if (v == null) return 0;
+    if (typeof v === 'number') return v;
+    if (typeof v === 'object' && typeof v.count === 'number') return v.count;
+    var n = parseFloat(v);
+    return isNaN(n) ? 0 : n;
+  }
+  function rows(panel) {
+    if (!panel) return [];
+    if (Array.isArray(panel)) return panel;
+    if (Array.isArray(panel.data)) return panel.data;
+    return [];
+  }
+
+  function showTip(evt, html) {
+    tip.innerHTML = html;
+    tip.style.opacity = 1;
+    var pad = 12;
+    var x = evt.clientX + pad, y = evt.clientY + pad;
+    var r = tip.getBoundingClientRect();
+    if (x + r.width > innerWidth) x = evt.clientX - r.width - pad;
+    if (y + r.height > innerHeight) y = evt.clientY - r.height - pad;
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+  }
+  function hideTip() { tip.style.opacity = 0; }
+
+  function svgEl(n, attrs) {
+    var e = document.createElementNS('http://www.w3.org/2000/svg', n);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  /* ---- requests by hour: single series, so sequential blue and no legend ---- */
+  function drawHours(data) {
+    var host = $('hours');
+    host.innerHTML = '';
+    if (!data.length) { host.innerHTML = '<p class="empty">No data yet.</p>'; return; }
+
+    var W = host.clientWidth || 900, H = 190, padL = 34, padB = 20, padT = 8;
+    var max = Math.max.apply(null, data.map(function (d) { return d.v; })) || 1;
+    var iw = W - padL, ih = H - padB - padT;
+    var bw = iw / data.length;
+
+    var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, height: H });
+
+    // Recessive gridlines, labelled at the ends only.
+    [0, .5, 1].forEach(function (f) {
+      var y = padT + ih - ih * f;
+      svg.appendChild(svgEl('line', { x1: padL, x2: W, y1: y, y2: y, class: 'grid-line' }));
+      var t = svgEl('text', { x: 0, y: y + 3, class: 'axis' });
+      t.textContent = fmt(Math.round(max * f));
+      svg.appendChild(t);
+    });
+
+    data.forEach(function (d, i) {
+      var h = Math.max(d.v > 0 ? 2 : 0, ih * (d.v / max));
+      var x = padL + i * bw, y = padT + ih - h;
+      // 2px surface gap between adjacent bars.
+      var w = Math.max(1, bw - 2);
+      var r = svgEl('rect', { x: x, y: y, width: w, height: h, rx: 3, class: 'bar' });
+      svg.appendChild(r);
+      // Hit target larger than the mark itself.
+      var hit = svgEl('rect', { x: x, y: padT, width: Math.max(1, bw), height: ih, class: 'hit' });
+      hit.addEventListener('mousemove', function (e) {
+        r.classList.add('on');
+        showTip(e, '<b>' + d.v.toLocaleString() + '</b> request' + (d.v === 1 ? '' : 's') + '<br>' + d.label);
+      });
+      hit.addEventListener('mouseleave', function () { r.classList.remove('on'); hideTip(); });
+      svg.appendChild(hit);
+    });
+
+    // Selective labels: never one per bar.
+    data.forEach(function (d, i) {
+      if (data.length > 12 && i % 3 !== 0) return;
+      var t = svgEl('text', { x: padL + i * bw + bw / 2, y: H - 6, class: 'axis', 'text-anchor': 'middle' });
+      t.textContent = d.label;
+      svg.appendChild(t);
+    });
+
+    host.appendChild(svg);
+  }
+
+  /* ---- response status: part-to-whole, so one stacked bar ---- */
+  var STATUS = [
+    { key: '2', label: '2xx success',  color: 'var(--good)' },
+    { key: '3', label: '3xx redirect', color: 'var(--info)' },
+    { key: '4', label: '4xx client',   color: 'var(--warn)' },
+    { key: '5', label: '5xx server',   color: 'var(--crit)' }
+  ];
+  function drawStatus(buckets) {
+    var host = $('status-chart'), legend = $('status-legend');
+    host.innerHTML = ''; legend.innerHTML = '';
+    var total = STATUS.reduce(function (a, s) { return a + (buckets[s.key] || 0); }, 0);
+    if (!total) { host.innerHTML = '<p class="empty">No responses logged yet.</p>'; return; }
+
+    var W = host.clientWidth || 400, H = 34;
+    var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, height: H });
+    var x = 0;
+    STATUS.forEach(function (s) {
+      var v = buckets[s.key] || 0;
+      if (!v) return;
+      var w = (v / total) * W;
+      // 2px surface gap between segments.
+      var seg = svgEl('rect', { x: x, y: 0, width: Math.max(1, w - 2), height: 20, rx: 3, fill: s.color });
+      svg.appendChild(seg);
+      var hit = svgEl('rect', { x: x, y: 0, width: Math.max(1, w), height: H, class: 'hit' });
+      var pct = (v / total * 100);
+      hit.addEventListener('mousemove', function (e) {
+        showTip(e, '<b>' + v.toLocaleString() + '</b> · ' + pct.toFixed(1) + '%<br>' + s.label);
+      });
+      hit.addEventListener('mouseleave', hideTip);
+      svg.appendChild(hit);
+      // Direct label wherever there is room — status colour never carries
+      // meaning alone, and the legend below repeats it regardless.
+      if (w > 46) {
+        var t = svgEl('text', { x: x + 5, y: 33, class: 'axis' });
+        t.textContent = pct.toFixed(0) + '%';
+        svg.appendChild(t);
+      }
+      x += w;
+    });
+    host.appendChild(svg);
+
+    STATUS.forEach(function (s) {
+      var v = buckets[s.key] || 0;
+      if (!v) return;
+      var el = document.createElement('span');
+      el.innerHTML = '<i class="sw" style="background:' + s.color + '"></i>' +
+                     s.label + ' <b style="color:var(--ink)">' + v.toLocaleString() + '</b>';
+      legend.appendChild(el);
+    });
+  }
+
+  /* ---- top endpoints: a table, because the labels are long and exact ---- */
+  function drawEndpoints(list) {
+    var host = $('endpoints');
+    if (!list.length) { host.innerHTML = '<p class="empty">No requests yet.</p>'; return; }
+    var max = list[0].hits || 1;
+    var html = '<table><thead><tr><th>Path</th><th style="text-align:right">Hits</th>' +
+               '<th style="width:28%"></th></tr></thead><tbody>';
+    list.slice(0, 10).forEach(function (r) {
+      var pct = Math.max(2, (r.hits / max) * 100);
+      html += '<tr><td class="path" title="' + r.path.replace(/"/g, '&quot;') + '">' + r.path +
+              '</td><td class="num">' + r.hits.toLocaleString() + '</td>' +
+              '<td><div class="meter" style="width:' + pct + '%"></div></td></tr>';
+    });
+    host.innerHTML = html + '</tbody></table>';
+  }
+
+  /* ---------------------------- data loading ---------------------------- */
+  function liveTick() {
+    fetch('live', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (d) {
+        $('k-viewers').textContent = fmt(d.viewers);
+        $('k-players').textContent = fmt(d.playersOnline);
+        $('k-groups').textContent  = fmt(d.groupsTotal);
+        $('k-uptime').textContent  = dur(d.uptimeSeconds);
+        $('status').className = 'status';
+        $('status').innerHTML = '<span class="dot"></span>live · ' + new Date().toLocaleTimeString();
+      })
+      .catch(function (e) {
+        $('status').className = 'status bad';
+        $('status').innerHTML = '<span class="dot"></span>live counts unavailable (' + e.message + ')';
+      });
+  }
+
+  function loadReport() {
+    fetch('report.json', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (j) {
+        var g = j.general || {};
+        $('k-requests').textContent = fmt(num(g.total_requests));
+        $('k-failed').textContent   = fmt(num(g.failed_requests));
+        if (g.date_time) $('generated').textContent = 'report generated ' + g.date_time;
+
+        // Hours if GoAccess collected them, else per-day visitors.
+        var hourRows = rows(j.visit_time);
+        if (hourRows.length) {
+          $('hours-sub').textContent = 'hits per hour, from the API access log';
+          drawHours(hourRows.map(function (r) {
+            return { label: String(r.data).replace(/:00$/, '') + 'h', v: num(r.hits) };
+          }));
+        } else {
+          var dayRows = rows(j.visitors);
+          $('hours-sub').textContent = 'hits per day, from the API access log';
+          drawHours(dayRows.map(function (r) {
+            return { label: String(r.data).split('/').slice(0, 2).join('/'), v: num(r.hits) };
+          }).reverse());
+        }
+
+        // status_codes nests classes as sub-items in some versions and flattens
+        // them in others; bucket by leading digit either way.
+        var buckets = {};
+        rows(j.status_codes).forEach(function (r) {
+          var kids = Array.isArray(r.items) && r.items.length ? r.items : [r];
+          kids.forEach(function (c) {
+            var m = String(c.data || '').match(/\d/);
+            if (!m) return;
+            buckets[m[0]] = (buckets[m[0]] || 0) + num(c.hits);
+          });
+        });
+        drawStatus(buckets);
+
+        drawEndpoints(rows(j.requests).map(function (r) {
+          return { path: String(r.data || ''), hits: num(r.hits) };
+        }).sort(function (a, b) { return b.hits - a.hits; }));
+      })
+      .catch(function (e) {
+        ['hours', 'status-chart', 'endpoints'].forEach(function (id) {
+          $(id).innerHTML = '<p class="empty">report.json unavailable (' + e.message + ')</p>';
+        });
+      });
+  }
+
+  liveTick(); setInterval(liveTick, 5000);
+  loadReport(); setInterval(loadReport, 60000);
+  addEventListener('resize', function () { clearTimeout(window._rz); window._rz = setTimeout(loadReport, 250); });
+})();
+</script>
+</body>
+</html>

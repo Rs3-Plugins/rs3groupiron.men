@@ -1,0 +1,209 @@
+:root {
+  /* —— Design tokens —— */
+  --gold: #e8a04a;
+  --gold-dim: #c47a2c;
+  --gold-bright: #f0d4a8;
+  --ink: #f0f2f4;
+  --muted: #8a949e;
+  --border: #3a4148;
+  --border-strong: #4a525a;
+  --panel: #1c2024;
+  --panel-2: #161a1e;
+  --offline: #7a7f86;
+
+  --font-ui: 'Segoe UI', Tahoma, sans-serif;
+  --font-display: 'Cinzel', 'Palatino Linotype', Palatino, serif;
+
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+
+  --z-menu: 40;
+  --z-overlay: 2000;
+  --z-tooltip: 3000;
+  --z-modal: 4000;
+
+  font-family: var(--font-ui);
+  line-height: 1.5;
+  font-weight: 400;
+  color: #e8e4d9;
+  background:
+    radial-gradient(ellipse at top, #2a3a2e 0%, transparent 55%),
+    linear-gradient(160deg, #1a1f1c 0%, #0f1210 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+:root {
+  --skel-trough: rgba(240, 242, 244, 0.04);
+  --skel-sheen: rgba(240, 242, 244, 0.1);
+  --skel-flat: rgba(240, 242, 244, 0.06);
+  --skel-bg: #0c0e10;
+  --skel-panel: rgba(18, 22, 26, 0.82);
+  --skel-border: #23282d;
+}
+
+[data-appearance='rs3'] {
+  --skel-trough: rgba(196, 164, 106, 0.08);
+  --skel-sheen: rgba(224, 196, 138, 0.2);
+  --skel-flat: rgba(196, 164, 106, 0.11);
+  --skel-bg: #1a1510;
+  --skel-panel: rgba(36, 28, 22, 0.9);
+  --skel-border: #2a1e12;
+}
+
+.skel {
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(
+      90deg,
+      var(--skel-trough) 25%,
+      var(--skel-sheen) 37%,
+      var(--skel-trough) 63%
+    );
+  background-size: 400% 100%;
+  animation: skel-shimmer 1.4s ease infinite;
+}
+
+[data-appearance='rs3'] .skel,
+[data-appearance='rs3'] .skel-card,
+[data-appearance='rs3'] .skel-panel {
+  border-radius: 0;
+}
+
+@keyframes skel-shimmer {
+  from {
+    background-position: 100% 50%;
+  }
+  to {
+    background-position: 0 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skel {
+    animation: none;
+    background: var(--skel-flat);
+  }
+}
+
+.skel-shell {
+  position: relative;
+  display: grid;
+  grid-template-columns: 268px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.9rem;
+  height: 100dvh;
+  padding: 0.75rem;
+  background: var(--skel-bg);
+}
+
+.skel-chrome {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.6rem;
+}
+
+.skel-brand {
+  width: 9rem;
+  height: 1.15rem;
+}
+
+.skel-tab {
+  width: 4.5rem;
+  height: 1.7rem;
+}
+
+.skel-side {
+  grid-row: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.skel-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.6rem;
+  border: 1px solid var(--skel-border);
+  border-radius: var(--radius-md);
+  background: var(--skel-panel);
+}
+
+.skel-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.skel-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.skel-line {
+  height: 0.7rem;
+}
+
+.skel-bar {
+  height: 1rem;
+}
+
+.skel-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-height: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--skel-border);
+  border-radius: var(--radius-lg);
+  background: var(--skel-panel);
+}
+
+.skel-panel-head {
+  height: 1.6rem;
+  max-width: 22rem;
+}
+
+.skel-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

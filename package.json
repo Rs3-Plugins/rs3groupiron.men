@@ -1,0 +1,23 @@
+{
+  "name": "rs3-group-ironman",
+  "private": true,
+  "version": "1.0.0",
+  "description": "RS3 Group Ironman monorepo — NestJS API + React site",
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "dev:api": "pnpm --filter @rs3/api run dev",
+    "dev:web": "pnpm --filter @rs3/web run dev",
+    "dev:db": "pnpm --dir tools/dev-db --ignore-workspace install --silent && pnpm --dir tools/dev-db --ignore-workspace start",
+    "db:migrate": "pnpm --filter @rs3/api exec prisma migrate dev",
+    "db:seed": "pnpm --filter @rs3/api run db:seed",
+    "db:reset": "pnpm --filter @rs3/api run db:reset",
+    "build": "pnpm -r run build",
+    "build:api": "pnpm --filter @rs3/api run build",
+    "build:web": "pnpm --filter @rs3/web run build",
+    "start:api": "pnpm --filter @rs3/api run start:prod"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.15.9"
+}
