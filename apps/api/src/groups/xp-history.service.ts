@@ -21,7 +21,7 @@ const DEDUPE_MS = 15 * 60 * 1000;
 
 const SAMPLE_COUNT = 52;
 
-type SamplePoint = { t: number; xp: number };
+export type SamplePoint = { t: number; xp: number };
 type SampleRow = {
   memberId: string;
   skillId: string;
@@ -321,7 +321,7 @@ function parseSkillFilter(raw?: string): 'overall' | SkillId {
   throw new BadRequestException('Invalid skill id');
 }
 
-function bucketSizeMs(period: XpHistoryPeriod): number {
+export function bucketSizeMs(period: XpHistoryPeriod): number {
   switch (period) {
     case '24h':
       return 60 * 60 * 1000;
@@ -334,7 +334,7 @@ function bucketSizeMs(period: XpHistoryPeriod): number {
   }
 }
 
-function bucketSeries(
+export function bucketSeries(
   bySkill: Map<string, SamplePoint[]>,
   skillIds: string[],
   from: Date,
@@ -346,33 +346,22 @@ function bucketSeries(
     baselines.set(id, bySkill.get(id)?.[0]?.xp ?? 0);
   }
 
-  const points: Array<{ t: string; gain: number }> = [];
-  for (let t = from.getTime(); t <= to.getTime(); t += bucketMs) {
-    const bucketEnd = Math.min(t + bucketMs, to.getTime());
+  const gainAt = (time: number) => {
     let totalGain = 0;
     for (const id of skillIds) {
       const series = bySkill.get(id) ?? [];
-      const xp = xpAtOrBefore(series, bucketEnd);
+      const xp = xpAtOrBefore(series, time);
       const base = baselines.get(id) ?? 0;
       totalGain += Math.max(0, xp - base);
     }
-    points.push({ t: new Date(bucketEnd).toISOString(), gain: totalGain });
-  }
+    return totalGain;
+  };
 
-  // Ensure final point at `to`
-  if (
-    !points.length ||
-    new Date(points[points.length - 1].t).getTime() < to.getTime()
-  ) {
-    let totalGain = 0;
-    for (const id of skillIds) {
-      const series = bySkill.get(id) ?? [];
-      const xp = xpAtOrBefore(series, to.getTime());
-      const base = baselines.get(id) ?? 0;
-      totalGain += Math.max(0, xp - base);
-    }
-    points.push({ t: to.toISOString(), gain: totalGain });
+  const points: Array<{ t: string; gain: number }> = [];
+  for (let t = from.getTime(); t < to.getTime(); t += bucketMs) {
+    points.push({ t: new Date(t).toISOString(), gain: gainAt(t) });
   }
+  points.push({ t: to.toISOString(), gain: gainAt(to.getTime()) });
 
   return points;
 }

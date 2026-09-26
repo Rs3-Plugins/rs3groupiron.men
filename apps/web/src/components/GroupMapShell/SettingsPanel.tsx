@@ -10,11 +10,16 @@ import {
 } from '../../api/groupClient';
 import { MIN_SLOTS } from '../../lib/constants';
 import type { PlayerView } from '../../lib/items';
+import { useAsyncAction } from '../../hooks/useAsyncAction';
 import { AddMemberModal } from './AddMemberModal';
 import { AppearanceSection } from './AppearanceSection';
+import { Banner } from './PanelChrome';
 import { PlusIcon } from './icons';
 import { MemberCard } from './MemberCard';
 import { RemoveMemberModal } from './RemoveMemberModal';
+
+const READ_ONLY_NOTICE =
+  'This is the read-only demo. You can still switch the look below. Create your own group to change anything else.';
 
 type SettingsPanelProps = {
   groupName?: string;
@@ -45,11 +50,8 @@ export function SettingsPanel({
 }: SettingsPanelProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [removeName, setRemoveName] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { isBusy, message, error, setMessage, setError, run } = useAsyncAction();
 
-  const isBusy = busy != null;
   // No token means this is the public demo, which the server serves read-only.
   const readOnly = !groupToken;
   const canAdd = players.length < memberSlots && !readOnly;
@@ -60,25 +62,16 @@ export function SettingsPanel({
     [players],
   );
 
-  async function run(key: string, action: () => Promise<void>) {
+  function save(key: string, action: () => Promise<void>) {
     if (readOnly) {
       setMessage(null);
-      setError(
-        'This is the read-only demo. You can still switch the look below. Create your own group to change anything else.',
-      );
+      setError(READ_ONLY_NOTICE);
       return;
     }
-    setBusy(key);
-    setError(null);
-    setMessage(null);
-    try {
+    void run(key, async () => {
       await action();
       onChanged();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
-    } finally {
-      setBusy(null);
-    }
+    });
   }
 
   return (
@@ -86,22 +79,13 @@ export function SettingsPanel({
       <h2 className="gms-settings-title">Settings</h2>
 
       {readOnly && (
-        <p className="gms-settings-banner" role="status">
-          You are viewing the read-only demo group. Try the RS3 and Modern looks
-          below — anything else needs your own group.
-        </p>
+        <Banner>
+          You are viewing the read-only demo group. Try the RS3 and Modern looks below — anything
+          else needs your own group.
+        </Banner>
       )}
-
-      {error && (
-        <p className="gms-settings-banner gms-settings-banner--error" role="alert">
-          {error}
-        </p>
-      )}
-      {message && (
-        <p className="gms-settings-banner" role="status">
-          {message}
-        </p>
-      )}
+      {error && <Banner tone="error">{error}</Banner>}
+      {message && <Banner>{message}</Banner>}
 
       <div className="gms-settings-section">
         <div className="gms-settings-section-head">
@@ -123,7 +107,7 @@ export function SettingsPanel({
               busy={isBusy}
               onRemove={() => setRemoveName(player.name)}
               onSave={(draft) =>
-                void run(`save-${player.name}`, async () => {
+                save(`save-${player.name}`, async () => {
                   await updateMemberProfile(groupName, groupToken, {
                     name: player.name,
                     nickname: draft.nickname.trim() || null,
@@ -170,16 +154,14 @@ export function SettingsPanel({
             setMessage(`Previewing the ${label} look`);
             return;
           }
-          void run(`appearance-${theme}`, async () => {
-            const info = await updateGroupSettings(groupName, groupToken, {
-              appearance: theme,
-            });
+          save(`appearance-${theme}`, async () => {
+            const info = await updateGroupSettings(groupName, groupToken, { appearance: theme });
             onAppearanceChange(info.appearance);
             setMessage(`Appearance set to ${label}`);
           });
         }}
         onSelectMode={(mode) =>
-          void run(`mode-${mode}`, async () => {
+          save(`mode-${mode}`, async () => {
             const info = await updateGroupSettings(groupName, groupToken, { mode });
             onModeChange(info.mode);
             setMessage(`Mode set to ${mode === 'normal' ? 'Normal' : 'Competitive'}`);
@@ -194,7 +176,7 @@ export function SettingsPanel({
           onClose={() => setAddOpen(false)}
           onSubmit={(member) => {
             if (!canAdd) return;
-            void run('add', async () => {
+            save('add', async () => {
               await addGroupMember(groupName, groupToken, member);
               setAddOpen(false);
               setMessage(`Added ${member.name}`);
@@ -209,14 +191,13 @@ export function SettingsPanel({
           appearance={appearance}
           busy={isBusy}
           onClose={() => setRemoveName(null)}
-          onConfirm={() => {
-            const name = removeName;
-            void run(`del-${name}`, async () => {
-              await deleteGroupMember(groupName, groupToken, name);
+          onConfirm={() =>
+            save(`del-${removeName}`, async () => {
+              await deleteGroupMember(groupName, groupToken, removeName);
               setRemoveName(null);
-              setMessage(`Removed ${name}`);
-            });
-          }}
+              setMessage(`Removed ${removeName}`);
+            })
+          }
         />
       )}
     </section>

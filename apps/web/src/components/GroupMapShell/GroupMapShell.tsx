@@ -10,26 +10,16 @@ import {
   type ReactNode,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  DEMO_GROUP,
-  type AppearanceTheme,
-  type GroupMode,
-} from '../../api/groupClient';
+import { DEMO_GROUP, type AppearanceTheme, type GroupMode } from '../../api/groupClient';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { useGroupData } from '../../hooks/useGroupData';
 import { useGroupQuests } from '../../hooks/useGroupQuests';
 import { useXpDrops } from '../../hooks/useXpDrops';
-import {
-  clearGroupSession,
-  readGroupSession,
-  writeGroupSession,
-} from '../../lib/groupSession';
+import { DEFAULT_APPEARANCE, readAppearance, writeAppearance } from '../../lib/appearance';
+import { DISCORD_URL } from '../../lib/constants';
+import { clearGroupSession, readGroupSession, writeGroupSession } from '../../lib/groupSession';
 import { aggregateGroupItems, type PlayerView } from '../../lib/items';
-import {
-  panelOpacityToAlpha,
-  readPanelOpacity,
-  writePanelOpacity,
-} from '../../lib/panelOpacity';
+import { panelOpacityToAlpha, readPanelOpacity, writePanelOpacity } from '../../lib/panelOpacity';
 import { POLL_MS_DEFAULT, POLL_MS_MAP } from '../../lib/polling';
 import { questPointsFor } from '../../lib/quests';
 import { DEFAULT_CENTER, Rs3Map } from '../Map';
@@ -37,7 +27,10 @@ import { ActionsMenu } from './ActionsMenu';
 import { AchievementsPanel } from './AchievementsPanel';
 import { ItemsPanel } from './ItemsPanel';
 import { LedgerPanel } from './LedgerPanel';
+import type { MemberBadge } from './memberOptions';
+import { PanelStatus } from './PanelChrome';
 import { PlayerCard } from './PlayerCard';
+import { PlayerCardSkeleton } from './PlayerCardSkeleton';
 import { QuestsPanel } from './QuestsPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { SetupModal } from './SetupModal';
@@ -45,11 +38,8 @@ import './GroupMapShell.css';
 import './GroupMapShell.theme-rs3.css';
 
 // Recharts is heavy; only load it when the graphs tab is opened.
-const GraphsPanel = lazy(() =>
-  import('./GraphsPanel').then((m) => ({ default: m.GraphsPanel })),
-);
+const GraphsPanel = lazy(() => import('./GraphsPanel').then((m) => ({ default: m.GraphsPanel })));
 
-const SUPPORT_URL = 'https://discord.gg/esbqXjUT6Z';
 const DEFAULT_MEMBER_SLOTS = 5;
 
 export type ShellTab =
@@ -61,6 +51,15 @@ export type ShellTab =
   | 'achievements'
   | 'settings';
 
+const NAV_TABS: Array<{ id: ShellTab; label: string }> = [
+  { id: 'items', label: 'Items' },
+  { id: 'map', label: 'Map' },
+  { id: 'graphs', label: 'Graphs' },
+  { id: 'ledger', label: 'Bank Ledger' },
+  { id: 'quests', label: 'Quests' },
+  { id: 'achievements', label: 'Achievements' },
+];
+
 export type GroupMapShellProps = {
   /** When given, always wins over any saved session. */
   groupName?: string;
@@ -71,21 +70,11 @@ export type GroupMapShellProps = {
   children?: ReactNode;
 };
 
-type MapFocus = {
-  name: string;
-  x: number;
-  y: number;
-  plane: number;
-};
+type MapFocus = { name: string; x: number; y: number; plane: number };
 
-/**
- * Explicit props win; otherwise fall back to the saved session, then demo.
- */
 function initialSession(name?: string, token?: string) {
   if (name) return { name, token: token ?? '' };
-  const cached = readGroupSession();
-  if (cached) return cached;
-  return { name: DEMO_GROUP, token: token ?? '' };
+  return readGroupSession() ?? { name: DEMO_GROUP, token: token ?? '' };
 }
 
 export function GroupMapShell({
@@ -103,7 +92,7 @@ export function GroupMapShell({
   const [setupOpen, setSetupOpen] = useState(false);
   const [displayName, setDisplayName] = useState(boot.name);
   const [groupMode, setGroupMode] = useState<GroupMode>('normal');
-  const [appearance, setAppearance] = useState<AppearanceTheme>('rs3');
+  const [appearance, setAppearance] = useState<AppearanceTheme>(readAppearance);
   /** Set once the visitor chooses a look, so info refreshes stop overriding it. */
   const themePicked = useRef(false);
   const [panelOpacityByTheme, setPanelOpacityByTheme] = useState(() => ({
@@ -124,19 +113,23 @@ export function GroupMapShell({
   // Group views are private (or the demo); keep them out of search results.
   useDocumentTitle(info?.name ?? groupName, { noindex: true });
 
-  // Mirror server-side group info into local editable state.
   useEffect(() => {
     if (!info) return;
     setDisplayName(info.name);
     setGroupMode(info.mode);
     // Once the visitor picks a look, keep it. On the read-only demo the choice
     // is local only, so a later info refresh must not snap it back.
-    if (!themePicked.current) setAppearance(info.appearance ?? 'rs3');
+    if (!themePicked.current) {
+      const next = info.appearance ?? DEFAULT_APPEARANCE;
+      setAppearance(next);
+      writeAppearance(next);
+    }
   }, [info]);
 
   const selectAppearance = useCallback((theme: AppearanceTheme) => {
     themePicked.current = true;
     setAppearance(theme);
+    writeAppearance(theme);
   }, []);
 
   useEffect(() => {
@@ -162,9 +155,7 @@ export function GroupMapShell({
               // Drop the viewKey so the next poll rebuilds this player from
               // server data instead of keeping the locally inflated XP.
               viewKey: undefined,
-              skills: p.skills.map((s) =>
-                s.id === skill.id ? { ...s, xp: s.xp + amount } : s,
-              ),
+              skills: p.skills.map((s) => (s.id === skill.id ? { ...s, xp: s.xp + amount } : s)),
             },
       ),
     );
@@ -175,8 +166,6 @@ export function GroupMapShell({
     [rawMembers, tab],
   );
 
-  // Bumps whenever a poll brings new member data. The fetch-backed panels
-  // watch this so they refresh in place instead of only on a tab switch.
   const dataRevision = useRef(0);
   const lastMembers = useRef(rawMembers);
   if (lastMembers.current !== rawMembers) {
@@ -188,6 +177,12 @@ export function GroupMapShell({
   // player's skills panel, so it lives at shell level.
   const quests = useGroupQuests(groupName, groupToken, dataRevision.current);
   const memberNames = useMemo(() => players.map((p) => p.name), [players]);
+
+  const memberBadges = useMemo<MemberBadge[]>(
+    () =>
+      players.map((p) => ({ name: p.name, avatarUrl: p.avatarUrl, color: p.avatarColor })),
+    [players],
+  );
 
   const mapMarkers = useMemo(
     () =>
@@ -217,14 +212,19 @@ export function GroupMapShell({
     setTab('map');
   }
 
+  const panelProps = {
+    groupName,
+    groupToken,
+    dataRevision: dataRevision.current,
+    members: memberBadges,
+  };
+
   return (
     <div
       className="gms"
       data-appearance={appearance}
       style={
-        {
-          '--gms-panel-alpha': String(panelOpacityToAlpha(panelOpacity)),
-        } as CSSProperties
+        { '--gms-panel-alpha': String(panelOpacityToAlpha(panelOpacity)) } as CSSProperties
       }
     >
       <Rs3Map
@@ -241,57 +241,22 @@ export function GroupMapShell({
         <div className={tab === 'map' ? 'gms-chrome gms-chrome--with-nav' : 'gms-chrome'}>
           <header className="gms-toolbar">
             <div className="gms-toolbar-left">
-              <div className="gms-group-identity">
-                <img
-                  className="gms-group-mode-icon"
-                  src={
-                    groupMode === 'competitive'
-                      ? '/group-modes/competitive.webp'
-                      : '/group-modes/normal.webp'
-                  }
-                  alt={groupMode === 'competitive' ? 'Competitive' : 'Normal'}
-                  title={groupMode === 'competitive' ? 'Competitive' : 'Normal'}
-                  width={18}
-                  height={18}
-                />
-                <span className="gms-group-name">{displayName}</span>
-              </div>
+              <GroupIdentity name={displayName} mode={groupMode} />
               <nav className="gms-tabs" aria-label="Group sections">
-                <TabButton active={tab === 'items'} onClick={() => setTab('items')}>
-                  Items
-                </TabButton>
-                <TabButton active={tab === 'map'} onClick={() => setTab('map')}>
-                  Map
-                </TabButton>
-                <TabButton active={tab === 'graphs'} onClick={() => setTab('graphs')}>
-                  Graphs
-                </TabButton>
-                <TabButton active={tab === 'ledger'} onClick={() => setTab('ledger')}>
-                  Bank Ledger
-                </TabButton>
-                <TabButton active={tab === 'quests'} onClick={() => setTab('quests')}>
-                  Quests
-                </TabButton>
-                <TabButton
-                  active={tab === 'achievements'}
-                  onClick={() => setTab('achievements')}
-                >
-                  Achievements
-                </TabButton>
+                {NAV_TABS.map(({ id, label }) => (
+                  <TabButton key={id} active={tab === id} onClick={() => setTab(id)}>
+                    {label}
+                  </TabButton>
+                ))}
               </nav>
             </div>
             <div className="gms-toolbar-right">
-              {/* Settings sits left of the overflow menu. */}
               <TabButton active={tab === 'settings'} onClick={() => setTab('settings')}>
                 Settings
               </TabButton>
               <ActionsMenu
                 items={[
-                  {
-                    key: 'setup',
-                    label: 'Setup',
-                    onSelect: () => setSetupOpen(true),
-                  },
+                  { key: 'setup', label: 'Setup', onSelect: () => setSetupOpen(true) },
                   {
                     key: 'logout',
                     label: 'Logout',
@@ -300,72 +265,28 @@ export function GroupMapShell({
                       navigate('/', { replace: true });
                     },
                   },
-                  { key: 'support', label: 'Support', href: SUPPORT_URL },
+                  { key: 'support', label: 'Support', href: DISCORD_URL },
                 ]}
               />
             </div>
           </header>
 
           {tab === 'map' && (
-            <nav className="gms-player-nav" aria-label="Player locations">
-              {players.map((player) => {
-                const hasLoc = player.coordinates.length >= 2;
-                const active = mapFocus?.name === player.name;
-                return (
-                  <button
-                    key={player.name}
-                    type="button"
-                    className={[
-                      'gms-player-nav-btn',
-                      active ? 'gms-player-nav-btn--active' : '',
-                      !player.online ? 'gms-player-nav-btn--offline' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    title={
-                      !hasLoc
-                        ? 'Location unknown'
-                        : player.online
-                          ? `Go to ${player.name}`
-                          : `Go to last location (${player.name} offline)`
-                    }
-                    disabled={!hasLoc}
-                    onClick={() => goToPlayer(player)}
-                  >
-                    {player.avatarUrl ? (
-                      <img
-                        className="gms-player-nav-avatar"
-                        src={player.avatarUrl}
-                        alt=""
-                        width={12}
-                        height={12}
-                      />
-                    ) : (
-                      <span
-                        className="gms-player-nav-dot"
-                        style={{
-                          background: player.online
-                            ? player.avatarColor
-                            : '#7a7f86',
-                        }}
-                        aria-hidden
-                      />
-                    )}
-                    {player.displayName}
-                    {!player.online ? (
-                      <span className="gms-player-nav-offline">offline</span>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </nav>
+            <PlayerNav
+              players={players}
+              activeName={mapFocus?.name ?? null}
+              onSelect={goToPlayer}
+            />
           )}
         </div>
 
         <aside className="gms-players" aria-label="Group members">
-          {loading && players.length === 0 && <p className="gms-side-status">Loading…</p>}
           {error && <p className="gms-side-status gms-side-status--error">{error}</p>}
-          {!loading && !error && players.length === 0 && (
+          {!error &&
+            loading &&
+            players.length === 0 &&
+            Array.from({ length: memberSlots }, (_, i) => <PlayerCardSkeleton key={i} />)}
+          {!error && !loading && players.length === 0 && (
             <p className="gms-side-status">No members yet</p>
           )}
           {players.map((player) => (
@@ -380,45 +301,29 @@ export function GroupMapShell({
           ))}
         </aside>
 
-        {tab === 'items' && <ItemsPanel items={groupItems} />}
+        {tab === 'items' && <ItemsPanel items={groupItems} members={memberBadges} />}
         {tab === 'graphs' && (
           <Suspense
             fallback={
-              <section className="gms-graphs" aria-label="XP graphs" aria-busy>
-                <p className="gms-graphs-status">Loading…</p>
+              <section className="gms-graphs gms-panel" aria-label="XP graphs" aria-busy>
+                <PanelStatus loading />
               </section>
             }
           >
-            <GraphsPanel
-              groupName={groupName}
-              groupToken={groupToken}
-              dataRevision={dataRevision.current}
-            />
+            <GraphsPanel {...panelProps} />
           </Suspense>
         )}
-        {tab === 'ledger' && (
-          <LedgerPanel
-            groupName={groupName}
-            groupToken={groupToken}
-            dataRevision={dataRevision.current}
-          />
-        )}
+        {tab === 'ledger' && <LedgerPanel {...panelProps} />}
         {tab === 'quests' && (
           <QuestsPanel
             memberNames={memberNames}
+            members={memberBadges}
             byMember={quests.byMember}
             loading={quests.loading}
             error={quests.error}
           />
         )}
-        {tab === 'achievements' && (
-          <AchievementsPanel
-            groupName={groupName}
-            groupToken={groupToken}
-            appearance={appearance}
-            dataRevision={dataRevision.current}
-          />
-        )}
+        {tab === 'achievements' && <AchievementsPanel {...panelProps} appearance={appearance} />}
         {tab === 'settings' && (
           <SettingsPanel
             groupName={groupName}
@@ -430,10 +335,7 @@ export function GroupMapShell({
             panelOpacity={panelOpacity}
             onPanelOpacityChange={(value) => {
               const next = writePanelOpacity(appearance, value);
-              setPanelOpacityByTheme((prev) => ({
-                ...prev,
-                [appearance]: next,
-              }));
+              setPanelOpacityByTheme((prev) => ({ ...prev, [appearance]: next }));
             }}
             onAppearanceChange={selectAppearance}
             onModeChange={setGroupMode}
@@ -444,11 +346,11 @@ export function GroupMapShell({
         {children}
       </div>
 
-      {demoTools ? (
+      {demoTools && (
         <button type="button" className="gms-demo-xp-btn" onClick={testXpDrop}>
           Test XP drop
         </button>
-      ) : null}
+      )}
 
       <SetupModal
         open={setupOpen}
@@ -464,6 +366,82 @@ export function GroupMapShell({
         }}
       />
     </div>
+  );
+}
+
+function GroupIdentity({ name, mode }: { name: string; mode: GroupMode }) {
+  const label = mode === 'competitive' ? 'Competitive' : 'Normal';
+  return (
+    <div className="gms-group-identity">
+      <img
+        className="gms-group-mode-icon"
+        src={`/group-modes/${mode === 'competitive' ? 'competitive' : 'normal'}.webp`}
+        alt={label}
+        title={label}
+        width={18}
+        height={18}
+      />
+      <span className="gms-group-name">{name}</span>
+    </div>
+  );
+}
+
+function PlayerNav({
+  players,
+  activeName,
+  onSelect,
+}: {
+  players: PlayerView[];
+  activeName: string | null;
+  onSelect: (player: PlayerView) => void;
+}) {
+  return (
+    <nav className="gms-player-nav" aria-label="Player locations">
+      {players.map((player) => {
+        const hasLocation = player.coordinates.length >= 2;
+        const active = activeName === player.name;
+        return (
+          <button
+            key={player.name}
+            type="button"
+            className={[
+              'gms-player-nav-btn',
+              active ? 'gms-player-nav-btn--active' : '',
+              !player.online ? 'gms-player-nav-btn--offline' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            title={
+              !hasLocation
+                ? 'Location unknown'
+                : player.online
+                  ? `Go to ${player.name}`
+                  : `Go to last location (${player.name} offline)`
+            }
+            disabled={!hasLocation}
+            onClick={() => onSelect(player)}
+          >
+            {player.avatarUrl ? (
+              <img
+                className="gms-player-nav-avatar"
+                src={player.avatarUrl}
+                alt=""
+                width={12}
+                height={12}
+              />
+            ) : (
+              <span
+                className="gms-player-nav-dot"
+                style={{ background: player.online ? player.avatarColor : '#7a7f86' }}
+                aria-hidden
+              />
+            )}
+            {player.displayName}
+            {!player.online && <span className="gms-player-nav-offline">offline</span>}
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 

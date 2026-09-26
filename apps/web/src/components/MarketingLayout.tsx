@@ -12,9 +12,7 @@ import '../pages/HomePage.css';
 const Rs3Map = lazy(() => import('./Map').then((m) => ({ default: m.Rs3Map })));
 
 type MarketingLayoutProps = {
-  /** Extra class on the page root (alongside `home`). */
   className?: string;
-  /** Class on the <main> content container. */
   mainClassName?: string;
   children: ReactNode;
 };

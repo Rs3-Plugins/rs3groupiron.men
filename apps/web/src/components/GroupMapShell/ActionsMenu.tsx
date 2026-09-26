@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useDismiss } from '../../hooks/useDismiss';
 
 export type ActionsMenuItem = {
   key: string;
@@ -13,12 +14,6 @@ type ActionsMenuProps = {
   items: ActionsMenuItem[];
 };
 
-/**
- * Toolbar overflow menu (Setup / Logout / Support).
- *
- * Closes on outside click, Escape and after a selection; arrow keys move
- * between items and focus returns to the trigger on close.
- */
 export function ActionsMenu({ label = 'Menu', items }: ActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -26,19 +21,19 @@ export function ActionsMenu({ label = 'Menu', items }: ActionsMenuProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
 
+  useDismiss(
+    open,
+    rootRef,
+    useCallback((reason) => {
+      setOpen(false);
+      if (reason === 'escape') triggerRef.current?.focus();
+    }, []),
+  );
+
   useEffect(() => {
     if (!open) return;
 
-    function onPointerDown(e: PointerEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    }
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        setOpen(false);
-        triggerRef.current?.focus();
-        return;
-      }
       if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
       const nodes = Array.from(
         listRef.current?.querySelectorAll<HTMLElement>('[data-menu-item]') ?? [],
@@ -46,21 +41,14 @@ export function ActionsMenu({ label = 'Menu', items }: ActionsMenuProps) {
       if (!nodes.length) return;
       e.preventDefault();
       const i = nodes.indexOf(document.activeElement as HTMLElement);
-      const next =
-        e.key === 'ArrowDown'
-          ? nodes[(i + 1 + nodes.length) % nodes.length]
-          : nodes[(i - 1 + nodes.length) % nodes.length];
-      next?.focus();
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      nodes[(i + step + nodes.length) % nodes.length]?.focus();
     }
 
-    document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
     // Focus the first item so the menu is usable from the keyboard.
     listRef.current?.querySelector<HTMLElement>('[data-menu-item]')?.focus();
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, [open]);
 
   return (
@@ -68,7 +56,7 @@ export function ActionsMenu({ label = 'Menu', items }: ActionsMenuProps) {
       <button
         type="button"
         ref={triggerRef}
-        className="gms-action gms-menu-trigger"
+        className="gms-action"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}

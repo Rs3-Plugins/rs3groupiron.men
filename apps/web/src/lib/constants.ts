@@ -13,5 +13,8 @@ export const COPY_FEEDBACK_MS = 1600;
 export const SETUP_VIDEO_URL =
   'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ';
 
+export const TOKEN_HINT =
+  'Use this token in the plugin Authorization header to sync your group.';
+
 export const DISCORD_URL = 'https://discord.gg/esbqXjUT6Z';
 export const COFFEE_URL = 'https://buymeacoffee.com/openrune';

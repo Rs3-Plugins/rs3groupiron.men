@@ -12,7 +12,11 @@ import {
   type QuestDef,
   type QuestState,
 } from '../../lib/quests';
+import { IconSelect } from './IconSelect';
+import { memberOptions, type MemberBadge } from './memberOptions';
+import { PanelStatus } from './PanelChrome';
 import { SearchField } from './SearchField';
+import { WikiIcon } from './icons';
 
 type Progress = 'all' | 'finished' | 'started' | 'not_started';
 
@@ -23,22 +27,11 @@ const PROGRESS: Array<{ key: Progress; label: string; groupHint: string }> = [
   { key: 'not_started', label: 'Not started', groupHint: 'Nobody has started it yet' },
 ];
 
-type QuestsPanelProps = {
-  /** Member names in display order; drives the columns. */
-  memberNames: string[];
-  byMember: Record<string, MemberQuestStates>;
-  loading?: boolean;
-  error?: string | null;
-};
-
 function stateOf(states: MemberQuestStates | undefined, quest: QuestDef): QuestState | null {
   return states?.[quest.gameval] ?? null;
 }
 
 /**
- * Progress of one quest across the selected members. With a single member
- * it is that member's state; across the group "finished" means everyone,
- * "started" means anyone has begun, "not started" means nobody has.
  */
 function groupProgress(
   quest: QuestDef,
@@ -58,8 +51,17 @@ function groupProgress(
   return 'not_started';
 }
 
+type QuestsPanelProps = {
+  memberNames: string[];
+  members?: ReadonlyArray<MemberBadge>;
+  byMember: Record<string, MemberQuestStates>;
+  loading?: boolean;
+  error?: string | null;
+};
+
 export function QuestsPanel({
   memberNames,
+  members = [],
   byMember,
   loading = false,
   error = null,
@@ -67,20 +69,22 @@ export function QuestsPanel({
   const [query, setQuery] = useState('');
   const [memberFilter, setMemberFilter] = useState('all');
   const [progress, setProgress] = useState<Progress>('all');
-  // Real quests by default; miniquests, subquests, sagas and seasonal
-  // quests are separate lists like on the wiki.
   const [category, setCategory] = useState<QuestCategory | 'all'>('quest');
 
   const columns = useMemo(
-    () => (memberFilter === 'all' ? memberNames : memberNames.filter((n) => n === memberFilter)),
+    () =>
+      memberFilter === 'all' ? memberNames : memberNames.filter((n) => n === memberFilter),
     [memberNames, memberFilter],
+  );
+
+  const memberChoices = useMemo(
+    () => memberOptions(memberNames, members),
+    [memberNames, members],
   );
 
   const pool = useMemo(() => questsInCategory(category), [category]);
   const poolPoints = useMemo(() => pool.reduce((sum, q) => sum + q.questPoints, 0), [pool]);
 
-  // Search narrows the pool; progress is then applied on top, so the counts
-  // on the progress buttons reflect what a click would show.
   const searched = useMemo(() => {
     const q = query.trim().toLowerCase();
     return q ? pool.filter((quest) => quest.name.toLowerCase().includes(q)) : pool;
@@ -105,7 +109,6 @@ export function QuestsPanel({
     [searched, progress, columns, byMember],
   );
 
-  /** Per-column stats shown in the table header. */
   const stats = useMemo(
     () =>
       Object.fromEntries(
@@ -118,13 +121,14 @@ export function QuestsPanel({
   );
 
   const singleMember = columns.length === 1;
-  const typeLabel = category === 'all' ? 'entries' : QUEST_CATEGORY_LABEL[category].toLowerCase();
+  const typeLabel =
+    category === 'all' ? 'entries' : QUEST_CATEGORY_LABEL[category].toLowerCase();
 
   return (
-    <section className="gms-quests gms-ach" aria-label="Group quests" aria-busy={loading}>
+    <section className="gms-quests gms-panel" aria-label="Group quests" aria-busy={loading}>
       <header className="gms-quests-head">
         <div className="gms-quests-heading">
-          <h2 className="gms-ach-title">Quests</h2>
+          <h2 className="gms-panel-title">Quests</h2>
           <p className="gms-quests-subtitle">
             {pool.length} {typeLabel}
             {poolPoints > 0 ? ` · ${poolPoints} quest points` : ''}
@@ -150,19 +154,13 @@ export function QuestsPanel({
             ))}
             <option value="all">Everything</option>
           </select>
-          <select
-            className="gms-quests-select"
-            aria-label="Member"
+          <IconSelect
+            label="Member"
+            hideLabel
             value={memberFilter}
-            onChange={(e) => setMemberFilter(e.target.value)}
-          >
-            <option value="all">All members</option>
-            {memberNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+            options={memberChoices}
+            onChange={setMemberFilter}
+          />
         </div>
       </header>
 
@@ -192,19 +190,18 @@ export function QuestsPanel({
         </ul>
       </div>
 
-      <div className="gms-ach-body gms-quests-body">
-        {error && <p className="gms-ach-status gms-ach-status--error">{error}</p>}
-        {!error && loading && memberNames.length === 0 && (
-          <p className="gms-ach-status">Loading…</p>
-        )}
-        {!error && !loading && rows.length === 0 && (
-          <p className="gms-ach-status">No quests match.</p>
-        )}
+      <div className="gms-panel-body gms-quests-body">
+        <PanelStatus
+          error={error}
+          loading={loading && memberNames.length === 0}
+          empty={!loading && rows.length === 0}
+          emptyText="No quests match."
+        />
         {rows.length > 0 && (
           <table className="gms-quests-table">
             <thead>
               <tr>
-                <th scope="col" className="gms-quests-th gms-quests-th--name">
+                <th scope="col" className="gms-quests-th">
                   Quest
                 </th>
                 <th scope="col" className="gms-quests-th gms-quests-th--qp" title="Quest points">
@@ -229,50 +226,15 @@ export function QuestsPanel({
               </tr>
             </thead>
             <tbody>
-              {rows.map((quest) => {
-                const rowState = groupProgress(quest, columns, byMember);
-                return (
-                  <tr key={quest.gameval} className={`gms-quests-row gms-quests-row--${rowState}`}>
-                    <th scope="row" className="gms-quests-name">
-                      <a
-                        className="gms-quests-name-text"
-                        href={questWikiUrl(quest)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={`${quest.name} on the RuneScape Wiki`}
-                      >
-                        {quest.name}
-                        <WikiIcon />
-                      </a>
-                      {category === 'all' && quest.category !== 'quest' && (
-                        <span className="gms-quests-tag">{quest.category}</span>
-                      )}
-                      {quest.parentName && (
-                        <span className="gms-quests-parent">{quest.parentName}</span>
-                      )}
-                    </th>
-                    <td className="gms-quests-qp">{quest.questPoints || ''}</td>
-                    {columns.map((name) => {
-                      const state = stateOf(byMember[name], quest);
-                      const label =
-                        state === 'finished'
-                          ? 'Finished'
-                          : state === 'started'
-                            ? 'In progress'
-                            : 'Not started';
-                      return (
-                        <td
-                          key={name}
-                          className={`gms-quests-cell gms-quests-cell--${state ?? 'not_started'}`}
-                          title={`${name} · ${quest.name} · ${label}`}
-                        >
-                          <Mark state={state} label={label} />
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
+              {rows.map((quest) => (
+                <QuestRow
+                  key={quest.gameval}
+                  quest={quest}
+                  columns={columns}
+                  byMember={byMember}
+                  showCategoryTag={category === 'all'}
+                />
+              ))}
             </tbody>
           </table>
         )}
@@ -281,26 +243,58 @@ export function QuestsPanel({
   );
 }
 
-/** Small external-link arrow shown on hover next to a quest name. */
-function WikiIcon() {
+const STATE_LABEL: Record<string, string> = {
+  finished: 'Finished',
+  started: 'In progress',
+  not_started: 'Not started',
+};
+
+function QuestRow({
+  quest,
+  columns,
+  byMember,
+  showCategoryTag,
+}: {
+  quest: QuestDef;
+  columns: string[];
+  byMember: Record<string, MemberQuestStates>;
+  showCategoryTag: boolean;
+}) {
+  const rowState = groupProgress(quest, columns, byMember);
+
   return (
-    <svg
-      className="gms-quests-wiki-icon"
-      viewBox="0 0 16 16"
-      width="12"
-      height="12"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-      focusable="false"
-    >
-      <path d="M6.5 3.5H3.5v9h9V9.5" />
-      <path d="M9 3h4v4" />
-      <path d="M13 3 7.5 8.5" />
-    </svg>
+    <tr className={`gms-quests-row gms-quests-row--${rowState}`}>
+      <th scope="row" className="gms-quests-name">
+        <a
+          className="gms-quests-name-text"
+          href={questWikiUrl(quest)}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={`${quest.name} on the RuneScape Wiki`}
+        >
+          {quest.name}
+          <WikiIcon />
+        </a>
+        {showCategoryTag && quest.category !== 'quest' && (
+          <span className="gms-quests-tag">{quest.category}</span>
+        )}
+        {quest.parentName && <span className="gms-quests-parent">{quest.parentName}</span>}
+      </th>
+      <td className="gms-quests-qp">{quest.questPoints || ''}</td>
+      {columns.map((name) => {
+        const state = stateOf(byMember[name], quest);
+        const label = STATE_LABEL[state ?? 'not_started']!;
+        return (
+          <td
+            key={name}
+            className={`gms-quests-cell gms-quests-cell--${state ?? 'not_started'}`}
+            title={`${name} · ${quest.name} · ${label}`}
+          >
+            <Mark state={state} label={label} />
+          </td>
+        );
+      })}
+    </tr>
   );
 }
 
@@ -320,7 +314,14 @@ function Mark({ state, label }: { state: QuestState | null; label?: string }) {
     return (
       <svg {...common}>
         <circle cx="8" cy="8" r="7" fill="currentColor" />
-        <path d="M4.6 8.3l2.3 2.3 4.6-4.8" fill="none" stroke="#0e1a12" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+        <path
+          d="M4.6 8.3l2.3 2.3 4.6-4.8"
+          fill="none"
+          stroke="#0e1a12"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     );
   }

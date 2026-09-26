@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { discordAvatarUrl, type PlayerView } from '../../lib/items';
 import { MIN_SLOTS } from '../../lib/constants';
+import { MemberAvatarOptions } from './MemberAvatarOptions';
 import { RemoveIcon, SaveIcon } from './icons';
 
 export type MemberDraft = {
@@ -87,27 +88,15 @@ export function MemberCard({ player, canRemove, busy, onSave, onRemove }: Member
           inputMode="numeric"
           onChange={(e) => patch({ discordId: e.target.value.replace(/\D/g, '') })}
         />
-        <div className="gms-settings-member-opts">
-          <label className="gms-settings-color">
-            <span>Colour</span>
-            <input
-              type="color"
-              value={draft.color}
-              aria-label={`Colour for ${player.name}`}
-              onChange={(e) => patch({ color: e.target.value })}
-            />
-          </label>
-          {hasValidDiscord && (
-            <label className="gms-settings-toggle">
-              <input
-                type="checkbox"
-                checked={draft.useDiscordAvatar}
-                onChange={(e) => patch({ useDiscordAvatar: e.target.checked })}
-              />
-              <span>Discord avatar</span>
-            </label>
-          )}
-        </div>
+        <MemberAvatarOptions
+          color={draft.color}
+          useDiscordAvatar={draft.useDiscordAvatar}
+          hasDiscord={hasValidDiscord}
+          busy={busy}
+          colorLabel={`Colour for ${player.name}`}
+          onColorChange={(color) => patch({ color })}
+          onUseDiscordAvatarChange={(useDiscordAvatar) => patch({ useDiscordAvatar })}
+        />
       </div>
 
       <footer className="gms-settings-member-actions">

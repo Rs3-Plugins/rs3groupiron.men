@@ -1,29 +1,40 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import {
   DEMO_GROUP,
   fetchXpHistory,
   type XpHistoryPeriod,
   type XpHistoryResponse,
 } from '../../api/groupClient';
+import { clickDownload, svgToPngBlob } from '../../lib/download';
+import { errorMessage } from '../../lib/errors';
+import { downloadCsv, downloadXlsx, type Table } from '../../lib/exportTable';
+import {
+  readGraphPrefs,
+  writeGraphPrefs,
+  TIME_CHARTS,
+  type ChartKind,
+  type GraphPrefs,
+} from '../../lib/graphPrefs';
 import { colorForName, formatQty } from '../../lib/items';
-import { SKILL_BY_ID, SKILLS, type SkillDef } from '../../lib/skills';
+import { SKILL_BY_ID, SKILLS } from '../../lib/skills';
+import { useLatestRequest } from '../../hooks/useLatestRequest';
 import { useLiveRefresh } from '../../hooks/useLiveRefresh';
+import { Spinner } from '../Spinner';
+import { ChartOptionsMenu } from './ChartOptionsMenu';
+import { ExportMenu, type ExportFormat } from './ExportMenu';
+import { IconSelect, type IconOption } from './IconSelect';
+import { SkillIcon } from './MemberAvatar';
+import { memberOptions, type MemberBadge } from './memberOptions';
+import { PanelStatus } from './PanelChrome';
+import { RefreshIcon } from './icons';
+import { SelectField, type SelectOption } from './SelectField';
+import { XpChart, type ChartRow, type Slice } from './XpChart';
 
-const PERIODS: Array<{ id: XpHistoryPeriod; label: string }> = [
-  { id: '24h', label: '24 Hours' },
-  { id: '7d', label: '7 Days' },
-  { id: '30d', label: '30 Days' },
-  { id: '365d', label: '12 Months' },
+const PERIODS: SelectOption[] = [
+  { value: '24h', label: '24 Hours' },
+  { value: '7d', label: '7 Days' },
+  { value: '30d', label: '30 Days' },
+  { value: '365d', label: '12 Months' },
 ];
 
 const PERIOD_TITLE: Record<XpHistoryPeriod, string> = {
@@ -33,14 +44,18 @@ const PERIOD_TITLE: Record<XpHistoryPeriod, string> = {
   '365d': 'Year',
 };
 
-const SKILL_OPTIONS: Array<{ id: string; name: string; icon?: string }> = [
-  { id: 'overall', name: 'Overall' },
-  ...[...SKILLS].sort((a, b) => a.name.localeCompare(b.name)).map((s: SkillDef) => ({
-    id: s.id,
-    name: s.name,
-    icon: s.icon,
-  })),
+const SKILL_OPTIONS: IconOption[] = [
+  {
+    value: 'overall',
+    label: 'Overall',
+    icon: <SkillIcon skillId="overall" />,
+  },
+  ...[...SKILLS]
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((s) => ({ value: s.id, label: s.name, icon: <SkillIcon skillId={s.id} /> })),
 ];
+
+const MAX_SLICES = 10;
 
 /** Module-level response cache so switching tabs doesn't refetch. */
 const CACHE_TTL_MS = 60_000;
@@ -63,127 +78,227 @@ function readCache(key: string) {
 type GraphsPanelProps = {
   groupName?: string;
   groupToken?: string;
-  /** Bumps on each incoming group poll; redraws the chart in place. */
   dataRevision?: number;
+  members?: ReadonlyArray<MemberBadge>;
 };
 
 export function GraphsPanel({
   groupName = DEMO_GROUP,
   groupToken = '',
   dataRevision,
+  members = [],
 }: GraphsPanelProps) {
-  const [period, setPeriod] = useState<XpHistoryPeriod>('24h');
-  const [skill, setSkill] = useState('overall');
-  const [playerFilter, setPlayerFilter] = useState('all');
+  const [prefs, setPrefs] = useState<GraphPrefs>(readGraphPrefs);
+  const { period, skill, player: playerFilter, mode, logScale, chart } = prefs;
+
   const [data, setData] = useState<XpHistoryResponse | null>(() =>
-    readCache(cacheKey(groupName, '24h', 'overall')),
+    readCache(cacheKey(groupName, prefs.period, prefs.skill)),
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [range, setRange] = useState<{ start: number; end: number } | null>(null);
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
+  const [drag, setDrag] = useState<{ from: number; to: number } | null>(null);
+  const [saving, setSaving] = useState<ExportFormat | null>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
+  const request = useLatestRequest();
 
-  // Rapid period/skill switching can let a slower earlier request resolve last;
-  // abort the in-flight one and only accept the latest sequence number.
-  const inFlight = useRef<AbortController | null>(null);
-  const seq = useRef(0);
+  const isTimeChart = TIME_CHARTS.includes(chart);
+
+  const patch = useCallback((next: Partial<GraphPrefs>) => {
+    setPrefs((prev) => {
+      const merged = { ...prev, ...next };
+      writeGraphPrefs(merged);
+      return merged;
+    });
+  }, []);
 
   const load = useCallback(
-    async (force = false) => {
+    async (force = false, silent = false) => {
       const key = cacheKey(groupName, period, skill);
       const cached = force ? null : readCache(key);
-      inFlight.current?.abort();
-      inFlight.current = null;
-      const mySeq = ++seq.current;
-      if (cached) {
-        setData(cached);
-        setError(null);
-        setLoading(false);
-        return;
-      }
-      const controller = new AbortController();
-      inFlight.current = controller;
-      setLoading(true);
+      if (!cached && !silent) setLoading(true);
       setError(null);
-      try {
-        const next = await fetchXpHistory(
-          groupName,
-          groupToken,
-          period,
-          skill,
-          controller.signal,
-        );
+      const settled = await request(async (signal) => {
+        if (cached) return cached;
+        const next = await fetchXpHistory(groupName, groupToken, period, skill, signal);
         historyCache.set(key, { at: Date.now(), data: next });
-        if (mySeq !== seq.current) return;
-        setData(next);
-      } catch (err) {
-        if (controller.signal.aborted || (err as Error)?.name === 'AbortError') return;
-        if (mySeq !== seq.current) return;
-        setError(err instanceof Error ? err.message : 'Failed to load XP history');
-      } finally {
-        if (inFlight.current === controller) inFlight.current = null;
-        if (mySeq === seq.current) setLoading(false);
-      }
+        return next;
+      });
+      if (!settled) return;
+      if (settled.ok) setData(settled.value);
+      else setError(errorMessage(settled.error, 'Failed to load XP history'));
+      setLoading(false);
     },
-    [groupName, groupToken, period, skill],
+    [request, groupName, groupToken, period, skill],
   );
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  // Redraw when a poll brings new XP, and on a slow timer as a backstop.
   // `force` skips the cache, which is the whole point of refreshing.
   useLiveRefresh(
-    useCallback(() => {
-      void load(true);
-    }, [load]),
-    { signal: dataRevision, intervalMs: 30000 },
+    useCallback(() => void load(true, true), [load]),
+    { signal: dataRevision, intervalMs: 30_000 },
   );
 
-  useEffect(() => () => inFlight.current?.abort(), []);
+  useEffect(() => {
+    if (!data || playerFilter === 'all') return;
+    if (!data.players.some((p) => p.name === playerFilter)) patch({ player: 'all' });
+  }, [data, playerFilter, patch]);
 
-  const allPlayerNames = useMemo(
-    () => (data?.players ?? []).map((p) => p.name),
-    [data],
+  const playerOptions = useMemo(
+    () =>
+      memberOptions(
+        (data?.players ?? []).map((p) => p.name),
+        members,
+        'All players',
+      ),
+    [data, members],
+  );
+
+  const matchesFilter = useCallback(
+    (name: string) => playerFilter === 'all' || name === playerFilter,
+    [playerFilter],
   );
 
   const visibleSeries = useMemo(
-    () =>
-      (data?.series ?? []).filter(
-        (s) => playerFilter === 'all' || s.name === playerFilter,
-      ),
-    [data, playerFilter],
+    () => (data?.series ?? []).filter((s) => matchesFilter(s.name)),
+    [data, matchesFilter],
   );
 
   const visiblePlayers = useMemo(
-    () =>
-      (data?.players ?? []).filter(
-        (p) => playerFilter === 'all' || p.name === playerFilter,
-      ),
-    [data, playerFilter],
+    () => (data?.players ?? []).filter((p) => matchesFilter(p.name)),
+    [data, matchesFilter],
   );
 
-  const chartRows = useMemo(() => {
+  const chartRows = useMemo<ChartRow[]>(() => {
     if (!visibleSeries.length) return [];
-    const byTime = new Map<string, Record<string, string | number>>();
+    const byTime = new Map<string, ChartRow>();
     for (const series of visibleSeries) {
+      let previous = 0;
       for (const point of series.points) {
         const row = byTime.get(point.t) ?? { t: point.t };
-        row[series.name] = point.gain;
+        row[series.name] = mode === 'interval' ? Math.max(0, point.gain - previous) : point.gain;
+        previous = point.gain;
         byTime.set(point.t, row);
       }
     }
     return [...byTime.values()].sort(
       (a, b) => new Date(String(a.t)).getTime() - new Date(String(b.t)).getTime(),
     );
-  }, [visibleSeries]);
+  }, [visibleSeries, mode]);
+
+  const slices = useMemo<Slice[]>(() => {
+    const raw =
+      playerFilter === 'all'
+        ? visiblePlayers.map((p) => ({ name: p.name, value: p.totalGain }))
+        : (visiblePlayers[0]?.skills ?? []).map((s) => ({ name: s.name, value: s.gain }));
+
+    const ranked = raw.filter((s) => s.value > 0).sort((a, b) => b.value - a.value);
+    if (ranked.length <= MAX_SLICES) return ranked;
+    const head = ranked.slice(0, MAX_SLICES - 1);
+    const rest = ranked.slice(MAX_SLICES - 1).reduce((sum, s) => sum + s.value, 0);
+    return rest > 0 ? [...head, { name: 'Other', value: rest }] : head;
+  }, [playerFilter, visiblePlayers]);
+
+  const lastIndex = Math.max(0, chartRows.length - 1);
+  const start = Math.min(range?.start ?? 0, lastIndex);
+  const end = Math.min(range?.end ?? lastIndex, lastIndex);
+  const zoomed = isTimeChart && range !== null && (start > 0 || end < lastIndex);
+
+  useEffect(() => setRange(null), [period, skill, mode]);
+
+  const seriesNames = useMemo(() => visibleSeries.map((s) => s.name), [visibleSeries]);
+  const shownNames = seriesNames.filter((name) => !hidden.has(name));
+
+  const toggleSeries = useCallback(
+    (name: string) => {
+      setHidden((prev) => {
+        const next = new Set(prev);
+        if (next.has(name)) next.delete(name);
+        else if (seriesNames.length - next.size > 1) next.add(name);
+        return next;
+      });
+    },
+    [seriesNames.length],
+  );
+
+  const endDrag = useCallback(() => {
+    setDrag((current) => {
+      if (!current) return null;
+      const [from, to] = [current.from, current.to].sort((a, b) => a - b);
+      if (to - from >= 1) setRange({ start: from, end: to });
+      return null;
+    });
+  }, []);
+
+  const baseName = `${groupName}-${skill}-${period}-${chart}`
+    .replace(/\s+/g, '-')
+    .toLowerCase();
+
+  function exportTable(): Table {
+    if (isTimeChart) {
+      return {
+        filename: baseName,
+        sheet: `${skillLabel} ${PERIOD_TITLE[period]}`,
+        headers: ['Time', ...shownNames],
+        rows: chartRows.map((row) => [
+          new Date(String(row.t)),
+          ...shownNames.map((name) => Number(row[name] ?? 0)),
+        ]),
+      };
+    }
+    const total = slices.reduce((sum, s) => sum + s.value, 0);
+    return {
+      filename: baseName,
+      sheet: `${skillLabel} ${PERIOD_TITLE[period]}`,
+      headers: [playerFilter === 'all' ? 'Member' : 'Skill', 'XP', 'Share %'],
+      rows: slices.map((s) => [
+        s.name,
+        s.value,
+        total ? Math.round((s.value / total) * 1000) / 10 : 0,
+      ]),
+    };
+  }
+
+  async function downloadPng() {
+    // Legend swatches carry .recharts-surface too and sort first in the DOM.
+    const svg = chartRef.current?.querySelector<SVGSVGElement>('.recharts-wrapper > svg');
+    if (!svg) throw new Error('The chart is not ready yet');
+    const legend = isTimeChart
+      ? shownNames.map((name) => ({ label: name, color: colorForName(name) }))
+      : slices.map((s) => ({ label: s.name, color: colorForName(s.name) }));
+    const blob = await svgToPngBlob(svg, {
+      background: '#12100c',
+      caption: `${skillLabel} — ${PERIOD_TITLE[period]}${mode === 'interval' && isTimeChart ? ' (per step)' : ''}`,
+      legend,
+    });
+    const href = URL.createObjectURL(blob);
+    clickDownload(href, `${baseName}.png`);
+    URL.revokeObjectURL(href);
+  }
+
+  async function runExport(format: ExportFormat) {
+    setSaving(format);
+    try {
+      if (format === 'png') await downloadPng();
+      else if (format === 'csv') downloadCsv(exportTable());
+      else await downloadXlsx(exportTable());
+    } catch (err) {
+      setError(errorMessage(err, 'Could not export the chart'));
+    } finally {
+      setSaving(null);
+    }
+  }
 
   const skillLabel =
-    skill === 'overall' ? 'Overall' : (SKILL_BY_ID[skill as keyof typeof SKILL_BY_ID]?.name ?? skill);
-  const chartTitle = `${skillLabel} - ${PERIOD_TITLE[period]}`;
-  const busy = loading && data != null;
+    skill === 'overall' ? 'Overall' : (SKILL_BY_ID[skill as SkillKey]?.name ?? skill);
+  const hasChart = data != null && (isTimeChart ? chartRows.length > 0 : slices.length > 0);
 
   return (
-    <section className="gms-graphs" aria-label="XP graphs" aria-busy={loading}>
+    <section className="gms-graphs gms-panel" aria-label="XP graphs" aria-busy={loading}>
       <div className="gms-graphs-toolbar">
         <button
           type="button"
@@ -209,120 +324,109 @@ export function GraphsPanel({
             height={32}
             draggable={false}
           />
-          <svg
-            className="gms-graphs-refresh-icon"
-            viewBox="0 0 24 24"
-            width="18"
-            height="18"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.25"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
-          >
-            <path d="M21 12a9 9 0 1 1-2.6-6.4" />
-            <path d="M21 3v6h-6" />
-          </svg>
+          <RefreshIcon />
         </button>
-        <label className="gms-graphs-field">
-          <span className="gms-graphs-field-label">Period</span>
-          <select
-            value={period}
-            onChange={(e) => setPeriod(e.target.value as XpHistoryPeriod)}
+
+        <SelectField
+          label="Period"
+          value={period}
+          options={PERIODS}
+          onChange={(value) => patch({ period: value as XpHistoryPeriod })}
+        />
+        <IconSelect
+          label="Skill"
+          value={skill}
+          options={SKILL_OPTIONS}
+          onChange={(value) => patch({ skill: value })}
+        />
+        <IconSelect
+          label="Player"
+          value={playerFilter}
+          options={playerOptions}
+          onChange={(value) => patch({ player: value })}
+        />
+
+        {/* Only while it applies — an always-there disabled button is noise. */}
+        {zoomed && (
+          <button
+            type="button"
+            className="gms-graphs-toggle"
+            title="Show the whole period again"
+            onClick={() => setRange(null)}
           >
-            {PERIODS.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="gms-graphs-field">
-          <span className="gms-graphs-field-label">Skill</span>
-          <select value={skill} onChange={(e) => setSkill(e.target.value)}>
-            {SKILL_OPTIONS.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="gms-graphs-field">
-          <span className="gms-graphs-field-label">Player</span>
-          <select value={playerFilter} onChange={(e) => setPlayerFilter(e.target.value)}>
-            <option value="all">All players</option>
-            {allPlayerNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
+            Reset zoom
+          </button>
+        )}
+
+        <ChartOptionsMenu
+          chart={chart}
+          onChartChange={(value) => patch({ chart: value })}
+          showMode={isTimeChart}
+          mode={mode}
+          onModeChange={(value) => patch({ mode: value })}
+          showLogScale={chart !== 'pie'}
+          logScale={logScale}
+          onLogScaleChange={(on) => patch({ logScale: on })}
+        />
+
+        <ExportMenu
+          busy={saving}
+          disabled={!hasChart}
+          onExport={(format) => void runExport(format)}
+        />
       </div>
 
       <div className="gms-graphs-chart-wrap">
-        <h2 className="gms-graphs-title">{chartTitle}</h2>
-        {error && <p className="gms-graphs-status gms-graphs-status--error">{error}</p>}
-        {loading && !data && <p className="gms-graphs-status">Loading…</p>}
-        {busy && (
-          <p className="gms-graphs-status" aria-live="polite">
-            Refreshing…
-          </p>
-        )}
-        {data && (
-          <div className="gms-graphs-chart" style={busy ? { opacity: 0.6 } : undefined}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartRows} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-                <CartesianGrid stroke="#2c3238" strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="t"
-                  tickFormatter={formatTick(period)}
-                  stroke="#8a949e"
-                  tick={{ fill: '#a8b0b8', fontSize: 11 }}
-                  minTickGap={28}
-                />
-                <YAxis
-                  stroke="#8a949e"
-                  tick={{ fill: '#a8b0b8', fontSize: 11 }}
-                  tickFormatter={(v: number) => formatAxisXp(v)}
-                  width={64}
-                  label={{
-                    value: 'XP Gain',
-                    angle: -90,
-                    position: 'insideLeft',
-                    fill: '#8a949e',
-                    style: { textAnchor: 'middle' },
-                  }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: 'rgba(18, 16, 12, 0.96)',
-                    border: '1px solid #8a7340',
-                    borderRadius: 4,
-                  }}
-                  labelStyle={{ color: '#e8a04a' }}
-                  labelFormatter={(label) => formatTooltipTime(String(label), period)}
-                  formatter={(value, name) => [
-                    `+${formatQty(Number(value ?? 0))}`,
-                    String(name),
-                  ]}
-                />
-                <Legend />
-                {visibleSeries.map((series) => (
-                  <Line
-                    key={series.name}
-                    type="monotone"
-                    dataKey={series.name}
-                    stroke={colorForName(series.name)}
-                    strokeWidth={2}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
+        <h2 className="gms-graphs-title">
+          {`${skillLabel} - ${PERIOD_TITLE[period]}`}
+          {isTimeChart && mode === 'interval' && (
+            <span className="gms-graphs-title-tag">per step</span>
+          )}
+          {zoomed && <span className="gms-graphs-title-tag">zoomed</span>}
+        </h2>
+
+        {/* The spinner takes the chart's place rather than sitting beside it, so
+            the panel doesn't reflow between states. */}
+        {loading ? (
+          <div className="gms-graphs-chart gms-graphs-chart--loading">
+            <Spinner label="Loading XP history…" />
           </div>
+        ) : (
+          <>
+            <PanelStatus error={error} />
+            {!error && hasChart && (
+              <div className="gms-graphs-chart" ref={chartRef}>
+                <XpChart
+                  kind={chart}
+                  period={period}
+                  mode={mode}
+                  logScale={logScale}
+                  rows={chartRows}
+                  slices={slices}
+                  seriesNames={seriesNames}
+                  hidden={hidden}
+                  onToggleSeries={toggleSeries}
+                  start={start}
+                  end={end}
+                  drag={drag}
+                  onDragStart={(i) => setDrag({ from: i, to: i })}
+                  onDragMove={(i) => setDrag((d) => (d ? { from: d.from, to: i } : d))}
+                  onDragEnd={endDrag}
+                  onBrush={(s, e) => setRange({ start: s, end: e })}
+                />
+              </div>
+            )}
+            {!error && !hasChart && (
+              <p className="gms-panel-status">No XP recorded in this period.</p>
+            )}
+          </>
+        )}
+
+        {!loading && hasChart && (
+          <p className="gms-graphs-hint">
+            {chartHint(chart, playerFilter === 'all')}
+            {isTimeChart && hidden.size > 0 ? ` · ${hidden.size} hidden` : ''}
+          </p>
         )}
       </div>
 
@@ -333,97 +437,84 @@ export function GraphsPanel({
             : 'gms-graphs-players gms-graphs-players--totals'
         }
       >
-        {skill !== 'overall' ? (
-          <div className="gms-graphs-totals">
-            {visiblePlayers.map((player) => {
-              const color = colorForName(player.name);
-              return (
-                <div key={player.name} className="gms-graphs-total-chip">
-                  <span className="gms-graphs-player-dot" style={{ background: color }} />
-                  <span className="gms-graphs-total-name">{player.name}</span>
-                  <span className="gms-graphs-player-total">
-                    +{formatQty(player.totalGain)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+        {skill === 'overall' ? (
+          visiblePlayers.map((player) => <PlayerBreakdown key={player.name} player={player} />)
         ) : (
-          visiblePlayers.map((player) => {
-            const maxSkill = Math.max(1, ...player.skills.map((s) => s.gain));
-            const color = colorForName(player.name);
-            return (
-              <article key={player.name} className="gms-graphs-player">
-                <header className="gms-graphs-player-head">
-                  <span className="gms-graphs-player-dot" style={{ background: color }} />
-                  <strong>{player.name}</strong>
-                  <span className="gms-graphs-player-total">
-                    +{formatQty(player.totalGain)}
-                  </span>
-                </header>
-                {player.skills.length > 0 && (
-                  <ul className="gms-graphs-skill-list">
-                    {player.skills.slice(0, 12).map((row) => {
-                      const def = SKILL_BY_ID[row.id as keyof typeof SKILL_BY_ID];
-                      const pct = Math.max(4, (row.gain / maxSkill) * 100);
-                      return (
-                        <li key={row.id} className="gms-graphs-skill-row">
-                          <img
-                            className="gms-graphs-skill-icon"
-                            src={`/skills/${def?.icon ?? `${row.id}.png`}`}
-                            alt=""
-                            width={18}
-                            height={18}
-                          />
-                          <span className="gms-graphs-skill-name">{row.name}</span>
-                          <div className="gms-graphs-skill-bar-track">
-                            <div
-                              className="gms-graphs-skill-bar"
-                              style={{ width: `${pct}%`, background: color }}
-                            />
-                          </div>
-                          <span className="gms-graphs-skill-gain">
-                            +{formatQty(row.gain)}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </article>
-            );
-          })
+          <div className="gms-graphs-totals">
+            {visiblePlayers.map((player) => (
+              <div key={player.name} className="gms-graphs-total-chip">
+                <span
+                  className="gms-graphs-player-dot"
+                  style={{ background: colorForName(player.name) }}
+                />
+                <span className="gms-graphs-total-name">{player.name}</span>
+                <span className="gms-graphs-player-total">+{formatQty(player.totalGain)}</span>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </section>
   );
 }
 
-function formatAxisXp(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}m`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
-  return String(n);
+function chartHint(chart: ChartKind, wholeGroup: boolean) {
+  if (TIME_CHARTS.includes(chart)) {
+    return 'Drag across the chart to zoom · click a name to hide that line';
+  }
+  if (chart === 'pie') {
+    return wholeGroup
+      ? 'Share of the group’s XP this period'
+      : 'Share of this member’s XP by skill';
+  }
+  return wholeGroup
+    ? 'XP per member this period, biggest first'
+    : 'XP per skill for this member, biggest first';
 }
 
-function formatTick(period: XpHistoryPeriod) {
-  return (value: string) => {
-    const d = new Date(value);
-    if (period === '24h') {
-      return d.toLocaleTimeString([], { hour: 'numeric' });
-    }
-    if (period === '365d') {
-      return d.toLocaleDateString([], { month: 'short' });
-    }
-    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  };
-}
+type SkillKey = keyof typeof SKILL_BY_ID;
+type GraphPlayer = XpHistoryResponse['players'][number];
 
-function formatTooltipTime(value: string, period: XpHistoryPeriod) {
-  const d = new Date(value);
-  if (period === '24h') return d.toLocaleString();
-  return d.toLocaleDateString([], {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+function PlayerBreakdown({ player }: { player: GraphPlayer }) {
+  const color = colorForName(player.name);
+  const maxSkill = Math.max(1, ...player.skills.map((s) => s.gain));
+
+  return (
+    <article className="gms-graphs-player">
+      <header className="gms-graphs-player-head">
+        <span className="gms-graphs-player-dot" style={{ background: color }} />
+        <strong>{player.name}</strong>
+        <span className="gms-graphs-player-total">+{formatQty(player.totalGain)}</span>
+      </header>
+      {player.skills.length > 0 && (
+        <ul className="gms-graphs-skill-list">
+          {player.skills.slice(0, 12).map((row) => {
+            const def = SKILL_BY_ID[row.id as SkillKey];
+            return (
+              <li key={row.id} className="gms-graphs-skill-row">
+                <img
+                  className="gms-graphs-skill-icon"
+                  src={`/skills/${def?.icon ?? `${row.id}.png`}`}
+                  alt=""
+                  width={18}
+                  height={18}
+                />
+                <span className="gms-graphs-skill-name">{row.name}</span>
+                <div className="gms-graphs-skill-bar-track">
+                  <div
+                    className="gms-graphs-skill-bar"
+                    style={{
+                      width: `${Math.max(4, (row.gain / maxSkill) * 100)}%`,
+                      background: color,
+                    }}
+                  />
+                </div>
+                <span className="gms-graphs-skill-gain">+{formatQty(row.gain)}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </article>
+  );
 }

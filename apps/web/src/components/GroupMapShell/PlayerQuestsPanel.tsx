@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   AGE_LABEL,
   DIFFICULTY_LABEL,
@@ -16,7 +16,8 @@ import {
 } from '../../lib/quests';
 import { SKILL_BY_ID, type SkillId } from '../../lib/skills';
 import type { PlayerSkill } from '../../lib/items';
-import { FilterIcon } from './icons';
+import { useDismiss } from '../../hooks/useDismiss';
+import { FilterIcon, LockIcon } from './icons';
 
 /** Sort orders in the same order as the in-game journal menu. */
 type Sort =
@@ -145,10 +146,27 @@ function headingFor(sort: Sort, row: Row): string | null {
   }
 }
 
+function rowTitle(row: Row) {
+  const q = row.quest;
+  const parts = [q.name, STATE_HEADING[row.state]!, `${q.questPoints} QP`];
+  if (row.locked) parts.push(`Locked: needs ${row.unmet.join(', ')}`);
+  if (q.difficulty) parts.push(DIFFICULTY_LABEL[q.difficulty]);
+  if (q.members !== null) parts.push(q.members ? 'Members' : 'Free to play');
+  if (q.length) parts.push(LENGTH_LABEL[q.length] ?? '');
+  if (q.combatText) parts.push(q.combatText);
+  return parts.filter(Boolean).join(' · ');
+}
+
+const FILTERS = [
+  { key: 'locked', label: 'Show Locked' },
+  { key: 'completed', label: 'Show Completed' },
+  { key: 'quests', label: 'Show Quests' },
+  { key: 'miniquests', label: 'Show Miniquests' },
+] as const;
+
+type FilterKey = (typeof FILTERS)[number]['key'];
+
 /**
- * Per-player quest journal, styled after the in-game list: green when
- * complete, yellow when started, red when untouched. The sort menu and the
- * funnel filter mirror the journal's own controls.
  */
 export function PlayerQuestsPanel({
   states,
@@ -161,29 +179,20 @@ export function PlayerQuestsPanel({
   // Progress first: in-progress quests at the top is the most useful default.
   const [sort, setSort] = useState<Sort>('progress');
   // Locked quests are hidden by default so the list shows what can be done now.
-  const [showLocked, setShowLocked] = useState(false);
-  const [showCompleted, setShowCompleted] = useState(true);
-  const [showQuests, setShowQuests] = useState(true);
-  const [showMiniquests, setShowMiniquests] = useState(false);
+  const [show, setShow] = useState<Record<FilterKey, boolean>>({
+    locked: false,
+    completed: true,
+    quests: true,
+    miniquests: false,
+  });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
 
-  // Close the filter popover on outside click or Escape.
-  useEffect(() => {
-    if (!filtersOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (!filterRef.current?.contains(e.target as Node)) setFiltersOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setFiltersOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [filtersOpen]);
+  useDismiss(
+    filtersOpen,
+    filterRef,
+    useCallback(() => setFiltersOpen(false), []),
+  );
 
   const points = questPointsFor(states);
   const baseLevels = useMemo(
@@ -195,9 +204,6 @@ export function PlayerQuestsPanel({
     () =>
       QUESTS.filter((q) => q.category === 'quest' || q.category === 'miniquest').map((quest) => {
         const state = states?.[quest.gameval] ?? 'not_started';
-        // Locked = can't be started yet: quest points, prerequisite quests
-        // and skill levels, all from the dump. Started/finished quests are
-        // never locked regardless.
         const unmet =
           state === 'not_started'
             ? unmetRequirements(quest, states, baseLevels, points, skillLabel)
@@ -207,23 +213,26 @@ export function PlayerQuestsPanel({
     [states, baseLevels, points],
   );
 
+  const inScope = useCallback(
+    (quest: QuestDef) => (quest.category === 'quest' ? show.quests : show.miniquests),
+    [show.quests, show.miniquests],
+  );
+
   const rows = useMemo(() => {
     const list = all.filter(({ quest, state, locked }) => {
-      if (!showCompleted && state === 'finished') return false;
-      if (!showLocked && locked) return false;
-      if (quest.category === 'quest' && !showQuests) return false;
-      if (quest.category === 'miniquest' && !showMiniquests) return false;
-      return true;
+      if (!show.completed && state === 'finished') return false;
+      if (!show.locked && locked) return false;
+      return inScope(quest);
     });
     return list.sort(comparator(sort));
-  }, [all, sort, showLocked, showCompleted, showQuests, showMiniquests]);
+  }, [all, sort, show.completed, show.locked, inScope]);
 
-  const total = all.filter((r) => (r.quest.category === 'quest' ? showQuests : showMiniquests)).length;
+  const total = all.filter((r) => inScope(r.quest)).length;
 
   let lastHeading: string | null = null;
 
   return (
-    <div className="gms-player-panel gms-pq">
+    <div className="gms-player-panel">
       <div className="gms-player-panel-title">Quests</div>
 
       <div className="gms-pq-toolbar">
@@ -240,10 +249,14 @@ export function PlayerQuestsPanel({
           </button>
           {filtersOpen && (
             <div className="gms-pq-popover" role="group" aria-label="Show">
-              <Check label="Show Locked" on={showLocked} onChange={setShowLocked} />
-              <Check label="Show Completed" on={showCompleted} onChange={setShowCompleted} />
-              <Check label="Show Quests" on={showQuests} onChange={setShowQuests} />
-              <Check label="Show Miniquests" on={showMiniquests} onChange={setShowMiniquests} />
+              {FILTERS.map(({ key, label }) => (
+                <Check
+                  key={key}
+                  label={label}
+                  on={show[key]}
+                  onChange={(next) => setShow((prev) => ({ ...prev, [key]: next }))}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -293,38 +306,6 @@ export function PlayerQuestsPanel({
         Quest Points: <strong>{points}</strong> / {MAX_QUEST_POINTS}
       </div>
     </div>
-  );
-}
-
-function rowTitle(row: Row) {
-  const q = row.quest;
-  const parts = [q.name, STATE_HEADING[row.state]!, `${q.questPoints} QP`];
-  if (row.locked) parts.push(`Locked: needs ${row.unmet.join(', ')}`);
-  if (q.difficulty) parts.push(DIFFICULTY_LABEL[q.difficulty]);
-  if (q.members !== null) parts.push(q.members ? 'Members' : 'Free to play');
-  if (q.length) parts.push(LENGTH_LABEL[q.length] ?? '');
-  if (q.combatText) parts.push(q.combatText);
-  return parts.filter(Boolean).join(' · ');
-}
-
-function LockIcon() {
-  return (
-    <svg
-      className="gms-pq-lock"
-      viewBox="0 0 16 16"
-      width="10"
-      height="10"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-label="Locked"
-      role="img"
-    >
-      <rect x="3" y="7" width="10" height="7" rx="1.5" />
-      <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
-    </svg>
   );
 }
 

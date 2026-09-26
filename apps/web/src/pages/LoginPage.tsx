@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { fetchGroupInfo } from '../api/groupClient';
+import { AuthError, AuthHeader, CountedField } from '../components/AuthFields';
 import { MarketingLayout } from '../components/MarketingLayout';
-import { MAX_NAME, SITE_NAME } from '../lib/constants';
+import { MAX_NAME } from '../lib/constants';
 import { writeGroupSession } from '../lib/groupSession';
+import { useAsyncAction } from '../hooks/useAsyncAction';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import '../styles/auth.css';
 import './LoginPage.css';
@@ -14,13 +16,10 @@ export function LoginPage() {
   const [name, setName] = useState('');
   const [token, setToken] = useState('');
   const [showToken, setShowToken] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { isBusy, error, setError, run } = useAsyncAction('Could not log in');
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setError(null);
-
     const groupName = name.trim();
     const groupToken = token.trim();
 
@@ -33,59 +32,39 @@ export function LoginPage() {
       return;
     }
 
-    setBusy(true);
-    try {
+    await run('login', async () => {
       const info = await fetchGroupInfo(groupName, groupToken);
-      writeGroupSession({
-        name: info.name,
-        token: info.token ?? groupToken,
-      });
+      writeGroupSession({ name: info.name, token: info.token ?? groupToken });
       navigate('/group', { replace: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not log in');
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (
     <MarketingLayout className="auth-page" mainClassName="login-content">
-      <Link className="auth-back" to="/">
-        ← Home
-      </Link>
-      <p className="auth-brand">{SITE_NAME}</p>
+      <AuthHeader />
       <h1 className="auth-title">Login</h1>
       <p className="auth-lead">Enter your group name and token to continue.</p>
 
       <form className="auth-form" onSubmit={(e) => void onSubmit(e)}>
-        {error && (
-          <p className="auth-error" role="alert">
-            {error}
-          </p>
-        )}
+        {error && <AuthError>{error}</AuthError>}
 
-        <label className="auth-field">
-          Group name
-          <input
-            value={name}
-            maxLength={MAX_NAME}
-            disabled={busy}
-            autoFocus
-            autoComplete="username"
-            placeholder={`1–${MAX_NAME} characters`}
-            onChange={(e) => setName(e.target.value.slice(0, MAX_NAME))}
-          />
-          <span className="auth-count">
-            {name.trim().length}/{MAX_NAME}
-          </span>
-        </label>
+        <CountedField
+          label="Group name"
+          value={name}
+          max={MAX_NAME}
+          disabled={isBusy}
+          autoFocus
+          autoComplete="username"
+          placeholder={`1–${MAX_NAME} characters`}
+          onChange={setName}
+        />
 
         <label className="auth-field">
           Group token
           <input
             type={showToken ? 'text' : 'password'}
             value={token}
-            disabled={busy}
+            disabled={isBusy}
             autoComplete="current-password"
             spellCheck={false}
             placeholder="Paste your group token"
@@ -102,12 +81,8 @@ export function LoginPage() {
           </button>
         </label>
 
-        <button
-          type="submit"
-          className="home-btn home-btn--primary auth-submit"
-          disabled={busy}
-        >
-          {busy ? 'Signing in…' : 'Go to group'}
+        <button type="submit" className="home-btn home-btn--primary auth-submit" disabled={isBusy}>
+          {isBusy ? 'Signing in…' : 'Go to group'}
         </button>
       </form>
     </MarketingLayout>

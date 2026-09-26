@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { fetchQuests } from '../api/groupClient';
+import { errorMessage } from '../lib/errors';
 import type { MemberQuestStates } from '../lib/quests';
+import { useLatestRequest } from './useLatestRequest';
 import { useLiveRefresh } from './useLiveRefresh';
 
 export type GroupQuests = {
@@ -25,37 +27,24 @@ export function useGroupQuests(
   const [byMember, setByMember] = useState<Record<string, MemberQuestStates>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const inFlight = useRef<AbortController | null>(null);
-  const seq = useRef(0);
+  const request = useLatestRequest();
 
   const load = useCallback(async () => {
-    inFlight.current?.abort();
-    const controller = new AbortController();
-    inFlight.current = controller;
-    const mySeq = ++seq.current;
-    try {
-      const res = await fetchQuests(groupName, token, controller.signal);
-      if (mySeq !== seq.current) return;
-      const next: Record<string, MemberQuestStates> = {};
-      for (const m of res.members) next[m.name] = m.quests;
-      setByMember(next);
+    const settled = await request((signal) => fetchQuests(groupName, token, signal));
+    if (!settled) return;
+    if (settled.ok) {
+      setByMember(Object.fromEntries(settled.value.members.map((m) => [m.name, m.quests])));
       setError(null);
-    } catch (err) {
-      if (controller.signal.aborted || (err as Error)?.name === 'AbortError') return;
-      if (mySeq !== seq.current) return;
-      setError(err instanceof Error ? err.message : 'Failed to load quests');
-    } finally {
-      if (inFlight.current === controller) inFlight.current = null;
-      if (mySeq === seq.current) setLoading(false);
+    } else {
+      setError(errorMessage(settled.error, 'Failed to load quests'));
     }
-  }, [groupName, token]);
+    setLoading(false);
+  }, [request, groupName, token]);
 
   useEffect(() => {
     setByMember({});
     setLoading(true);
     void load();
-    return () => inFlight.current?.abort();
   }, [load]);
 
   useLiveRefresh(load, { signal: dataRevision, intervalMs: REFRESH_MS });

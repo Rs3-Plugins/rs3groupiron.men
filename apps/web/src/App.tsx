@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 // The marketing pages are a few KB each and share one layout, so splitting them
 // only bought a round trip the preload scanner could not see — i.e. a visible
 // "Loading…" on the landing page. They ship in the entry chunk instead.
+import { GroupSkeleton } from './components/GroupSkeleton';
 import { GetStartedPage } from './pages/GetStartedPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
@@ -17,21 +18,7 @@ const GroupPage = lazy(() =>
   import('./pages/GroupPage').then((m) => ({ default: m.GroupPage })),
 );
 
-// Only reachable via /demo and /group now, which really are a large download.
-const FALLBACK = (
-  <div
-    style={{
-      minHeight: '100dvh',
-      padding: '2rem',
-      background: '#0c0e10',
-      color: '#a8b0b8',
-      textAlign: 'center',
-    }}
-    aria-busy
-  >
-    Loading…
-  </div>
-);
+const FALLBACK = <GroupSkeleton />;
 
 export default function App() {
   return (

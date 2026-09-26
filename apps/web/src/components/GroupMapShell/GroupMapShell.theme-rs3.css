@@ -198,9 +198,7 @@
 .gms[data-appearance='rs3'] .gms-player,
 .gms[data-appearance='rs3'] .gms-side-status,
 .gms[data-appearance='rs3'] .gms-items,
-.gms[data-appearance='rs3'] .gms-graphs,
-.gms[data-appearance='rs3'] .gms-ledger,
-.gms[data-appearance='rs3'] .gms-ach,
+.gms[data-appearance='rs3'] .gms-panel,
 .gms[data-appearance='rs3'] .gms-settings {
   border: 1px solid #2a1e12;
   border-radius: 0;
@@ -214,6 +212,29 @@
     inset 2px 2px 0 rgba(90, 70, 40, 0.35),
     inset -2px -2px 0 rgba(0, 0, 0, 0.45),
     0 8px 22px var(--rs3-shadow);
+}
+
+.gms[data-appearance='rs3'] .gms-player-nav {
+  border: 1px solid #2a1e12;
+  border-top: none;
+  border-radius: 0;
+  color: var(--rs3-ink);
+  background:
+    linear-gradient(180deg, rgba(255, 240, 200, 0.04) 0%, transparent 40%),
+    rgba(var(--rs3-panel-rgb), var(--gms-panel-alpha));
+  box-shadow:
+    inset 1px 0 0 rgba(220, 190, 130, 0.45),
+    inset -1px -1px 0 rgba(40, 28, 14, 0.95),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.45),
+    0 8px 22px var(--rs3-shadow);
+}
+
+.gms[data-appearance='rs3'] .gms-player-nav-offline {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-player-nav-dot {
+  border-color: var(--rs3-ink);
 }
 
 /* Nested panel inside player card — no second frame */
@@ -398,17 +419,24 @@
   display: block;
 }
 
-/* Graphs nested boxes — RS3 brown, no modern rounded chrome */
-.gms[data-appearance='rs3'] .gms-graphs {
+.gms[data-appearance='rs3'] .gms-panel {
   background:
     linear-gradient(180deg, rgba(255, 240, 200, 0.04) 0%, transparent 18%),
     rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha));
 }
 
+.gms[data-appearance='rs3'] .gms-panel-body,
+.gms[data-appearance='rs3'] .gms-panel-summary-chip,
+.gms[data-appearance='rs3'] .gms-panel-more,
+.gms[data-appearance='rs3'] .gms-panel-day-step,
+.gms[data-appearance='rs3'] .gms-panel-day-all,
+.gms[data-appearance='rs3'] .gms-panel-field select,
+.gms[data-appearance='rs3'] .gms-panel-field input[type='date'],
 .gms[data-appearance='rs3'] .gms-graphs-chart-wrap,
 .gms[data-appearance='rs3'] .gms-graphs-player,
 .gms[data-appearance='rs3'] .gms-graphs-total-chip,
-.gms[data-appearance='rs3'] .gms-graphs-field select {
+.gms[data-appearance='rs3'] .gms-ach-thumb-btn,
+.gms[data-appearance='rs3'] .gms-ach-badge {
   border-radius: 0 !important;
   border: 1px solid var(--rs3-gold-dim) !important;
   background: rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha)) !important;
@@ -416,21 +444,174 @@
   color: var(--rs3-ink);
 }
 
-.gms[data-appearance='rs3'] .gms-graphs-field-label {
+.gms[data-appearance='rs3'] .gms-iconselect-trigger,
+.gms[data-appearance='rs3'] .gms-iconselect-list {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background: rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha));
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-iconselect-option {
+  border-radius: 0;
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-iconselect-option--active {
+  background: rgba(138, 115, 64, 0.35);
+}
+
+.gms[data-appearance='rs3'] .gms-iconselect-option--selected {
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-iconselect-caret,
+.gms[data-appearance='rs3'] .gms-member-avatar--all {
   color: var(--rs3-muted);
 }
 
+.gms[data-appearance='rs3'] .gms-panel-field-label,
+.gms[data-appearance='rs3'] .gms-panel-status,
+.gms[data-appearance='rs3'] .gms-panel-time,
+.gms[data-appearance='rs3'] .gms-panel-ago,
+.gms[data-appearance='rs3'] .gms-ledger-amount,
+.gms[data-appearance='rs3'] .gms-ach-detail,
+.gms[data-appearance='rs3'] .gms-ach-summary-kind,
+.gms[data-appearance='rs3'] .gms-ach-badge {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-panel-summary-name,
+.gms[data-appearance='rs3'] .gms-panel-summary-chip strong,
+.gms[data-appearance='rs3'] .gms-ledger-name,
+.gms[data-appearance='rs3'] .gms-ledger-item,
+.gms[data-appearance='rs3'] .gms-ach-name,
 .gms[data-appearance='rs3'] .gms-graphs-player-head,
 .gms[data-appearance='rs3'] .gms-graphs-total-name,
 .gms[data-appearance='rs3'] .gms-graphs-skill-name {
   color: var(--rs3-ink);
 }
 
+.gms[data-appearance='rs3'] .gms-panel-title,
+.gms[data-appearance='rs3'] .gms-ach-headline,
 .gms[data-appearance='rs3'] .gms-graphs-player-total,
 .gms[data-appearance='rs3'] .gms-graphs-skill-gain,
 .gms[data-appearance='rs3'] .gms-graphs-title {
   color: var(--rs3-gold-bright);
   text-shadow: 0 1px 0 #000;
+}
+
+.gms[data-appearance='rs3'] .gms-panel-clock,
+.gms[data-appearance='rs3'] .gms-panel-inline-btn {
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-panel-body,
+.gms[data-appearance='rs3'] .gms-graphs-players {
+  scrollbar-color: var(--rs3-gold-dim) #120e0b;
+}
+
+.gms[data-appearance='rs3'] .gms-ledger-row,
+.gms[data-appearance='rs3'] .gms-ach-card {
+  border-bottom-color: rgba(138, 115, 64, 0.35);
+}
+
+.gms[data-appearance='rs3'] .gms-ledger-head {
+  border-bottom-color: var(--rs3-gold-dim);
+  background: #1b1511;
+  color: var(--rs3-gold);
+}
+
+.gms[data-appearance='rs3'] .gms-ach-glyph {
+  color: var(--rs3-gold);
+}
+
+.gms[data-appearance='rs3'] .gms-ach-card--level {
+  border-left-color: var(--rs3-gold-dim);
+}
+
+.gms[data-appearance='rs3'] .gms-graphs-toggle {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background: rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha));
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-graphs-toggle--active {
+  background: rgba(138, 115, 64, 0.35);
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-graphs-hint,
+.gms[data-appearance='rs3'] .gms-graphs-title-tag,
+.gms[data-appearance='rs3'] .gms-spinner-label {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-spinner-ring {
+  border-color: rgba(138, 115, 64, 0.3);
+  border-top-color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-tip {
+  border-radius: 0;
+  border-color: var(--rs3-gold-dim);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-tip-title {
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-tip-value,
+.gms[data-appearance='rs3'] .gms-chart-tip-big {
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-tip-sub {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-menu-pop {
+  border-radius: 0;
+  border: 1px solid var(--rs3-gold-dim);
+  background: rgba(var(--rs3-modal-rgb), 0.98);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-menu-head,
+.gms[data-appearance='rs3'] .gms-chart-menu-desc {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-menu-seg {
+  border-radius: 0;
+  border-color: var(--rs3-gold-dim);
+  background: rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha));
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-menu-seg:hover,
+.gms[data-appearance='rs3'] .gms-chart-menu-seg:focus-visible,
+.gms[data-appearance='rs3'] .gms-chart-menu-seg--on {
+  background: rgba(138, 115, 64, 0.35);
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-menu-label {
+  color: var(--rs3-ink);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-menu-tick,
+.gms[data-appearance='rs3'] .gms-chart-menu-row--on .gms-chart-menu-label {
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-chart-menu-row:hover,
+.gms[data-appearance='rs3'] .gms-chart-menu-row:focus-visible {
+  background: rgba(138, 115, 64, 0.3);
+}
+
+.gms[data-appearance='rs3'] .gms-graphs-title-tag {
+  border-color: var(--rs3-gold-dim);
 }
 
 .gms[data-appearance='rs3'] .gms-graphs-skill-bar-track {
@@ -442,136 +623,6 @@
 .gms[data-appearance='rs3'] .gms-graphs-skill-bar {
   border-radius: 0;
   background: linear-gradient(180deg, #d4b06a 0%, #8a7340 100%);
-}
-
-.gms[data-appearance='rs3'] .gms-graphs-players {
-  scrollbar-color: var(--rs3-gold-dim) #120e0b;
-}
-
-/* Ledger — RS3 brown, no modern rounded chrome */
-.gms[data-appearance='rs3'] .gms-ledger {
-  background:
-    linear-gradient(180deg, rgba(255, 240, 200, 0.04) 0%, transparent 18%),
-    rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha));
-}
-
-.gms[data-appearance='rs3'] .gms-ledger-body,
-.gms[data-appearance='rs3'] .gms-ledger-summary-chip,
-.gms[data-appearance='rs3'] .gms-ledger-more,
-.gms[data-appearance='rs3'] .gms-ledger-day-step,
-.gms[data-appearance='rs3'] .gms-ledger-day-all,
-.gms[data-appearance='rs3'] .gms-ledger-field input[type='date'],
-.gms[data-appearance='rs3'] .gms-ach-day-step,
-.gms[data-appearance='rs3'] .gms-ach-day-all,
-.gms[data-appearance='rs3'] .gms-ach-field input[type='date'],
-.gms[data-appearance='rs3'] .gms-ledger-field select {
-  border-radius: 0 !important;
-  border: 1px solid var(--rs3-gold-dim) !important;
-  background: rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha)) !important;
-  box-shadow: none !important;
-  color: var(--rs3-ink);
-}
-
-.gms[data-appearance='rs3'] .gms-ledger-field-label,
-.gms[data-appearance='rs3'] .gms-ledger-time,
-.gms[data-appearance='rs3'] .gms-ledger-amount,
-.gms[data-appearance='rs3'] .gms-ledger-status {
-  color: var(--rs3-muted);
-}
-
-.gms[data-appearance='rs3'] .gms-ledger-name,
-.gms[data-appearance='rs3'] .gms-ledger-item,
-.gms[data-appearance='rs3'] .gms-ledger-summary-name {
-  color: var(--rs3-ink);
-}
-
-.gms[data-appearance='rs3'] .gms-ledger-title {
-  color: var(--rs3-gold-bright);
-  text-shadow: 0 1px 0 #000;
-}
-
-.gms[data-appearance='rs3'] .gms-ledger-row {
-  border-bottom-color: rgba(138, 115, 64, 0.35);
-}
-
-.gms[data-appearance='rs3'] .gms-ledger-head {
-  border-bottom-color: var(--rs3-gold-dim);
-  background: #1b1511;
-  color: var(--rs3-gold);
-}
-
-.gms[data-appearance='rs3'] .gms-ledger-clock {
-  color: var(--rs3-gold-bright);
-}
-
-.gms[data-appearance='rs3'] .gms-ledger-inline-btn,
-.gms[data-appearance='rs3'] .gms-ach-inline-btn {
-  color: var(--rs3-gold-bright);
-}
-
-.gms[data-appearance='rs3'] .gms-ledger-body {
-  scrollbar-color: var(--rs3-gold-dim) #120e0b;
-}
-
-/* Achievements — matches the ledger's RS3 brown chrome */
-.gms[data-appearance='rs3'] .gms-ach {
-  background:
-    linear-gradient(180deg, rgba(255, 240, 200, 0.04) 0%, transparent 18%),
-    rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha));
-}
-
-.gms[data-appearance='rs3'] .gms-ach-body,
-.gms[data-appearance='rs3'] .gms-ach-summary-chip,
-.gms[data-appearance='rs3'] .gms-ach-more,
-.gms[data-appearance='rs3'] .gms-ach-thumb-btn,
-.gms[data-appearance='rs3'] .gms-ach-badge,
-.gms[data-appearance='rs3'] .gms-ach-field select {
-  border-radius: 0 !important;
-  border: 1px solid var(--rs3-gold-dim) !important;
-  background: rgba(var(--rs3-modal-rgb), var(--gms-panel-alpha)) !important;
-  box-shadow: none !important;
-  color: var(--rs3-ink);
-}
-
-.gms[data-appearance='rs3'] .gms-ach-field-label,
-.gms[data-appearance='rs3'] .gms-ach-detail,
-.gms[data-appearance='rs3'] .gms-ach-time,
-.gms[data-appearance='rs3'] .gms-ach-ago,
-.gms[data-appearance='rs3'] .gms-ach-summary-kind,
-.gms[data-appearance='rs3'] .gms-ach-badge,
-.gms[data-appearance='rs3'] .gms-ach-status {
-  color: var(--rs3-muted);
-}
-
-.gms[data-appearance='rs3'] .gms-ach-name,
-.gms[data-appearance='rs3'] .gms-ach-summary-chip strong {
-  color: var(--rs3-ink);
-}
-
-.gms[data-appearance='rs3'] .gms-ach-title,
-.gms[data-appearance='rs3'] .gms-ach-headline {
-  color: var(--rs3-gold-bright);
-  text-shadow: 0 1px 0 #000;
-}
-
-.gms[data-appearance='rs3'] .gms-ach-glyph {
-  color: var(--rs3-gold);
-}
-
-.gms[data-appearance='rs3'] .gms-ach-clock {
-  color: var(--rs3-gold-bright);
-}
-
-.gms[data-appearance='rs3'] .gms-ach-card {
-  border-bottom-color: rgba(138, 115, 64, 0.35);
-}
-
-.gms[data-appearance='rs3'] .gms-ach-card--level {
-  border-left-color: var(--rs3-gold-dim);
-}
-
-.gms[data-appearance='rs3'] .gms-ach-body {
-  scrollbar-color: var(--rs3-gold-dim) #120e0b;
 }
 
 /* Quests — inherits the achievements chrome; controls and table go brown */

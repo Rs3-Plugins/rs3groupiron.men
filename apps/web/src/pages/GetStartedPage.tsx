@@ -1,41 +1,30 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { createGroup, type GroupMode } from '../api/groupClient';
+import { AuthError, AuthHeader, CountedField } from '../components/AuthFields';
 import { MarketingLayout } from '../components/MarketingLayout';
+import { SetupVideoFrame } from '../components/SetupVideoFrame';
 import { TokenReveal } from '../components/TokenReveal';
-import {
-  MAX_NAME,
-  MAX_SLOTS,
-  MIN_SLOTS,
-  SETUP_VIDEO_URL,
-  SITE_NAME,
-} from '../lib/constants';
+import { MAX_NAME, MAX_SLOTS, MIN_SLOTS, TOKEN_HINT } from '../lib/constants';
 import { writeGroupSession } from '../lib/groupSession';
+import { useAsyncAction } from '../hooks/useAsyncAction';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import '../styles/auth.css';
 import './GetStartedPage.css';
 
-type CreatedGroup = {
-  name: string;
-  token: string;
-};
-
 type MemberField = { id: number; name: string };
 
 let nextFieldId = 0;
-function newField(): MemberField {
-  nextFieldId += 1;
-  return { id: nextFieldId, name: '' };
+function emptyMembers(size: number): MemberField[] {
+  return Array.from({ length: size }, () => ({ id: ++nextFieldId, name: '' }));
 }
 
-function emptyMembers(size: number) {
-  return Array.from({ length: size }, newField);
-}
+const SLOT_OPTIONS = Array.from({ length: MAX_SLOTS - MIN_SLOTS + 1 }, (_, i) => MIN_SLOTS + i);
 
-const SLOT_OPTIONS = Array.from(
-  { length: MAX_SLOTS - MIN_SLOTS + 1 },
-  (_, i) => MIN_SLOTS + i,
-);
+const MODES: Array<{ id: GroupMode; label: string; icon: string }> = [
+  { id: 'normal', label: 'Normal', icon: '/group-modes/normal.webp' },
+  { id: 'competitive', label: 'Comp', icon: '/group-modes/competitive.webp' },
+];
 
 const TOKEN_CLASSES = {
   root: 'get-started-token',
@@ -52,30 +41,24 @@ export function GetStartedPage() {
   const [slots, setSlots] = useState(MIN_SLOTS);
   const [mode, setMode] = useState<GroupMode>('normal');
   const [members, setMembers] = useState(() => emptyMembers(MIN_SLOTS));
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [created, setCreated] = useState<CreatedGroup | null>(null);
+  const [created, setCreated] = useState<{ name: string; token: string } | null>(null);
+  const { isBusy, error, setError, run } = useAsyncAction('Could not create group');
 
   function setSlotCount(next: number) {
     setSlots(next);
     setMembers((prev) => {
       if (next === prev.length) return prev;
-      if (next > prev.length) {
-        return [...prev, ...emptyMembers(next - prev.length)];
-      }
+      if (next > prev.length) return [...prev, ...emptyMembers(next - prev.length)];
       return prev.slice(0, next);
     });
   }
 
   function setMemberName(id: number, value: string) {
-    setMembers((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, name: value.slice(0, MAX_NAME) } : m)),
-    );
+    setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, name: value } : m)));
   }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setError(null);
 
     const groupName = name.trim();
     if (groupName.length < 1 || groupName.length > MAX_NAME) {
@@ -93,8 +76,7 @@ export function GetStartedPage() {
       return;
     }
 
-    setBusy(true);
-    try {
+    await run('create', async () => {
       const result = await createGroup({
         name: groupName,
         mode,
@@ -102,11 +84,7 @@ export function GetStartedPage() {
         member_names: memberNames,
       });
       setCreated({ name: result.name, token: result.token });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create group');
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   function goToGroup() {
@@ -117,10 +95,7 @@ export function GetStartedPage() {
 
   return (
     <MarketingLayout className="auth-page" mainClassName="get-started-content">
-      <Link className="auth-back" to="/">
-        ← Home
-      </Link>
-      <p className="auth-brand">{SITE_NAME}</p>
+      <AuthHeader />
 
       {!created ? (
         <>
@@ -128,28 +103,20 @@ export function GetStartedPage() {
           <p className="auth-lead">Name it, size it, add your crew.</p>
 
           <form className="auth-form" onSubmit={(e) => void onSubmit(e)}>
-            {error && (
-              <p className="auth-error" role="alert">
-                {error}
-              </p>
-            )}
+            {error && <AuthError>{error}</AuthError>}
 
             <div className="get-started-name-row">
-              <label className="auth-field auth-field--grow">
-                Group name
-                <input
-                  value={name}
-                  maxLength={MAX_NAME}
-                  disabled={busy}
-                  autoFocus
-                  autoComplete="off"
-                  placeholder={`1–${MAX_NAME} characters`}
-                  onChange={(e) => setName(e.target.value.slice(0, MAX_NAME))}
-                />
-                <span className="auth-count">
-                  {name.trim().length}/{MAX_NAME}
-                </span>
-              </label>
+              <CountedField
+                label="Group name"
+                className="auth-field--grow"
+                value={name}
+                max={MAX_NAME}
+                disabled={isBusy}
+                autoFocus
+                autoComplete="off"
+                placeholder={`1–${MAX_NAME} characters`}
+                onChange={setName}
+              />
 
               <div
                 className={
@@ -161,35 +128,23 @@ export function GetStartedPage() {
                 aria-label="Group type"
               >
                 <span className="get-started-mode-thumb" aria-hidden />
-                <button
-                  type="button"
-                  className="get-started-mode-btn"
-                  disabled={busy}
-                  aria-pressed={mode === 'normal'}
-                  onClick={() => setMode('normal')}
-                >
-                  <img src="/group-modes/normal.webp" alt="" width={18} height={18} />
-                  <span>Normal</span>
-                </button>
-                <button
-                  type="button"
-                  className="get-started-mode-btn"
-                  disabled={busy}
-                  aria-pressed={mode === 'competitive'}
-                  onClick={() => setMode('competitive')}
-                >
-                  <img
-                    src="/group-modes/competitive.webp"
-                    alt=""
-                    width={18}
-                    height={18}
-                  />
-                  <span>Comp</span>
-                </button>
+                {MODES.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className="get-started-mode-btn"
+                    disabled={isBusy}
+                    aria-pressed={mode === option.id}
+                    onClick={() => setMode(option.id)}
+                  >
+                    <img src={option.icon} alt="" width={18} height={18} />
+                    <span>{option.label}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
-            <fieldset className="get-started-fieldset" disabled={busy}>
+            <fieldset className="get-started-fieldset" disabled={isBusy}>
               <legend>Group size</legend>
               <div className="get-started-chips" role="group" aria-label="Group size">
                 {SLOT_OPTIONS.map((value) => (
@@ -210,27 +165,23 @@ export function GetStartedPage() {
               </div>
             </fieldset>
 
-            <fieldset className="get-started-fieldset" disabled={busy}>
+            <fieldset className="get-started-fieldset" disabled={isBusy}>
               <legend>Members</legend>
               <p className="auth-hint">
                 RuneScape usernames — {slots} players, 1–{MAX_NAME} chars each.
               </p>
               <div className="get-started-members">
                 {members.map((member, index) => (
-                  <label key={member.id} className="auth-field">
-                    Player {index + 1}
-                    <input
-                      value={member.name}
-                      maxLength={MAX_NAME}
-                      disabled={busy}
-                      autoComplete="off"
-                      placeholder="Username"
-                      onChange={(e) => setMemberName(member.id, e.target.value)}
-                    />
-                    <span className="auth-count">
-                      {member.name.trim().length}/{MAX_NAME}
-                    </span>
-                  </label>
+                  <CountedField
+                    key={member.id}
+                    label={`Player ${index + 1}`}
+                    value={member.name}
+                    max={MAX_NAME}
+                    disabled={isBusy}
+                    autoComplete="off"
+                    placeholder="Username"
+                    onChange={(value) => setMemberName(member.id, value)}
+                  />
                 ))}
               </div>
             </fieldset>
@@ -238,9 +189,9 @@ export function GetStartedPage() {
             <button
               type="submit"
               className="home-btn home-btn--primary auth-submit"
-              disabled={busy}
+              disabled={isBusy}
             >
-              {busy ? 'Creating…' : 'Create group'}
+              {isBusy ? 'Creating…' : 'Create group'}
             </button>
           </form>
         </>
@@ -252,30 +203,19 @@ export function GetStartedPage() {
             <strong>{created.name}</strong>.
           </p>
 
-          {error && (
-            <p className="auth-error" role="alert">
-              {error}
-            </p>
-          )}
+          {error && <AuthError>{error}</AuthError>}
 
           <TokenReveal
             token={created.token}
             classNames={TOKEN_CLASSES}
             onCopyError={setError}
-            hint="Use this token in the plugin Authorization header to sync your group."
+            hint={TOKEN_HINT}
           />
 
           <section className="get-started-video" aria-label="How to setup">
             <h2>How to setup</h2>
             <div className="get-started-video-frame">
-              <iframe
-                src={SETUP_VIDEO_URL}
-                title="How to setup"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                loading="lazy"
-                referrerPolicy="strict-origin-when-cross-origin"
-              />
+              <SetupVideoFrame />
             </div>
           </section>
 

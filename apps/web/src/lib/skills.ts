@@ -98,7 +98,6 @@ export const SKILL_BY_ID = Object.fromEntries(SKILLS.map((s) => [s.id, s])) as R
   SkillDef
 >;
 
-/** Approximate XP required for a given level (standard RS curve, capped). */
 /**
  * Cumulative XP for each elite level, 1 to 120. Verbatim from
  * https://runescape.wiki/w/Experience/Table — the elite curve has no published

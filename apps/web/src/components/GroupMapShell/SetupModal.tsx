@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import {
-  DEMO_GROUP,
-  updateGroupSettings,
-  type AppearanceTheme,
-} from '../../api/groupClient';
-import { SETUP_VIDEO_URL } from '../../lib/constants';
+import { DEMO_GROUP, updateGroupSettings, type AppearanceTheme } from '../../api/groupClient';
+import { TOKEN_HINT } from '../../lib/constants';
+import { useAsyncAction } from '../../hooks/useAsyncAction';
 import { Modal } from '../Modal';
+import { SetupVideoFrame } from '../SetupVideoFrame';
 import { TokenReveal } from '../TokenReveal';
+import { Banner } from './PanelChrome';
 
 type SetupModalProps = {
   open: boolean;
@@ -40,8 +39,7 @@ function SetupModalBody({
   onSaved,
 }: SetupModalProps) {
   const [name, setName] = useState(groupName);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { isBusy, error, setError, run } = useAsyncAction('Failed to save setup');
 
   async function saveAndGo() {
     const trimmed = name.trim();
@@ -49,32 +47,21 @@ function SetupModalBody({
       setError('Group name is required');
       return;
     }
-
     // No token means the read-only public demo; renaming it is never allowed.
     if (!groupToken && trimmed !== groupName) {
       setError('This is the read-only demo. Create your own group to rename it.');
       return;
     }
 
-    setBusy(true);
-    setError(null);
-    try {
-      let nextName = groupName;
-      let nextToken = groupToken;
+    await run('save', async () => {
+      let next = { name: groupName, token: groupToken };
       if (trimmed !== groupName) {
-        const info = await updateGroupSettings(groupName, groupToken, {
-          name: trimmed,
-        });
-        nextName = info.name;
-        nextToken = info.token ?? groupToken;
+        const info = await updateGroupSettings(groupName, groupToken, { name: trimmed });
+        next = { name: info.name, token: info.token ?? groupToken };
       }
-      onSaved({ name: nextName, token: nextToken });
+      onSaved(next);
       onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save setup');
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (
@@ -85,16 +72,16 @@ function SetupModalBody({
       title="Setup"
       className="gms-modal--setup"
       appearance={appearance}
-      closeDisabled={busy}
+      closeDisabled={isBusy}
     >
       <div className="gms-modal-body gms-setup-body">
-        {error && <p className="gms-settings-banner gms-settings-banner--error">{error}</p>}
+        {error && <Banner tone="error">{error}</Banner>}
 
         <label>
           Group name
           <input
             value={name}
-            disabled={busy}
+            disabled={isBusy}
             onChange={(e) => setName(e.target.value)}
             placeholder="Your group name"
           />
@@ -102,24 +89,16 @@ function SetupModalBody({
 
         <TokenReveal
           token={groupToken}
-          disabled={busy}
+          disabled={isBusy}
           classNames={TOKEN_CLASSES}
           onCopyError={setError}
-          hint="Use this token in the plugin Authorization header to sync your group."
+          hint={TOKEN_HINT}
         />
 
         <section className="gms-setup-howto" aria-label="How to setup">
           <h4>How to setup</h4>
           <div className="gms-setup-video">
-            <iframe
-              className="gms-setup-video-frame"
-              src={SETUP_VIDEO_URL}
-              title="How to setup"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              loading="lazy"
-              referrerPolicy="strict-origin-when-cross-origin"
-            />
+            <SetupVideoFrame className="gms-setup-video-frame" />
           </div>
         </section>
 
@@ -127,10 +106,10 @@ function SetupModalBody({
           <button
             type="button"
             className="gms-settings-text-btn gms-settings-save gms-setup-go"
-            disabled={busy || !name.trim()}
+            disabled={isBusy || !name.trim()}
             onClick={() => void saveAndGo()}
           >
-            {busy ? 'Saving…' : 'Go to group'}
+            {isBusy ? 'Saving…' : 'Go to group'}
           </button>
         </div>
       </div>

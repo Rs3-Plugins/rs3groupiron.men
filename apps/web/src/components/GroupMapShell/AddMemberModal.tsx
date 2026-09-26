@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { AppearanceTheme } from '../../api/groupClient';
 import { discordAvatarUrl } from '../../lib/items';
 import { Modal } from '../Modal';
+import { MemberAvatarOptions } from './MemberAvatarOptions';
 import { PlusIcon } from './icons';
 
 export type NewMember = {
@@ -77,29 +78,15 @@ export function AddMemberModal({ appearance, busy, onClose, onSubmit }: AddMembe
             onChange={(e) => setDiscord(e.target.value.replace(/\D/g, ''))}
           />
         </label>
-        <div className="gms-settings-member-opts">
-          <label className="gms-settings-color">
-            <span>Colour</span>
-            <input
-              type="color"
-              value={color}
-              disabled={busy}
-              aria-label="Member colour"
-              onChange={(e) => setColor(e.target.value)}
-            />
-          </label>
-          {hasValidDiscord && (
-            <label className="gms-settings-toggle">
-              <input
-                type="checkbox"
-                checked={useDiscordAvatar}
-                disabled={busy}
-                onChange={(e) => setUseDiscordAvatar(e.target.checked)}
-              />
-              <span>Discord avatar</span>
-            </label>
-          )}
-        </div>
+        <MemberAvatarOptions
+          color={color}
+          useDiscordAvatar={useDiscordAvatar}
+          hasDiscord={hasValidDiscord}
+          busy={busy}
+          colorLabel="Member colour"
+          onColorChange={setColor}
+          onUseDiscordAvatarChange={setUseDiscordAvatar}
+        />
         <div className="gms-modal-actions">
           <button type="button" className="gms-modal-cancel" onClick={onClose}>
             Cancel

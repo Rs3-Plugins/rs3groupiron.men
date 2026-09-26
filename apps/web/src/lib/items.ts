@@ -93,7 +93,6 @@ export type PlayerView = {
   online: boolean;
   /** Game world the member is on, or 0 when the plugin hasn't reported one. */
   world: number;
-  /** ISO timestamp of the member's last update, or null when unknown. */
   lastSeen: string | null;
   avatarColor: string;
   health: { current: number; max: number };
