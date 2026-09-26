@@ -6,8 +6,7 @@
     "watchPatterns": ["apps/api/**", "pnpm-lock.yaml", "railway.json"]
   },
   "deploy": {
-    "preDeployCommand": ["pnpm --filter @rs3/api exec prisma migrate deploy"],
-    "startCommand": "pnpm --filter @rs3/api start:prod",
+    "startCommand": "pnpm --filter @rs3/api run start:migrate",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",
