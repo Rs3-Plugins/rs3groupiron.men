@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: rs3-gim-postgres
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:5432:5432'
+    environment:
+      POSTGRES_USER: rs3
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rs3dev}
+      POSTGRES_DB: rs3_gim
+    volumes:
+      - rs3_gim_pg:/var/lib/postgresql/data
+
+volumes:
+  rs3_gim_pg:

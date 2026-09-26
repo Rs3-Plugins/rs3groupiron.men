@@ -1,0 +1,965 @@
+{
+  "groups": [
+    {
+      "name": "Demo Group",
+      "mode": "normal",
+      "appearance": "rs3",
+      "member_slots": 4,
+      "token": "11111111-2222-3333-4444-555555555555",
+      "created_at": "2026-01-15T12:00:00.000Z",
+      "members": [
+        {
+          "name": "IronJackery",
+          "online": true,
+          "last_updated": "2026-04-26T02:58:32.000Z",
+          "stats": [
+            61,
+            61,
+            46,
+            46,
+            52,
+            52,
+            12
+          ],
+          "coordinates": [
+            3200,
+            3200,
+            0
+          ],
+          "inventory": [
+            995,
+            25000,
+            23351,
+            1,
+            23354,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bank": [
+            995,
+            1500000,
+            15259,
+            50,
+            2434,
+            100
+          ],
+          "equipment": [],
+          "skills": {
+            "attack": {
+              "xp": 4385776,
+              "level": 88,
+              "baseLevel": 88
+            },
+            "constitution": {
+              "xp": 1986068,
+              "level": 80,
+              "baseLevel": 80
+            },
+            "mining": {
+              "xp": 2421087,
+              "level": 82,
+              "baseLevel": 82
+            },
+            "strength": {
+              "xp": 4385776,
+              "level": 88,
+              "baseLevel": 88
+            },
+            "agility": {
+              "xp": 4842295,
+              "level": 89,
+              "baseLevel": 89
+            },
+            "smithing": {
+              "xp": 9684577,
+              "level": 96,
+              "baseLevel": 96
+            },
+            "defence": {
+              "xp": 4842295,
+              "level": 89,
+              "baseLevel": 89
+            },
+            "herblore": {
+              "xp": 9684577,
+              "level": 96,
+              "baseLevel": 96
+            },
+            "fishing": {
+              "xp": 4842295,
+              "level": 89,
+              "baseLevel": 89
+            },
+            "ranged": {
+              "xp": 2421087,
+              "level": 82,
+              "baseLevel": 82
+            },
+            "thieving": {
+              "xp": 9684577,
+              "level": 96,
+              "baseLevel": 96
+            },
+            "cooking": {
+              "xp": 4842295,
+              "level": 89,
+              "baseLevel": 89
+            },
+            "prayer": {
+              "xp": 2421087,
+              "level": 82,
+              "baseLevel": 82
+            },
+            "crafting": {
+              "xp": 9684577,
+              "level": 96,
+              "baseLevel": 96
+            },
+            "firemaking": {
+              "xp": 37224,
+              "level": 40,
+              "baseLevel": 40
+            },
+            "magic": {
+              "xp": 1210421,
+              "level": 75,
+              "baseLevel": 75
+            },
+            "fletching": {
+              "xp": 19368992,
+              "level": 103,
+              "baseLevel": 103
+            },
+            "woodcutting": {
+              "xp": 75127,
+              "level": 47,
+              "baseLevel": 47
+            },
+            "runecrafting": {
+              "xp": 150872,
+              "level": 54,
+              "baseLevel": 54
+            },
+            "slayer": {
+              "xp": 2421087,
+              "level": 82,
+              "baseLevel": 82
+            },
+            "farming": {
+              "xp": 4842295,
+              "level": 89,
+              "baseLevel": 89
+            },
+            "construction": {
+              "xp": 55649,
+              "level": 44,
+              "baseLevel": 44
+            },
+            "hunter": {
+              "xp": 2421087,
+              "level": 82,
+              "baseLevel": 82
+            },
+            "summoning": {
+              "xp": 55649,
+              "level": 44,
+              "baseLevel": 44
+            },
+            "dungeoneering": {
+              "xp": 111945,
+              "level": 51,
+              "baseLevel": 51
+            },
+            "divination": {
+              "xp": 111945,
+              "level": 51,
+              "baseLevel": 51
+            },
+            "invention": {
+              "xp": 19368992,
+              "level": 103,
+              "baseLevel": 103
+            },
+            "archaeology": {
+              "xp": 77474828,
+              "level": 117,
+              "baseLevel": 117
+            },
+            "necromancy": {
+              "xp": 273742,
+              "level": 60,
+              "baseLevel": 60
+            }
+          }
+        },
+        {
+          "name": "IronNuggz",
+          "online": true,
+          "last_updated": "2026-04-26T02:58:32.000Z",
+          "stats": [
+            93,
+            93,
+            70,
+            70,
+            66,
+            66,
+            12
+          ],
+          "coordinates": [
+            3222,
+            3218,
+            0
+          ],
+          "inventory": [
+            4151,
+            1,
+            11694,
+            1,
+            995,
+            500000,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bank": [
+            995,
+            8000000,
+            1127,
+            1,
+            1079,
+            1
+          ],
+          "equipment": [],
+          "skills": {
+            "attack": {
+              "xp": 5902831,
+              "level": 91,
+              "baseLevel": 91
+            },
+            "constitution": {
+              "xp": 10692629,
+              "level": 97,
+              "baseLevel": 97
+            },
+            "mining": {
+              "xp": 10692629,
+              "level": 97,
+              "baseLevel": 97
+            },
+            "strength": {
+              "xp": 3258594,
+              "level": 85,
+              "baseLevel": 85
+            },
+            "agility": {
+              "xp": 5902831,
+              "level": 91,
+              "baseLevel": 91
+            },
+            "smithing": {
+              "xp": 3258594,
+              "level": 85,
+              "baseLevel": 85
+            },
+            "defence": {
+              "xp": 737627,
+              "level": 70,
+              "baseLevel": 70
+            },
+            "herblore": {
+              "xp": 2421087,
+              "level": 82,
+              "baseLevel": 82
+            },
+            "fishing": {
+              "xp": 1336443,
+              "level": 76,
+              "baseLevel": 76
+            },
+            "ranged": {
+              "xp": 2421087,
+              "level": 82,
+              "baseLevel": 82
+            },
+            "thieving": {
+              "xp": 4385776,
+              "level": 88,
+              "baseLevel": 88
+            },
+            "cooking": {
+              "xp": 10692629,
+              "level": 97,
+              "baseLevel": 97
+            },
+            "prayer": {
+              "xp": 1336443,
+              "level": 76,
+              "baseLevel": 76
+            },
+            "crafting": {
+              "xp": 10692629,
+              "level": 97,
+              "baseLevel": 97
+            },
+            "firemaking": {
+              "xp": 1336443,
+              "level": 76,
+              "baseLevel": 76
+            },
+            "magic": {
+              "xp": 10692629,
+              "level": 97,
+              "baseLevel": 97
+            },
+            "fletching": {
+              "xp": 1336443,
+              "level": 76,
+              "baseLevel": 76
+            },
+            "woodcutting": {
+              "xp": 10692629,
+              "level": 97,
+              "baseLevel": 97
+            },
+            "runecrafting": {
+              "xp": 2421087,
+              "level": 82,
+              "baseLevel": 82
+            },
+            "slayer": {
+              "xp": 3258594,
+              "level": 85,
+              "baseLevel": 85
+            },
+            "farming": {
+              "xp": 1336443,
+              "level": 76,
+              "baseLevel": 76
+            },
+            "construction": {
+              "xp": 10692629,
+              "level": 97,
+              "baseLevel": 97
+            },
+            "hunter": {
+              "xp": 2421087,
+              "level": 82,
+              "baseLevel": 82
+            },
+            "summoning": {
+              "xp": 3258594,
+              "level": 85,
+              "baseLevel": 85
+            },
+            "dungeoneering": {
+              "xp": 737627,
+              "level": 70,
+              "baseLevel": 70
+            },
+            "divination": {
+              "xp": 737627,
+              "level": 70,
+              "baseLevel": 70
+            },
+            "invention": {
+              "xp": 3258594,
+              "level": 85,
+              "baseLevel": 85
+            },
+            "archaeology": {
+              "xp": 5902831,
+              "level": 91,
+              "baseLevel": 91
+            },
+            "necromancy": {
+              "xp": 737627,
+              "level": 70,
+              "baseLevel": 70
+            }
+          }
+        },
+        {
+          "name": "IronMayo",
+          "online": false,
+          "last_updated": "2026-04-26T02:58:32.000Z",
+          "stats": [
+            99,
+            99,
+            77,
+            77,
+            80,
+            80,
+            12
+          ],
+          "coordinates": [
+            3105,
+            3430,
+            0
+          ],
+          "inventory": [
+            6685,
+            4,
+            3024,
+            2,
+            995,
+            120000,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bank": [
+            995,
+            25000000,
+            560,
+            5000,
+            565,
+            2000
+          ],
+          "equipment": [],
+          "skills": {
+            "attack": {
+              "xp": 9684577,
+              "level": 96,
+              "baseLevel": 96
+            },
+            "constitution": {
+              "xp": 7195629,
+              "level": 93,
+              "baseLevel": 93
+            },
+            "mining": {
+              "xp": 9684577,
+              "level": 96,
+              "baseLevel": 96
+            },
+            "strength": {
+              "xp": 11805606,
+              "level": 98,
+              "baseLevel": 98
+            },
+            "agility": {
+              "xp": 10692629,
+              "level": 97,
+              "baseLevel": 97
+            },
+            "smithing": {
+              "xp": 11805606,
+              "level": 98,
+              "baseLevel": 98
+            },
+            "defence": {
+              "xp": 10692629,
+              "level": 97,
+              "baseLevel": 97
+            },
+            "herblore": {
+              "xp": 104273167,
+              "level": 120,
+              "baseLevel": 120
+            },
+            "fishing": {
+              "xp": 10692629,
+              "level": 97,
+              "baseLevel": 97
+            },
+            "ranged": {
+              "xp": 9684577,
+              "level": 96,
+              "baseLevel": 96
+            },
+            "thieving": {
+              "xp": 11805606,
+              "level": 98,
+              "baseLevel": 98
+            },
+            "cooking": {
+              "xp": 10692629,
+              "level": 97,
+              "baseLevel": 97
+            },
+            "prayer": {
+              "xp": 9684577,
+              "level": 96,
+              "baseLevel": 96
+            },
+            "crafting": {
+              "xp": 11805606,
+              "level": 98,
+              "baseLevel": 98
+            },
+            "firemaking": {
+              "xp": 14391160,
+              "level": 100,
+              "baseLevel": 100
+            },
+            "magic": {
+              "xp": 8771558,
+              "level": 95,
+              "baseLevel": 95
+            },
+            "fletching": {
+              "xp": 13034431,
+              "level": 99,
+              "baseLevel": 99
+            },
+            "woodcutting": {
+              "xp": 15889109,
+              "level": 101,
+              "baseLevel": 101
+            },
+            "runecrafting": {
+              "xp": 17542976,
+              "level": 102,
+              "baseLevel": 102
+            },
+            "slayer": {
+              "xp": 104273167,
+              "level": 120,
+              "baseLevel": 120
+            },
+            "farming": {
+              "xp": 10692629,
+              "level": 97,
+              "baseLevel": 97
+            },
+            "construction": {
+              "xp": 17542976,
+              "level": 102,
+              "baseLevel": 102
+            },
+            "hunter": {
+              "xp": 9684577,
+              "level": 96,
+              "baseLevel": 96
+            },
+            "summoning": {
+              "xp": 5346332,
+              "level": 90,
+              "baseLevel": 90
+            },
+            "dungeoneering": {
+              "xp": 19368992,
+              "level": 103,
+              "baseLevel": 103
+            },
+            "divination": {
+              "xp": 5902831,
+              "level": 91,
+              "baseLevel": 91
+            },
+            "invention": {
+              "xp": 13034431,
+              "level": 99,
+              "baseLevel": 99
+            },
+            "archaeology": {
+              "xp": 15889109,
+              "level": 101,
+              "baseLevel": 101
+            },
+            "necromancy": {
+              "xp": 14391160,
+              "level": 100,
+              "baseLevel": 100
+            }
+          }
+        },
+        {
+          "name": "IronVex",
+          "online": false,
+          "last_updated": "2026-04-26T02:58:32.000Z",
+          "stats": [
+            78,
+            78,
+            52,
+            52,
+            60,
+            60,
+            12
+          ],
+          "coordinates": [
+            2945,
+            3368,
+            0
+          ],
+          "inventory": [
+            1351,
+            1,
+            1265,
+            1,
+            995,
+            42000,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bank": [
+            995,
+            3200000,
+            1511,
+            200,
+            440,
+            150
+          ],
+          "equipment": [],
+          "skills": {
+            "attack": {
+              "xp": 273742,
+              "level": 60,
+              "baseLevel": 60
+            },
+            "constitution": {
+              "xp": 449428,
+              "level": 65,
+              "baseLevel": 65
+            },
+            "mining": {
+              "xp": 273742,
+              "level": 60,
+              "baseLevel": 60
+            },
+            "strength": {
+              "xp": 737627,
+              "level": 70,
+              "baseLevel": 70
+            },
+            "agility": {
+              "xp": 449428,
+              "level": 65,
+              "baseLevel": 65
+            },
+            "smithing": {
+              "xp": 737627,
+              "level": 70,
+              "baseLevel": 70
+            },
+            "defence": {
+              "xp": 449428,
+              "level": 65,
+              "baseLevel": 65
+            },
+            "herblore": {
+              "xp": 737627,
+              "level": 70,
+              "baseLevel": 70
+            },
+            "fishing": {
+              "xp": 449428,
+              "level": 65,
+              "baseLevel": 65
+            },
+            "ranged": {
+              "xp": 273742,
+              "level": 60,
+              "baseLevel": 60
+            },
+            "thieving": {
+              "xp": 737627,
+              "level": 70,
+              "baseLevel": 70
+            },
+            "cooking": {
+              "xp": 449428,
+              "level": 65,
+              "baseLevel": 65
+            },
+            "prayer": {
+              "xp": 273742,
+              "level": 60,
+              "baseLevel": 60
+            },
+            "crafting": {
+              "xp": 737627,
+              "level": 70,
+              "baseLevel": 70
+            },
+            "firemaking": {
+              "xp": 166636,
+              "level": 55,
+              "baseLevel": 55
+            },
+            "magic": {
+              "xp": 166636,
+              "level": 55,
+              "baseLevel": 55
+            },
+            "fletching": {
+              "xp": 1210421,
+              "level": 75,
+              "baseLevel": 75
+            },
+            "woodcutting": {
+              "xp": 273742,
+              "level": 60,
+              "baseLevel": 60
+            },
+            "runecrafting": {
+              "xp": 449428,
+              "level": 65,
+              "baseLevel": 65
+            },
+            "slayer": {
+              "xp": 273742,
+              "level": 60,
+              "baseLevel": 60
+            },
+            "farming": {
+              "xp": 449428,
+              "level": 65,
+              "baseLevel": 65
+            },
+            "construction": {
+              "xp": 449428,
+              "level": 65,
+              "baseLevel": 65
+            },
+            "hunter": {
+              "xp": 273742,
+              "level": 60,
+              "baseLevel": 60
+            },
+            "summoning": {
+              "xp": 1210421,
+              "level": 75,
+              "baseLevel": 75
+            },
+            "dungeoneering": {
+              "xp": 737627,
+              "level": 70,
+              "baseLevel": 70
+            },
+            "divination": {
+              "xp": 166636,
+              "level": 55,
+              "baseLevel": 55
+            },
+            "invention": {
+              "xp": 1210421,
+              "level": 75,
+              "baseLevel": 75
+            },
+            "archaeology": {
+              "xp": 273742,
+              "level": 60,
+              "baseLevel": 60
+            },
+            "necromancy": {
+              "xp": 166636,
+              "level": 55,
+              "baseLevel": 55
+            }
+          }
+        },
+        {
+          "name": "@SHARED",
+          "last_updated": "2026-04-26T02:58:32.000Z",
+          "stats": [],
+          "coordinates": [],
+          "inventory": [],
+          "bank": [
+            995,
+            5000000,
+            554,
+            10000,
+            560,
+            5000,
+            565,
+            2500
+          ],
+          "equipment": [],
+          "skills": {}
+        }
+      ]
+    }
+  ]
+}

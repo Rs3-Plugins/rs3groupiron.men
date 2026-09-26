@@ -1,0 +1,244 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Group {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  /// Lower-cased name for case-insensitive lookups.
+  nameKey     String           @unique @map("name_key")
+  token       String
+  mode        GroupMode        @default(normal)
+  appearance  AppearanceTheme  @default(rs3)
+  /// Fixed group capacity (2–5). Add only when below this.
+  memberSlots Int              @default(5) @map("member_slots")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  members     Member[]
+  /// Group-owned inventories, i.e. the shared bank.
+  inventories GroupInventory[]
+  sharedBankEntries SharedBankEntry[]
+  achievements Achievement[]
+
+  @@map("groups")
+}
+
+enum AchievementKind {
+  level
+  drop
+  quest
+  diary
+  other
+}
+
+/// Notable group moments: level milestones, drops, quests, diaries.
+model Achievement {
+  id         String          @id @default(cuid())
+  groupId    String          @map("group_id")
+  /// Member name as it was at the time; survives renames/removals.
+  memberName String          @map("member_name")
+  kind       AchievementKind
+  /// Headline, e.g. "99 Slayer" or "Twisted bow".
+  title      String
+  detail     String?
+  /// Skill id for level milestones (see skills.catalog.ts).
+  skillId    String?         @map("skill_id")
+  /// Item id for drops.
+  itemId     Int?            @map("item_id")
+  /// RS3 gameval name for quests/diaries (e.g. quest_cooks_assistant).
+  /// Stored instead of the cache id because names survive renumbering.
+  gameval    String?
+  /// Optional screenshot hosted on the CDN.
+  imageUrl   String?         @map("image_url")
+  /// Set for auto-detected milestones so they are recorded once only.
+  dedupeKey  String?         @map("dedupe_key")
+  achievedAt DateTime        @default(now()) @map("achieved_at")
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, dedupeKey])
+  @@index([groupId, achievedAt])
+  @@map("achievements")
+}
+
+/// Append-only record of shared ("group") bank movements.
+model SharedBankEntry {
+  id         String   @id @default(cuid())
+  groupId    String   @map("group_id")
+  /// Member name as it was at the time; kept even if they are renamed or removed.
+  memberName String   @map("member_name")
+  itemId     Int      @map("item_id")
+  /// Positive = deposited into the shared bank, negative = withdrawn.
+  delta      Int
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, createdAt])
+  @@map("shared_bank_entries")
+}
+
+enum GroupMode {
+  normal
+  competitive
+}
+
+enum AppearanceTheme {
+  rs3
+  modern
+}
+
+model Member {
+  id          String   @id @default(cuid())
+  groupId     String   @map("group_id")
+  name        String
+  nickname    String?
+  discordId   String?  @map("discord_id")
+  /// Hex map/panel colour, e.g. #4a8f3c. Null = hash from name.
+  color       String?
+  /// When true and discordId is set, show Discord avatar on map + left panel.
+  useDiscordAvatar Boolean @default(true) @map("use_discord_avatar")
+  /// Plugin/client presence — offline members are hidden on the map.
+  online      Boolean  @default(false)
+  lastUpdated DateTime @default(now()) @map("last_updated")
+  hpCurrent     Int @default(0) @map("hp_current")
+  hpMax         Int @default(0) @map("hp_max")
+  prayerCurrent Int @default(0) @map("prayer_current")
+  prayerMax     Int @default(0) @map("prayer_max")
+  summonCurrent Int @default(0) @map("summon_current")
+  summonMax     Int @default(0) @map("summon_max")
+  world         Int @default(0)
+  x     Int @default(0)
+  y     Int @default(0)
+  plane Int @default(0)
+
+  group Group        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  inventories MemberInventory[]
+  skills MemberSkill[]
+  xpSamples SkillXpSample[]
+  quests MemberQuest[]
+
+  @@unique([groupId, name])
+  @@index([groupId])
+  @@map("members")
+}
+
+/// An inventory a member owns, keyed by its RS3 inv gameval (inv, worn,
+/// bank, money_pouch, ...). The plugin's inventory, equipment and bank are
+/// each one of these; contents live in MemberInventoryItem.
+model MemberInventory {
+  id        String   @id @default(cuid())
+  memberId  String   @map("member_id")
+  key       String
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  member Member                @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  items  MemberInventoryItem[]
+
+  @@unique([memberId, key])
+  @@map("member_inventories")
+}
+
+/// A slot in a member inventory. Slots are positional for `inv`; other
+/// inventories only store occupied slots.
+model MemberInventoryItem {
+  id          String @id @default(cuid())
+  inventoryId String @map("inventory_id")
+  slot        Int
+  itemId      Int    @map("item_id")
+  quantity    Int    @default(0)
+
+  inventory MemberInventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  @@unique([inventoryId, slot])
+  @@map("member_inventory_items")
+}
+
+/// An inventory the group owns rather than a member: the shared bank lives
+/// here under the `bank` key. Same shape as a member inventory.
+model GroupInventory {
+  id        String   @id @default(cuid())
+  groupId   String   @map("group_id")
+  key       String
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  group Group                @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  items GroupInventoryItem[]
+
+  @@unique([groupId, key])
+  @@map("group_inventories")
+}
+
+model GroupInventoryItem {
+  id          String @id @default(cuid())
+  inventoryId String @map("inventory_id")
+  slot        Int
+  itemId      Int    @map("item_id")
+  quantity    Int    @default(0)
+
+  inventory GroupInventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  @@unique([inventoryId, slot])
+  @@map("group_inventory_items")
+}
+
+/// Only quests a member has touched are stored; no row means not started.
+enum QuestState {
+  started
+  finished
+}
+
+/// Per-member quest progress keyed by the quest's RS3 gameval name
+/// (e.g. cooks_assistant), which survives cache renumbering. Everything
+/// static about a quest (name, points, requirements) lives in the client's
+/// quest dump, so nothing else is stored here.
+model MemberQuest {
+  id        String     @id @default(cuid())
+  memberId  String     @map("member_id")
+  gameval   String
+  state     QuestState
+  updatedAt DateTime   @default(now()) @map("updated_at")
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, gameval])
+  @@map("member_quests")
+}
+
+/// Per-member RS3 skill XP/levels (max XP 200m; max level 99/110/120 per skill)
+model MemberSkill {
+  id        String @id @default(cuid())
+  memberId  String @map("member_id")
+  skillId   String @map("skill_id")
+  xp        BigInt @default(0)
+  /// Boosted / current level shown in UI
+  level     Int    @default(1)
+  /// Unboosted base level
+  baseLevel Int    @default(1) @map("base_level")
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, skillId])
+  @@index([memberId])
+  @@map("member_skills")
+}
+
+/// Time-series XP samples for graphs (indexed for period/skill queries)
+model SkillXpSample {
+  id        String   @id @default(cuid())
+  memberId  String   @map("member_id")
+  skillId   String   @map("skill_id")
+  xp        BigInt
+  sampledAt DateTime @map("sampled_at")
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId, skillId, sampledAt])
+  @@index([memberId, sampledAt])
+  @@index([sampledAt])
+  @@map("skill_xp_samples")
+}

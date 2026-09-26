@@ -1,0 +1,54 @@
+:root {
+  /* —— Design tokens —— */
+  --gold: #e8a04a;
+  --gold-dim: #c47a2c;
+  --gold-bright: #f0d4a8;
+  --ink: #f0f2f4;
+  --muted: #8a949e;
+  --border: #3a4148;
+  --border-strong: #4a525a;
+  --panel: #1c2024;
+  --panel-2: #161a1e;
+  --offline: #7a7f86;
+
+  --font-ui: 'Segoe UI', Tahoma, sans-serif;
+  --font-display: 'Cinzel', 'Palatino Linotype', Palatino, serif;
+
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+
+  --z-menu: 40;
+  --z-overlay: 2000;
+  --z-tooltip: 3000;
+  --z-modal: 4000;
+
+  font-family: var(--font-ui);
+  line-height: 1.5;
+  font-weight: 400;
+  color: #e8e4d9;
+  background:
+    radial-gradient(ellipse at top, #2a3a2e 0%, transparent 55%),
+    linear-gradient(160deg, #1a1f1c 0%, #0f1210 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}

@@ -1,0 +1,12 @@
+{
+  "name": "rs3-dev-db",
+  "private": true,
+  "description": "Throwaway local Postgres for development when Docker isn't available. Not part of the workspace, so production builds never install it.",
+  "type": "module",
+  "scripts": {
+    "start": "node dev-db.mjs"
+  },
+  "dependencies": {
+    "embedded-postgres": "18.4.0-beta.17"
+  }
+}
