@@ -1,15 +1,15 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
-const HomePage = lazy(() =>
-  import('./pages/HomePage').then((m) => ({ default: m.HomePage })),
-);
-const GetStartedPage = lazy(() =>
-  import('./pages/GetStartedPage').then((m) => ({ default: m.GetStartedPage })),
-);
-const LoginPage = lazy(() =>
-  import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })),
-);
+// The marketing pages are a few KB each and share one layout, so splitting them
+// only bought a round trip the preload scanner could not see — i.e. a visible
+// "Loading…" on the landing page. They ship in the entry chunk instead.
+import { GetStartedPage } from './pages/GetStartedPage';
+import { HomePage } from './pages/HomePage';
+import { LoginPage } from './pages/LoginPage';
+
+// These two are worth splitting: they pull in GroupMapShell (~385 KB) and
+// GraphsPanel (~366 KB), neither of which a first-time visitor needs.
 const DemoPage = lazy(() =>
   import('./pages/DemoPage').then((m) => ({ default: m.DemoPage })),
 );
@@ -17,7 +17,7 @@ const GroupPage = lazy(() =>
   import('./pages/GroupPage').then((m) => ({ default: m.GroupPage })),
 );
 
-// Minimal inline fallback: pages have their own chrome, so keep this neutral.
+// Only reachable via /demo and /group now, which really are a large download.
 const FALLBACK = (
   <div
     style={{
