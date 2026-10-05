@@ -181,6 +181,38 @@ export function WikiIcon() {
   );
 }
 
+export function LayersIcon() {
+  return (
+    <svg {...CHIP}>
+      <path d="M12 3 3 7.5l9 4.5 9-4.5z" />
+      <path d="m3 12 9 4.5 9-4.5" />
+      <path d="m3 16.5 9 4.5 9-4.5" />
+    </svg>
+  );
+}
+
+export function FullscreenIcon({ exit = false }: { exit?: boolean }) {
+  return (
+    <svg {...CHIP}>
+      {exit ? (
+        <>
+          <path d="M9 3v6H3" />
+          <path d="M15 21v-6h6" />
+          <path d="M21 9h-6V3" />
+          <path d="M3 15h6v6" />
+        </>
+      ) : (
+        <>
+          <path d="M3 9V3h6" />
+          <path d="M21 15v6h-6" />
+          <path d="M15 3h6v6" />
+          <path d="M9 21H3v-6" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 export function LockIcon() {
   return (
     <svg

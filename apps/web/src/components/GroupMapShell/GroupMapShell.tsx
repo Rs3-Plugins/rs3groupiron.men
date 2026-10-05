@@ -12,6 +12,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { DEMO_GROUP, type AppearanceTheme, type GroupMode } from '../../api/groupClient';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { useFullscreen } from '../../hooks/useFullscreen';
 import { useGroupData } from '../../hooks/useGroupData';
 import { useGroupQuests } from '../../hooks/useGroupQuests';
 import { useXpDrops } from '../../hooks/useXpDrops';
@@ -22,9 +23,18 @@ import { aggregateGroupItems, type PlayerView } from '../../lib/items';
 import { panelOpacityToAlpha, readPanelOpacity, writePanelOpacity } from '../../lib/panelOpacity';
 import { POLL_MS_DEFAULT, POLL_MS_MAP } from '../../lib/polling';
 import { questPointsFor } from '../../lib/quests';
-import { DEFAULT_CENTER, Rs3Map } from '../Map';
+import {
+  DEFAULT_CENTER,
+  findMapMode,
+  MAP_MODES,
+  readMapMode,
+  Rs3Map,
+  writeMapMode,
+  type MapMode,
+} from '../Map';
 import { ActionsMenu } from './ActionsMenu';
 import { AchievementsPanel } from './AchievementsPanel';
+import { FullscreenIcon, LayersIcon } from './icons';
 import { ItemsPanel } from './ItemsPanel';
 import { LedgerPanel } from './LedgerPanel';
 import type { MemberBadge } from './memberOptions';
@@ -101,6 +111,13 @@ export function GroupMapShell({
   }));
   const panelOpacity = panelOpacityByTheme[appearance];
   const [mapFocus, setMapFocus] = useState<MapFocus | null>(null);
+  const [mapMode, setMapMode] = useState<MapMode>(readMapMode);
+  const fullscreen = useFullscreen();
+
+  const selectMapMode = useCallback((next: MapMode) => {
+    writeMapMode(next);
+    setMapMode(next);
+  }, []);
 
   const pollMs = tab === 'map' ? POLL_MS_MAP : POLL_MS_DEFAULT;
   const { players, rawMembers, info, loading, error, refresh, patchPlayers } = useGroupData(
@@ -233,6 +250,7 @@ export function GroupMapShell({
         x={mapFocus?.x ?? DEFAULT_CENTER.x}
         y={mapFocus?.y ?? DEFAULT_CENTER.y}
         plane={mapFocus?.plane ?? 0}
+        mode={mapMode}
         markers={mapMarkers}
         activeMarkerId={mapFocus?.name ?? null}
       />
@@ -346,11 +364,41 @@ export function GroupMapShell({
         {children}
       </div>
 
-      {demoTools && (
-        <button type="button" className="gms-demo-xp-btn" onClick={testXpDrop}>
-          Test XP drop
-        </button>
-      )}
+      <div className="gms-corner-tools">
+        <div className="gms-maptools">
+          <ActionsMenu
+            label={findMapMode(mapMode).label}
+            title="Map style"
+            icon={<LayersIcon />}
+            placement="top"
+            items={MAP_MODES.map((style) => ({
+              key: style.id,
+              label: style.label,
+              hint: style.hint,
+              active: style.id === mapMode,
+              onSelect: () => selectMapMode(style.id),
+            }))}
+          />
+          {fullscreen.supported && (
+            <button
+              type="button"
+              className="gms-action gms-action--icon"
+              aria-pressed={fullscreen.active}
+              title={fullscreen.active ? 'Exit fullscreen' : 'Fullscreen'}
+              aria-label={fullscreen.active ? 'Exit fullscreen' : 'Fullscreen'}
+              onClick={fullscreen.toggle}
+            >
+              <FullscreenIcon exit={fullscreen.active} />
+            </button>
+          )}
+        </div>
+
+        {demoTools && (
+          <button type="button" className="gms-demo-xp-btn" onClick={testXpDrop}>
+            Test XP drop
+          </button>
+        )}
+      </div>
 
       <SetupModal
         open={setupOpen}
