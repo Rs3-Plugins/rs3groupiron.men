@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DEMO_GROUP, type AppearanceTheme, type GroupMode } from '../../api/groupClient';
+import { mergeQuestStates, useDemoActivity } from '../../hooks/useDemoActivity';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { useFullscreen } from '../../hooks/useFullscreen';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
@@ -105,7 +106,7 @@ export type GroupMapShellProps = {
   groupName?: string;
   groupToken?: string;
   initialTab?: ShellTab;
-  /** Show demo-only controls (e.g. Test XP drop). */
+  /** Run the demo activity simulation (XP, movement, loot, achievements). */
   demoTools?: boolean;
   children?: ReactNode;
 };
@@ -251,27 +252,7 @@ export function GroupMapShell({
     writeGroupSession({ name: groupName, token: groupToken });
   }, [groupName, groupToken]);
 
-  const testXpDrop = useCallback(() => {
-    const pool = players.filter((p) => p.online);
-    const player = pool[Math.floor(Math.random() * pool.length)] ?? players[0];
-    if (!player?.skills.length) return;
-    const skill = player.skills[Math.floor(Math.random() * player.skills.length)]!;
-    const amount = [12, 20, 35, 50, 75, 100][Math.floor(Math.random() * 6)]!;
-    // Bumping XP locally lets useXpDrops pick up the gain like a real poll.
-    patchPlayers((prev) =>
-      prev.map((p) =>
-        p.name !== player.name
-          ? p
-          : {
-              ...p,
-              // Drop the viewKey so the next poll rebuilds this player from
-              // server data instead of keeping the locally inflated XP.
-              viewKey: undefined,
-              skills: p.skills.map((s) => (s.id === skill.id ? { ...s, xp: s.xp + amount } : s)),
-            },
-      ),
-    );
-  }, [players, patchPlayers]);
+  const demo = useDemoActivity(demoTools, patchPlayers);
 
   const groupItems = useMemo(
     () => (tab === 'items' ? aggregateGroupItems(rawMembers) : []),
@@ -288,6 +269,10 @@ export function GroupMapShell({
   // Quest progress feeds both the Quests tab and the quest points on each
   // player's skills panel, so it lives at shell level.
   const quests = useGroupQuests(groupName, groupToken, dataRevision.current);
+  const questsByMember = useMemo(
+    () => mergeQuestStates(quests.byMember, demo.quests),
+    [quests.byMember, demo.quests],
+  );
   const memberNames = useMemo(() => players.map((p) => p.name), [players]);
 
   const memberBadges = useMemo<MemberBadge[]>(
@@ -443,8 +428,8 @@ export function GroupMapShell({
               player={player}
               xpDrop={xpDropsByPlayer[player.name] ?? null}
               onXpDropDone={dismissXpDrop}
-              questPoints={questPointsFor(quests.byMember[player.name])}
-              quests={quests.byMember[player.name]}
+              questPoints={questPointsFor(questsByMember[player.name])}
+              quests={questsByMember[player.name]}
             />
           ))}
         </aside>
@@ -458,20 +443,26 @@ export function GroupMapShell({
               </section>
             }
           >
-            <GraphsPanel {...panelProps} />
+            <GraphsPanel {...panelProps} injectedXp={demo.xp} />
           </Suspense>
         )}
-        {tab === 'ledger' && <LedgerPanel {...panelProps} />}
+        {tab === 'ledger' && <LedgerPanel {...panelProps} injected={demo.ledger} />}
         {tab === 'quests' && (
           <QuestsPanel
             memberNames={memberNames}
             members={memberBadges}
-            byMember={quests.byMember}
+            byMember={questsByMember}
             loading={quests.loading}
             error={quests.error}
           />
         )}
-        {tab === 'achievements' && <AchievementsPanel {...panelProps} appearance={appearance} />}
+        {tab === 'achievements' && (
+          <AchievementsPanel
+            {...panelProps}
+            appearance={appearance}
+            injected={demo.achievements}
+          />
+        )}
         {tab === 'settings' && (
           <SettingsPanel
             groupName={groupName}
@@ -522,12 +513,6 @@ export function GroupMapShell({
             </button>
           )}
         </div>
-
-        {demoTools && (
-          <button type="button" className="gms-demo-xp-btn" onClick={testXpDrop}>
-            Test XP drop
-          </button>
-        )}
       </div>
 
       <SetupModal

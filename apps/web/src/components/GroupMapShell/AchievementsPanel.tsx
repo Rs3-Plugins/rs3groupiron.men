@@ -48,6 +48,8 @@ type AchievementsPanelProps = {
   appearance?: AppearanceTheme;
   dataRevision?: number;
   members?: ReadonlyArray<MemberBadge>;
+  /** Client-side entries shown above the fetched ones (the demo's activity). */
+  injected?: ReadonlyArray<Achievement>;
 };
 
 export function AchievementsPanel({
@@ -56,6 +58,7 @@ export function AchievementsPanel({
   appearance = 'modern',
   dataRevision,
   members = [],
+  injected,
 }: AchievementsPanelProps) {
   const [kindFilter, setKindFilter] = useUrlState<KindFilter>('kind', 'all', {
     allowed: KIND_FILTERS,
@@ -81,13 +84,26 @@ export function AchievementsPanel({
     [groupName, groupToken, kindFilter, memberFilter, day],
   );
 
-  const { entries, hasMore, error, loading, refreshing, oldest, loadMore } =
+  const { entries: fetched, hasMore, error, loading, refreshing, oldest, loadMore } =
     usePagedHistory<Achievement>({
       fetchPage,
       pageSize: PAGE_SIZE,
       errorFallback: 'Failed to load achievements',
       dataRevision,
     });
+
+  // Injected entries skip the API, so the active filters are applied here.
+  const entries = useMemo(() => {
+    if (!injected?.length) return fetched;
+    const bounds = day ? dayBounds(day) : null;
+    const extra = injected.filter(
+      (entry) =>
+        (kindFilter === 'all' || entry.kind === kindFilter) &&
+        (memberFilter === 'all' || entry.name === memberFilter) &&
+        (!bounds || (entry.at >= bounds.from && entry.at < bounds.to)),
+    );
+    return extra.length ? [...extra, ...fetched] : fetched;
+  }, [injected, fetched, kindFilter, memberFilter, day]);
 
   const [knownMembers, setKnownMembers] = useState<string[]>([]);
   useEffect(() => {

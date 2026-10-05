@@ -458,31 +458,6 @@
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
 
-.gms-demo-xp-btn {
-  appearance: none;
-  padding: 0.65rem 1rem;
-  border: 1px solid rgba(232, 160, 74, 0.45);
-  border-radius: var(--radius-md);
-  background: rgba(28, 32, 36, 0.94);
-  color: var(--gold-bright);
-  font: inherit;
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    transform 0.15s ease;
-}
-
-.gms-demo-xp-btn:hover {
-  border-color: var(--gold);
-  background: rgba(40, 36, 28, 0.96);
-  transform: translateY(-1px);
-}
-
 .gms-side-status {
   margin: 0;
   padding: 0.75rem;
@@ -4485,7 +4460,6 @@
   .gms-action,
   .gms-page,
   .gms-player-nav-btn,
-  .gms-demo-xp-btn,
   .gms-items-mode-btn,
   .gms-quests-seg,
   .gms-panel-day-all,
@@ -4537,8 +4511,6 @@
     animation-duration: 2.4s;
   }
 
-  .gms-demo-xp-btn,
-  .gms-demo-xp-btn:hover,
   .gms-settings-add-card,
   .gms-settings-toggle input[type='checkbox'],
   .gms-settings-toggle input[type='checkbox']::after {

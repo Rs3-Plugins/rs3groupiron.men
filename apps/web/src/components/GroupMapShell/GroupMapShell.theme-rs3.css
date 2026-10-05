@@ -272,7 +272,6 @@
 .gms[data-appearance='rs3'] .gms-action,
 .gms[data-appearance='rs3'] .gms-modal-cancel,
 .gms[data-appearance='rs3'] .gms-player-nav-btn,
-.gms[data-appearance='rs3'] .gms-demo-xp-btn,
 [data-appearance='rs3'] .gms-modal-cancel {
   border: 0 !important;
   border-radius: 0 !important;
@@ -325,7 +324,6 @@
 .gms[data-appearance='rs3'] .gms-action:hover,
 .gms[data-appearance='rs3'] .gms-modal-cancel:hover,
 .gms[data-appearance='rs3'] .gms-player-nav-btn:hover:not(:disabled),
-.gms[data-appearance='rs3'] .gms-demo-xp-btn:hover,
 [data-appearance='rs3'] .gms-modal-cancel:hover {
   background-image: var(--rs3-btn-hover) !important;
   color: #fff8e8 !important;
@@ -1260,7 +1258,6 @@
   .gms[data-appearance='rs3'] .gms-tab,
   .gms[data-appearance='rs3'] .gms-action,
   .gms[data-appearance='rs3'] .gms-player-nav-btn,
-  .gms[data-appearance='rs3'] .gms-demo-xp-btn,
   .gms[data-appearance='rs3'] .gms-modal-cancel,
   [data-appearance='rs3'] .gms-modal-cancel {
     height: 40px;

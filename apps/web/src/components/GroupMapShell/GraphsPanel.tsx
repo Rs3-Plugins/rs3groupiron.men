@@ -20,6 +20,11 @@ import {
 } from '../../lib/graphPrefs';
 import { colorForName, formatQty } from '../../lib/items';
 import { SKILL_BY_ID, SKILLS } from '../../lib/skills';
+import {
+  DEMO_XP_SAMPLE_MS,
+  demoGainFor,
+  type DemoXp,
+} from '../../hooks/useDemoActivity';
 import { useLatestRequest } from '../../hooks/useLatestRequest';
 import { useLiveRefresh } from '../../hooks/useLiveRefresh';
 import { useUrlState } from '../../hooks/useUrlState';
@@ -86,6 +91,7 @@ type GraphsPanelProps = {
   groupToken?: string;
   dataRevision?: number;
   members?: ReadonlyArray<MemberBadge>;
+  injectedXp?: DemoXp;
 };
 
 export function GraphsPanel({
@@ -93,6 +99,7 @@ export function GraphsPanel({
   groupToken = '',
   dataRevision,
   members = [],
+  injectedXp,
 }: GraphsPanelProps) {
   const [urlParams] = useSearchParams();
   const [prefs, setPrefs] = useState<GraphPrefs>(readGraphPrefs);
@@ -175,19 +182,72 @@ export function GraphsPanel({
     { signal: dataRevision, intervalMs: 30_000 },
   );
 
+  // Demo gains are appended on a synthetic clock that carries on past the end
+  // of the fetched window, so the live tail can never fall behind a refreshed
+  // `to` and dip the cumulative line.
+  const view = useMemo<XpHistoryResponse | null>(() => {
+    const samples = injectedXp?.samples ?? [];
+    if (!data || !injectedXp || !samples.length) return data;
+
+    const grid = data.series[0]?.points ?? [];
+    const lastT = grid.length ? new Date(grid[grid.length - 1]!.t).getTime() : Date.now();
+    const stamps = samples.map((_, i) =>
+      new Date(lastT + (i + 1) * DEMO_XP_SAMPLE_MS).toISOString(),
+    );
+
+    const names = [
+      ...new Set([...data.series.map((s) => s.name), ...Object.keys(injectedXp.totals)]),
+    ];
+
+    const series = names.map((name) => {
+      const base = data.series.find((s) => s.name === name);
+      const points = base ? [...base.points] : grid.map((p) => ({ t: p.t, gain: 0 }));
+      const tail = points[points.length - 1]?.gain ?? 0;
+      samples.forEach((entry, i) => {
+        points.push({ t: stamps[i]!, gain: tail + demoGainFor(entry.totals, name, skill) });
+      });
+      return { name, points };
+    });
+
+    const players = names.map((name) => {
+      const base = data.players.find((p) => p.name === name);
+      const gains = injectedXp.totals[name] ?? {};
+      const bySkill = new Map((base?.skills ?? []).map((s) => [s.id, { ...s }]));
+      for (const id of Object.keys(gains)) {
+        if (skill !== 'overall' && id !== skill) continue;
+        const row = bySkill.get(id);
+        if (row) row.gain += gains[id]!;
+        else {
+          bySkill.set(id, {
+            id,
+            name: SKILL_BY_ID[id as SkillKey]?.name ?? id,
+            gain: gains[id]!,
+          });
+        }
+      }
+      return {
+        name,
+        totalGain: (base?.totalGain ?? 0) + demoGainFor(injectedXp.totals, name, skill),
+        skills: [...bySkill.values()].sort((a, b) => b.gain - a.gain),
+      };
+    });
+
+    return { ...data, series, players };
+  }, [data, injectedXp, skill]);
+
   useEffect(() => {
-    if (!data || playerFilter === 'all') return;
-    if (!data.players.some((p) => p.name === playerFilter)) patch({ player: 'all' });
-  }, [data, playerFilter, patch]);
+    if (!view || playerFilter === 'all') return;
+    if (!view.players.some((p) => p.name === playerFilter)) patch({ player: 'all' });
+  }, [view, playerFilter, patch]);
 
   const playerOptions = useMemo(
     () =>
       memberOptions(
-        (data?.players ?? []).map((p) => p.name),
+        (view?.players ?? []).map((p) => p.name),
         members,
         'All players',
       ),
-    [data, members],
+    [view, members],
   );
 
   const matchesFilter = useCallback(
@@ -196,13 +256,13 @@ export function GraphsPanel({
   );
 
   const visibleSeries = useMemo(
-    () => (data?.series ?? []).filter((s) => matchesFilter(s.name)),
-    [data, matchesFilter],
+    () => (view?.series ?? []).filter((s) => matchesFilter(s.name)),
+    [view, matchesFilter],
   );
 
   const visiblePlayers = useMemo(
-    () => (data?.players ?? []).filter((p) => matchesFilter(p.name)),
-    [data, matchesFilter],
+    () => (view?.players ?? []).filter((p) => matchesFilter(p.name)),
+    [view, matchesFilter],
   );
 
   const chartRows = useMemo<ChartRow[]>(() => {
@@ -327,7 +387,7 @@ export function GraphsPanel({
 
   const skillLabel =
     skill === 'overall' ? 'Overall' : (SKILL_BY_ID[skill as SkillKey]?.name ?? skill);
-  const hasChart = data != null && (isTimeChart ? chartRows.length > 0 : slices.length > 0);
+  const hasChart = view != null && (isTimeChart ? chartRows.length > 0 : slices.length > 0);
 
   return (
     <section className="gms-graphs gms-panel" aria-label="XP graphs" aria-busy={loading}>

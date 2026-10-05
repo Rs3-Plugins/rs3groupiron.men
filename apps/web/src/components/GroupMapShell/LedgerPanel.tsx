@@ -36,6 +36,7 @@ type LedgerPanelProps = {
   groupToken?: string;
   dataRevision?: number;
   members?: ReadonlyArray<MemberBadge>;
+  injected?: ReadonlyArray<BankLedgerEntry>;
 };
 
 export function LedgerPanel({
@@ -43,6 +44,7 @@ export function LedgerPanel({
   groupToken = '',
   dataRevision,
   members = [],
+  injected,
 }: LedgerPanelProps) {
   const [direction, setDirection] = useUrlState<Direction>('dir', 'all', {
     allowed: DIRECTION_VALUES,
@@ -65,13 +67,29 @@ export function LedgerPanel({
     [groupName, groupToken, day],
   );
 
-  const { entries, hasMore, error, loading, refreshing, oldest, loadMore } =
-    usePagedHistory<BankLedgerEntry>({
-      fetchPage,
-      pageSize: PAGE_SIZE,
-      errorFallback: 'Failed to load bank ledger',
-      dataRevision,
-    });
+  const {
+    entries: fetched,
+    hasMore,
+    error,
+    loading,
+    refreshing,
+    oldest,
+    loadMore,
+  } = usePagedHistory<BankLedgerEntry>({
+    fetchPage,
+    pageSize: PAGE_SIZE,
+    errorFallback: 'Failed to load bank ledger',
+    dataRevision,
+  });
+
+  const entries = useMemo(() => {
+    if (!injected?.length) return fetched;
+    const bounds = day ? dayBounds(day) : null;
+    const extra = injected.filter(
+      (entry) => !bounds || (entry.at >= bounds.from && entry.at < bounds.to),
+    );
+    return extra.length ? [...extra, ...fetched] : fetched;
+  }, [injected, fetched, day]);
 
   const memberChoices = useMemo(() => {
     const names = [...new Set(entries.map((e) => e.name))].sort((a, b) => a.localeCompare(b));
