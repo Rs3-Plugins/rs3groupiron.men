@@ -15,6 +15,7 @@ import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { useFullscreen } from '../../hooks/useFullscreen';
 import { useGroupData } from '../../hooks/useGroupData';
 import { useGroupQuests } from '../../hooks/useGroupQuests';
+import { useUrlState } from '../../hooks/useUrlState';
 import { useXpDrops } from '../../hooks/useXpDrops';
 import { DEFAULT_APPEARANCE, readAppearance, writeAppearance } from '../../lib/appearance';
 import { DISCORD_URL } from '../../lib/constants';
@@ -70,6 +71,8 @@ const NAV_TABS: Array<{ id: ShellTab; label: string }> = [
   { id: 'achievements', label: 'Achievements' },
 ];
 
+const SHELL_TABS: ShellTab[] = [...NAV_TABS.map((t) => t.id), 'settings'];
+
 export type GroupMapShellProps = {
   /** When given, always wins over any saved session. */
   groupName?: string;
@@ -81,6 +84,12 @@ export type GroupMapShellProps = {
 };
 
 type MapFocus = { name: string; x: number; y: number; plane: number };
+
+function focusFor(player: PlayerView): MapFocus | null {
+  const [x, y, plane = 0] = player.coordinates;
+  if (typeof x !== 'number' || typeof y !== 'number') return null;
+  return { name: player.name, x, y, plane: plane ?? 0 };
+}
 
 function initialSession(name?: string, token?: string) {
   if (name) return { name, token: token ?? '' };
@@ -96,7 +105,10 @@ export function GroupMapShell({
 }: GroupMapShellProps) {
   const navigate = useNavigate();
   const [boot] = useState(() => initialSession(initialGroupName, initialGroupToken));
-  const [tab, setTab] = useState<ShellTab>(initialTab);
+  const [tab, setTab] = useUrlState<ShellTab>('tab', initialTab, {
+    allowed: SHELL_TABS,
+    history: 'push',
+  });
   const [groupName, setGroupName] = useState(boot.name);
   const [groupToken, setGroupToken] = useState(boot.token);
   const [setupOpen, setSetupOpen] = useState(false);
@@ -111,6 +123,7 @@ export function GroupMapShell({
   }));
   const panelOpacity = panelOpacityByTheme[appearance];
   const [mapFocus, setMapFocus] = useState<MapFocus | null>(null);
+  const [focusName, setFocusName] = useUrlState('player', '', { history: 'push' });
   const [mapMode, setMapMode] = useState<MapMode>(readMapMode);
   const fullscreen = useFullscreen();
 
@@ -222,10 +235,21 @@ export function GroupMapShell({
     [players],
   );
 
+  useEffect(() => {
+    if (!focusName) {
+      setMapFocus(null);
+      return;
+    }
+    if (mapFocus?.name === focusName) return;
+    const player = players.find((p) => p.name === focusName);
+    if (player) setMapFocus(focusFor(player));
+  }, [focusName, players, mapFocus?.name]);
+
   function goToPlayer(player: PlayerView) {
-    const [x, y, plane = 0] = player.coordinates;
-    if (typeof x !== 'number' || typeof y !== 'number') return;
-    setMapFocus({ name: player.name, x, y, plane: plane ?? 0 });
+    const focus = focusFor(player);
+    if (!focus) return;
+    setMapFocus(focus);
+    setFocusName(player.name);
     setTab('map');
   }
 
@@ -252,7 +276,7 @@ export function GroupMapShell({
         plane={mapFocus?.plane ?? 0}
         mode={mapMode}
         markers={mapMarkers}
-        activeMarkerId={mapFocus?.name ?? null}
+        activeMarkerId={focusName || null}
       />
 
       <div className={tab === 'map' ? 'gms-overlay gms-overlay--map' : 'gms-overlay'}>
@@ -292,7 +316,7 @@ export function GroupMapShell({
           {tab === 'map' && (
             <PlayerNav
               players={players}
-              activeName={mapFocus?.name ?? null}
+              activeName={focusName || null}
               onSelect={goToPlayer}
             />
           )}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   DEMO_GROUP,
   fetchXpHistory,
@@ -9,6 +10,8 @@ import { clickDownload, svgToPngBlob } from '../../lib/download';
 import { errorMessage } from '../../lib/errors';
 import { downloadCsv, downloadXlsx, type Table } from '../../lib/exportTable';
 import {
+  DEFAULT_GRAPH_PREFS,
+  PERIODS as PERIOD_VALUES,
   readGraphPrefs,
   writeGraphPrefs,
   TIME_CHARTS,
@@ -19,6 +22,7 @@ import { colorForName, formatQty } from '../../lib/items';
 import { SKILL_BY_ID, SKILLS } from '../../lib/skills';
 import { useLatestRequest } from '../../hooks/useLatestRequest';
 import { useLiveRefresh } from '../../hooks/useLiveRefresh';
+import { useUrlState } from '../../hooks/useUrlState';
 import { Spinner } from '../Spinner';
 import { ChartOptionsMenu } from './ChartOptionsMenu';
 import { ExportMenu, type ExportFormat } from './ExportMenu';
@@ -55,6 +59,8 @@ const SKILL_OPTIONS: IconOption[] = [
     .map((s) => ({ value: s.id, label: s.name, icon: <SkillIcon skillId={s.id} /> })),
 ];
 
+const SKILL_VALUES: string[] = SKILL_OPTIONS.map((o) => o.value);
+
 const MAX_SLICES = 10;
 
 /** Module-level response cache so switching tabs doesn't refetch. */
@@ -88,11 +94,20 @@ export function GraphsPanel({
   dataRevision,
   members = [],
 }: GraphsPanelProps) {
+  const [urlParams] = useSearchParams();
   const [prefs, setPrefs] = useState<GraphPrefs>(readGraphPrefs);
-  const { period, skill, player: playerFilter, mode, logScale, chart } = prefs;
+  const { mode, logScale, chart } = prefs;
+
+  const [period, setPeriodUrl] = useUrlState('period', DEFAULT_GRAPH_PREFS.period, {
+    allowed: PERIOD_VALUES,
+  });
+  const [skill, setSkillUrl] = useUrlState('skill', DEFAULT_GRAPH_PREFS.skill, {
+    allowed: SKILL_VALUES,
+  });
+  const [playerFilter, setPlayerUrl] = useUrlState('member', DEFAULT_GRAPH_PREFS.player);
 
   const [data, setData] = useState<XpHistoryResponse | null>(() =>
-    readCache(cacheKey(groupName, prefs.period, prefs.skill)),
+    readCache(cacheKey(groupName, period, skill)),
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -105,13 +120,30 @@ export function GraphsPanel({
 
   const isTimeChart = TIME_CHARTS.includes(chart);
 
-  const patch = useCallback((next: Partial<GraphPrefs>) => {
-    setPrefs((prev) => {
-      const merged = { ...prev, ...next };
-      writeGraphPrefs(merged);
-      return merged;
-    });
-  }, []);
+  const patch = useCallback(
+    (next: Partial<GraphPrefs>) => {
+      if (next.period !== undefined) setPeriodUrl(next.period);
+      if (next.skill !== undefined) setSkillUrl(next.skill);
+      if (next.player !== undefined) setPlayerUrl(next.player);
+      setPrefs((prev) => {
+        const merged = { ...prev, ...next };
+        writeGraphPrefs(merged);
+        return merged;
+      });
+    },
+    [setPeriodUrl, setSkillUrl, setPlayerUrl],
+  );
+
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current) return;
+    seeded.current = true;
+    if (urlParams.has('period') || urlParams.has('skill') || urlParams.has('member')) return;
+    const saved = readGraphPrefs();
+    if (saved.period !== DEFAULT_GRAPH_PREFS.period) setPeriodUrl(saved.period);
+    if (saved.skill !== DEFAULT_GRAPH_PREFS.skill) setSkillUrl(saved.skill);
+    if (saved.player !== DEFAULT_GRAPH_PREFS.player) setPlayerUrl(saved.player);
+  }, [urlParams, setPeriodUrl, setSkillUrl, setPlayerUrl]);
 
   const load = useCallback(
     async (force = false, silent = false) => {

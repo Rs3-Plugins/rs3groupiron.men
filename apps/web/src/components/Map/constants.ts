@@ -21,4 +21,5 @@ export const DEFAULT_LABELS_API_KEY: string =
 
 export const DEFAULT_CENTER = { x: 3200, y: 3200 };
 export const DEFAULT_ZOOM = 3;
+export const DEFAULT_MIN_ZOOM = -2;
 export const DEFAULT_MAP_ID = -1;

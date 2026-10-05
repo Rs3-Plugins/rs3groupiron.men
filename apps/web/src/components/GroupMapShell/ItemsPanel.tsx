@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useUrlNumber, useUrlState, useUrlText } from '../../hooks/useUrlState';
 import { formatGp, getItemPrices } from '../../lib/itemPrices';
 import { formatQty, type GroupItem } from '../../lib/items';
 import { IconSelect } from './IconSelect';
@@ -23,6 +24,9 @@ const SORTS: Array<{ value: Sort; label: string }> = [
   { value: 'alch', label: 'Sort: Alch value' },
 ];
 
+const SORT_VALUES: Sort[] = SORTS.map((s) => s.value);
+const PRICE_MODES: PriceMode[] = ['each', 'stack'];
+
 const BADGES = {
   ge: { label: 'Grand Exchange', src: '/item-prices/ge.png?v=3', text: 'GE' },
   alch: { label: 'High alchemy', src: '/item-prices/high-alch.png?v=3', text: 'Alch' },
@@ -38,11 +42,13 @@ export function ItemsPanel({
   items: GroupItem[];
   members?: ReadonlyArray<MemberBadge>;
 }) {
-  const [query, setQuery] = useState('');
-  const [page, setPage] = useState(1);
-  const [playerFilter, setPlayerFilter] = useState('all');
-  const [sort, setSort] = useState<Sort>('qty');
-  const [priceMode, setPriceMode] = useState<PriceMode>('stack');
+  const [query, setQuery] = useUrlText('q');
+  const [page, setPage] = useUrlNumber('page', 1, { min: 1 });
+  const [playerFilter, setPlayerFilter] = useUrlState('member', 'all');
+  const [sort, setSort] = useUrlState<Sort>('sort', 'qty', { allowed: SORT_VALUES });
+  const [priceMode, setPriceMode] = useUrlState<PriceMode>('price', 'stack', {
+    allowed: PRICE_MODES,
+  });
 
   const players = useMemo(() => {
     const names = new Set<string>();

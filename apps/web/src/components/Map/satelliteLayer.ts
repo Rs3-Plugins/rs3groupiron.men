@@ -6,13 +6,14 @@ import type { ElevationConfig, SatelliteSource } from './mapModes';
 const TILE_SIZE = 512;
 const ORIGIN_X = -16.5;
 const ORIGIN_Y = 12783.5;
+const MIN_NATIVE_ZOOM = -5;
 
 export type SatelliteLayerOptions = L.TileLayerOptions;
 
 const SatelliteTileLayer = (L.TileLayer as any).extend({
   initialize(this: any, sources: SatelliteSource[], options?: SatelliteLayerOptions) {
     this._sources = sources;
-    L.setOptions(this, { tileSize: TILE_SIZE, ...options });
+    L.setOptions(this, { tileSize: TILE_SIZE, minZoom: MIN_NATIVE_ZOOM, ...options });
   },
 
   _sourceFor(this: any, zoom: number): SatelliteSource | undefined {

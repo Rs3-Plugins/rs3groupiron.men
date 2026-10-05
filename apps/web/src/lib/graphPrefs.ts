@@ -19,7 +19,7 @@ export type GraphPrefs = {
 
 const CHARTS: ChartKind[] = ['line', 'area', 'bar', 'pie'];
 
-const PERIODS: XpHistoryPeriod[] = ['24h', '7d', '30d', '365d'];
+export const PERIODS: XpHistoryPeriod[] = ['24h', '7d', '30d', '365d'];
 
 export const DEFAULT_GRAPH_PREFS: GraphPrefs = {
   period: '24h',

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { DEMO_GROUP, fetchBankLedger, type BankLedgerEntry } from '../../api/groupClient';
+import { useUrlState } from '../../hooks/useUrlState';
 import { dayBounds, toDayInput } from '../../lib/day';
 import { colorForName, formatQty, itemName } from '../../lib/items';
 import { formatGp } from '../../lib/itemPrices';
@@ -16,6 +17,8 @@ const PAGE_SIZE = 100;
 const MINUS = '−';
 
 type Direction = 'all' | 'in' | 'out';
+
+const DIRECTION_VALUES: Direction[] = ['all', 'in', 'out'];
 
 const DIRECTIONS: SelectOption[] = [
   { value: 'all', label: 'All movements' },
@@ -41,10 +44,12 @@ export function LedgerPanel({
   dataRevision,
   members = [],
 }: LedgerPanelProps) {
-  const [direction, setDirection] = useState<Direction>('all');
-  const [memberFilter, setMemberFilter] = useState('all');
+  const [direction, setDirection] = useUrlState<Direction>('dir', 'all', {
+    allowed: DIRECTION_VALUES,
+  });
+  const [memberFilter, setMemberFilter] = useUrlState('member', 'all');
   const [today] = useState(() => toDayInput(new Date()));
-  const [day, setDay] = useState(today);
+  const [day, setDay] = useUrlState('day', today);
 
   const fetchPage = useCallback(
     ({ before, limit, signal }: { before?: string; limit: number; signal: AbortSignal }) => {

@@ -12,6 +12,7 @@ import { colorForName } from '../../lib/items';
 import { SKILL_BY_ID, type SkillId } from '../../lib/skills';
 import { timestamp } from '../../lib/time';
 import { usePagedHistory } from '../../hooks/usePagedHistory';
+import { useUrlState } from '../../hooks/useUrlState';
 import { Modal } from '../Modal';
 import { DayPicker, ShowAllTimeButton } from './DayPicker';
 import { IconSelect } from './IconSelect';
@@ -39,6 +40,8 @@ const KIND_OPTIONS: SelectOption[] = [
 
 type KindFilter = 'all' | AchievementKind;
 
+const KIND_FILTERS: KindFilter[] = ['all', ...KINDS];
+
 type AchievementsPanelProps = {
   groupName?: string;
   groupToken?: string;
@@ -54,11 +57,13 @@ export function AchievementsPanel({
   dataRevision,
   members = [],
 }: AchievementsPanelProps) {
-  const [kindFilter, setKindFilter] = useState<KindFilter>('all');
-  const [memberFilter, setMemberFilter] = useState('all');
-  const [zoomed, setZoomed] = useState<Achievement | null>(null);
+  const [kindFilter, setKindFilter] = useUrlState<KindFilter>('kind', 'all', {
+    allowed: KIND_FILTERS,
+  });
+  const [memberFilter, setMemberFilter] = useUrlState('member', 'all');
+  const [zoomedId, setZoomedId] = useUrlState('achievement', '', { history: 'push' });
   const [today] = useState(() => toDayInput(new Date()));
-  const [day, setDay] = useState('');
+  const [day, setDay] = useUrlState('day', '');
 
   const fetchPage = useCallback(
     ({ before, limit, signal }: { before?: string; limit: number; signal: AbortSignal }) => {
@@ -97,6 +102,11 @@ export function AchievementsPanel({
   const memberChoices = useMemo(
     () => memberOptions(knownMembers, members),
     [knownMembers, members],
+  );
+
+  const zoomed = useMemo(
+    () => (zoomedId ? (entries.find((e) => e.id === zoomedId) ?? null) : null),
+    [zoomedId, entries],
   );
 
   const counts = useMemo(() => {
@@ -154,7 +164,7 @@ export function AchievementsPanel({
         {entries.length > 0 && (
           <ul className="gms-panel-list">
             {entries.map((entry) => (
-              <AchievementCard key={entry.id} entry={entry} onZoom={() => setZoomed(entry)} />
+              <AchievementCard key={entry.id} entry={entry} onZoom={() => setZoomedId(entry.id)} />
             ))}
           </ul>
         )}
@@ -164,7 +174,7 @@ export function AchievementsPanel({
 
       <Modal
         open={zoomed !== null}
-        onClose={() => setZoomed(null)}
+        onClose={() => setZoomedId('')}
         titleId="gms-ach-image-title"
         title={zoomed ? zoomed.title : 'Achievement'}
         className="gms-modal--achievement"

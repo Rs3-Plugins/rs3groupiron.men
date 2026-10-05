@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useUrlState, useUrlText } from '../../hooks/useUrlState';
 import {
   MAX_QUEST_POINTS,
   QUEST_CATEGORIES,
@@ -26,6 +27,9 @@ const PROGRESS: Array<{ key: Progress; label: string; groupHint: string }> = [
   { key: 'started', label: 'In progress', groupHint: 'At least one member has started it' },
   { key: 'not_started', label: 'Not started', groupHint: 'Nobody has started it yet' },
 ];
+
+const PROGRESS_VALUES: Progress[] = PROGRESS.map((p) => p.key);
+const CATEGORY_VALUES: Array<QuestCategory | 'all'> = ['all', ...QUEST_CATEGORIES];
 
 function stateOf(states: MemberQuestStates | undefined, quest: QuestDef): QuestState | null {
   return states?.[quest.gameval] ?? null;
@@ -66,10 +70,14 @@ export function QuestsPanel({
   loading = false,
   error = null,
 }: QuestsPanelProps) {
-  const [query, setQuery] = useState('');
-  const [memberFilter, setMemberFilter] = useState('all');
-  const [progress, setProgress] = useState<Progress>('all');
-  const [category, setCategory] = useState<QuestCategory | 'all'>('quest');
+  const [query, setQuery] = useUrlText('q');
+  const [memberFilter, setMemberFilter] = useUrlState('member', 'all');
+  const [progress, setProgress] = useUrlState<Progress>('progress', 'all', {
+    allowed: PROGRESS_VALUES,
+  });
+  const [category, setCategory] = useUrlState<QuestCategory | 'all'>('category', 'quest', {
+    allowed: CATEGORY_VALUES,
+  });
 
   const columns = useMemo(
     () =>
