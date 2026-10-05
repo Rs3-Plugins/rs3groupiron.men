@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 type UrlStateOptions<T extends string> = {
   allowed?: readonly T[];
   history?: 'push' | 'replace';
+  exclusive?: boolean;
 };
 
 export function useUrlState<T extends string = string>(
@@ -11,7 +12,7 @@ export function useUrlState<T extends string = string>(
   fallback: NoInfer<T>,
   options: UrlStateOptions<T> = {},
 ): [T, (next: T) => void] {
-  const { allowed, history = 'replace' } = options;
+  const { allowed, history = 'replace', exclusive = false } = options;
   const [params, setParams] = useSearchParams();
 
   const raw = params.get(key);
@@ -24,7 +25,7 @@ export function useUrlState<T extends string = string>(
     (next: T) => {
       setParams(
         (prev) => {
-          const out = new URLSearchParams(prev);
+          const out = exclusive ? new URLSearchParams() : new URLSearchParams(prev);
           if (next === fallback) out.delete(key);
           else out.set(key, next);
           return out;
@@ -32,7 +33,7 @@ export function useUrlState<T extends string = string>(
         { replace: history === 'replace' },
       );
     },
-    [key, fallback, history, setParams],
+    [key, fallback, history, exclusive, setParams],
   );
 
   return [value, set];

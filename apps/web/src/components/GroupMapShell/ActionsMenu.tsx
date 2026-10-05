@@ -14,6 +14,7 @@ export type ActionsMenuItem = {
 type ActionsMenuProps = {
   label?: string;
   icon?: ReactNode;
+  hideLabel?: boolean;
   title?: string;
   placement?: 'bottom' | 'top';
   items: ActionsMenuItem[];
@@ -36,6 +37,7 @@ function itemClass(item: ActionsMenuItem) {
 export function ActionsMenu({
   label = 'Menu',
   icon,
+  hideLabel = false,
   title,
   placement = 'bottom',
   items,
@@ -81,18 +83,27 @@ export function ActionsMenu({
       <button
         type="button"
         ref={triggerRef}
-        className={icon ? 'gms-action gms-action--with-icon' : 'gms-action'}
-        title={title}
+        className={[
+          'gms-action',
+          icon && !hideLabel ? 'gms-action--with-icon' : '',
+          hideLabel ? 'gms-action--icon' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        title={title ?? (hideLabel ? label : undefined)}
+        aria-label={hideLabel ? label : undefined}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((v) => !v)}
       >
         {icon}
-        {label}
-        <span className="gms-menu-caret" aria-hidden>
-          ▾
-        </span>
+        {!hideLabel && <span className="gms-action-label">{label}</span>}
+        {!hideLabel && (
+          <span className="gms-menu-caret" aria-hidden>
+            ▾
+          </span>
+        )}
       </button>
 
       {open && (

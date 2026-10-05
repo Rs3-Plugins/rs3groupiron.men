@@ -296,6 +296,7 @@ function QuestRow({
           <td
             key={name}
             className={`gms-quests-cell gms-quests-cell--${state ?? 'not_started'}`}
+            data-member={name}
             title={`${name} · ${quest.name} · ${label}`}
           >
             <Mark state={state} label={label} />

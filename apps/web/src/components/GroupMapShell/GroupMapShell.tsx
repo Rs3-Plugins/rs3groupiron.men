@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { DEMO_GROUP, type AppearanceTheme, type GroupMode } from '../../api/groupClient';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { useFullscreen } from '../../hooks/useFullscreen';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useGroupData } from '../../hooks/useGroupData';
 import { useGroupQuests } from '../../hooks/useGroupQuests';
 import { useUrlState } from '../../hooks/useUrlState';
@@ -35,7 +36,19 @@ import {
 } from '../Map';
 import { ActionsMenu } from './ActionsMenu';
 import { AchievementsPanel } from './AchievementsPanel';
-import { FullscreenIcon, LayersIcon } from './icons';
+import {
+  AchievementsIcon,
+  FullscreenIcon,
+  GraphsIcon,
+  ItemsIcon,
+  LayersIcon,
+  LedgerIcon,
+  MapIcon,
+  MenuIcon,
+  ProfileIcon,
+  QuestsIcon,
+  SettingsIcon,
+} from './icons';
 import { ItemsPanel } from './ItemsPanel';
 import { LedgerPanel } from './LedgerPanel';
 import type { MemberBadge } from './memberOptions';
@@ -45,6 +58,7 @@ import { PlayerCardSkeleton } from './PlayerCardSkeleton';
 import { QuestsPanel } from './QuestsPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { SetupModal } from './SetupModal';
+import { TabNav, type NavAction, type NavMenu, type NavTab } from './TabNav';
 import './GroupMapShell.css';
 import './GroupMapShell.theme-rs3.css';
 
@@ -60,18 +74,31 @@ export type ShellTab =
   | 'ledger'
   | 'quests'
   | 'achievements'
+  | 'players'
   | 'settings';
 
-const NAV_TABS: Array<{ id: ShellTab; label: string }> = [
-  { id: 'items', label: 'Items' },
-  { id: 'map', label: 'Map' },
-  { id: 'graphs', label: 'Graphs' },
-  { id: 'ledger', label: 'Bank Ledger' },
-  { id: 'quests', label: 'Quests' },
-  { id: 'achievements', label: 'Achievements' },
+const NAV_TABS: Array<NavTab<ShellTab>> = [
+  { id: 'items', label: 'Items', icon: <ItemsIcon /> },
+  { id: 'map', label: 'Map', icon: <MapIcon /> },
+  { id: 'graphs', label: 'Graphs', icon: <GraphsIcon /> },
+  { id: 'ledger', label: 'Bank Ledger', icon: <LedgerIcon /> },
+  { id: 'quests', label: 'Quests', icon: <QuestsIcon /> },
+  { id: 'achievements', label: 'Achievements', icon: <AchievementsIcon /> },
 ];
 
-const SHELL_TABS: ShellTab[] = [...NAV_TABS.map((t) => t.id), 'settings'];
+const PROFILE_TAB: NavTab<ShellTab> = {
+  id: 'players',
+  label: 'Profile',
+  icon: <ProfileIcon />,
+};
+
+const NAV_TABS_MOBILE: Array<NavTab<ShellTab>> = NAV_TABS.flatMap((t) =>
+  t.id === 'map' ? [PROFILE_TAB, t] : [t],
+);
+
+const SHELL_TABS: ShellTab[] = [...NAV_TABS.map((t) => t.id), 'players', 'settings'];
+
+const MOBILE_QUERY = '(max-width: 900px)';
 
 export type GroupMapShellProps = {
   /** When given, always wins over any saved session. */
@@ -108,6 +135,7 @@ export function GroupMapShell({
   const [tab, setTab] = useUrlState<ShellTab>('tab', initialTab, {
     allowed: SHELL_TABS,
     history: 'push',
+    exclusive: true,
   });
   const [groupName, setGroupName] = useState(boot.name);
   const [groupToken, setGroupToken] = useState(boot.token);
@@ -126,6 +154,27 @@ export function GroupMapShell({
   const [focusName, setFocusName] = useUrlState('player', '', { history: 'push' });
   const [mapMode, setMapMode] = useState<MapMode>(readMapMode);
   const fullscreen = useFullscreen();
+  const isNarrow = useMediaQuery(MOBILE_QUERY);
+  const playersRef = useRef<HTMLElement>(null);
+  const cardPitch = useRef(0);
+  const [cardsOverflow, setCardsOverflow] = useState(false);
+  const stacked = isNarrow || cardsOverflow;
+
+  useEffect(() => {
+    if (tab === 'players' && !stacked) setTab('map');
+  }, [tab, stacked, setTab]);
+  const chromeRef = useRef<HTMLDivElement>(null);
+  const [chromeHeight, setChromeHeight] = useState(0);
+
+  useEffect(() => {
+    const el = chromeRef.current;
+    if (!el) return;
+    const sync = () => setChromeHeight(el.offsetHeight);
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const selectMapMode = useCallback((next: MapMode) => {
     writeMapMode(next);
@@ -138,6 +187,39 @@ export function GroupMapShell({
     groupToken,
     pollMs,
   );
+  const memberCount = players.length;
+
+  useEffect(() => {
+    const el = playersRef.current;
+    if (!el) return;
+
+    const recompute = () => {
+      if (!stacked) {
+        const card = el.querySelector<HTMLElement>('.gms-player');
+        if (card) {
+          const gap = Number.parseFloat(getComputedStyle(el).rowGap) || 0;
+          cardPitch.current = card.getBoundingClientRect().height + gap;
+        }
+      }
+      const pitch = cardPitch.current;
+      if (!pitch || memberCount === 0) {
+        setCardsOverflow(false);
+        return;
+      }
+      const available = window.innerHeight - 24;
+      const needed = memberCount * pitch;
+      setCardsOverflow((wasOverflowing) =>
+        wasOverflowing ? needed > available - 16 : needed > available,
+      );
+    };
+
+    recompute();
+    const observer = new ResizeObserver(recompute);
+    observer.observe(document.documentElement);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [memberCount, stacked]);
+
   const { xpDropsByPlayer, dismissXpDrop } = useXpDrops(players);
   const memberSlots = info?.member_slots ?? DEFAULT_MEMBER_SLOTS;
   // Group views are private (or the demo); keep them out of search results.
@@ -249,8 +331,10 @@ export function GroupMapShell({
     const focus = focusFor(player);
     if (!focus) return;
     setMapFocus(focus);
-    setFocusName(player.name);
+    // Tab first: it clears the other params, so the player has to be written
+    // after it or the exclusive write would drop it again.
     setTab('map');
+    setFocusName(player.name);
   }
 
   const panelProps = {
@@ -260,12 +344,42 @@ export function GroupMapShell({
     members: memberBadges,
   };
 
+  const navActions: NavAction[] = [
+    {
+      key: 'settings',
+      label: 'Settings',
+      icon: <SettingsIcon />,
+      active: tab === 'settings',
+      onSelect: () => setTab('settings'),
+    },
+  ];
+
+  const navMenu: NavMenu = {
+    label: 'Menu',
+    icon: <MenuIcon />,
+    items: [
+      { key: 'setup', label: 'Setup', onSelect: () => setSetupOpen(true) },
+      {
+        key: 'logout',
+        label: 'Logout',
+        onSelect: () => {
+          clearGroupSession();
+          navigate('/', { replace: true });
+        },
+      },
+      { key: 'support', label: 'Support', href: DISCORD_URL },
+    ],
+  };
+
   return (
     <div
       className="gms"
       data-appearance={appearance}
       style={
-        { '--gms-panel-alpha': String(panelOpacityToAlpha(panelOpacity)) } as CSSProperties
+        {
+          '--gms-panel-alpha': String(panelOpacityToAlpha(panelOpacity)),
+          ...(chromeHeight ? { '--gms-chrome-h': `${chromeHeight}px` } : null),
+        } as CSSProperties
       }
     >
       <Rs3Map
@@ -279,38 +393,30 @@ export function GroupMapShell({
         activeMarkerId={focusName || null}
       />
 
-      <div className={tab === 'map' ? 'gms-overlay gms-overlay--map' : 'gms-overlay'}>
-        <div className={tab === 'map' ? 'gms-chrome gms-chrome--with-nav' : 'gms-chrome'}>
+      <div
+        className={[
+          'gms-overlay',
+          tab === 'map' ? 'gms-overlay--map' : '',
+          tab === 'players' ? 'gms-overlay--players' : '',
+          stacked ? 'gms-overlay--stacked' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
+        <div
+          ref={chromeRef}
+          className={tab === 'map' ? 'gms-chrome gms-chrome--with-nav' : 'gms-chrome'}
+        >
           <header className="gms-toolbar">
-            <div className="gms-toolbar-left">
-              <GroupIdentity name={displayName} mode={groupMode} />
-              <nav className="gms-tabs" aria-label="Group sections">
-                {NAV_TABS.map(({ id, label }) => (
-                  <TabButton key={id} active={tab === id} onClick={() => setTab(id)}>
-                    {label}
-                  </TabButton>
-                ))}
-              </nav>
-            </div>
-            <div className="gms-toolbar-right">
-              <TabButton active={tab === 'settings'} onClick={() => setTab('settings')}>
-                Settings
-              </TabButton>
-              <ActionsMenu
-                items={[
-                  { key: 'setup', label: 'Setup', onSelect: () => setSetupOpen(true) },
-                  {
-                    key: 'logout',
-                    label: 'Logout',
-                    onSelect: () => {
-                      clearGroupSession();
-                      navigate('/', { replace: true });
-                    },
-                  },
-                  { key: 'support', label: 'Support', href: DISCORD_URL },
-                ]}
-              />
-            </div>
+            <GroupIdentity name={displayName} mode={groupMode} />
+            <TabNav
+              tabs={stacked ? NAV_TABS_MOBILE : NAV_TABS}
+              active={tab}
+              onSelect={setTab}
+              ariaLabel="Group sections"
+              actions={navActions}
+              menu={navMenu}
+            />
           </header>
 
           {tab === 'map' && (
@@ -322,7 +428,7 @@ export function GroupMapShell({
           )}
         </div>
 
-        <aside className="gms-players" aria-label="Group members">
+        <aside className="gms-players" aria-label="Group members" ref={playersRef}>
           {error && <p className="gms-side-status gms-side-status--error">{error}</p>}
           {!error &&
             loading &&
@@ -508,7 +614,7 @@ function PlayerNav({
                 aria-hidden
               />
             )}
-            {player.displayName}
+            <span className="gms-player-nav-name">{player.displayName}</span>
             {!player.online && <span className="gms-player-nav-offline">offline</span>}
           </button>
         );
@@ -517,22 +623,3 @@ function PlayerNav({
   );
 }
 
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active?: boolean;
-  onClick?: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      className={active ? 'gms-tab gms-tab--active' : 'gms-tab'}
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  );
-}

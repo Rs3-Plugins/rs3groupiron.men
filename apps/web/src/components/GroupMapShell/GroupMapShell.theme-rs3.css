@@ -43,6 +43,10 @@
   --rs3-frame-tl-w: 76px;
   --rs3-frame-tr-w: 116px;
   --rs3-small-sheet: url('/sprites/buttons_small_sheet.png');
+  --scroll-track: rgba(0, 0, 0, 0.32);
+  --scroll-thumb: #6d5733;
+  --scroll-thumb-hover: #8a7340;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
 }
 
 /* —— 9-slice window frame (scale/repeat border parts) —— */
@@ -1251,3 +1255,37 @@
   border-radius: 0;
 }
 
+
+@media (pointer: coarse), (max-width: 720px) {
+  .gms[data-appearance='rs3'] .gms-tab,
+  .gms[data-appearance='rs3'] .gms-action,
+  .gms[data-appearance='rs3'] .gms-player-nav-btn,
+  .gms[data-appearance='rs3'] .gms-demo-xp-btn,
+  .gms[data-appearance='rs3'] .gms-modal-cancel,
+  [data-appearance='rs3'] .gms-modal-cancel {
+    height: 40px;
+    min-height: 40px;
+    line-height: 40px;
+  }
+
+  .gms[data-appearance='rs3'] .gms-settings-text-btn,
+  .gms[data-appearance='rs3'] .gms-settings-save,
+  [data-appearance='rs3'] .gms-settings-text-btn,
+  [data-appearance='rs3'] .gms-settings-save {
+    min-height: 40px;
+  }
+}
+
+@media (pointer: coarse), (max-width: 720px) {
+  .gms[data-appearance='rs3']
+    input:not([type='color']):not([type='checkbox']):not([type='radio']):not([type='range']),
+  .gms[data-appearance='rs3'] .gms-items-search,
+  [data-appearance='rs3']
+    input:not([type='color']):not([type='checkbox']):not([type='radio']):not([type='range']) {
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    line-height: 40px;
+    background-size: 20px 40px, 20px 40px, 20px 40px !important;
+  }
+}

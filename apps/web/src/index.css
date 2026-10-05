@@ -18,6 +18,11 @@
   --radius-md: 8px;
   --radius-lg: 10px;
 
+  --scroll-track: rgba(255, 255, 255, 0.04);
+  --scroll-thumb: #454e58;
+  --scroll-thumb-hover: #5d6873;
+  --scroll-size: 10px;
+
   --z-menu: 40;
   --z-map-tools: 1900;
   --z-overlay: 2000;
@@ -38,6 +43,43 @@
 
 * {
   box-sizing: border-box;
+}
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+}
+
+::-webkit-scrollbar {
+  width: var(--scroll-size);
+  height: var(--scroll-size);
+}
+
+::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: var(--scroll-track);
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--scroll-thumb);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@media (pointer: coarse), (max-width: 720px) {
+  :root {
+    --scroll-size: 6px;
+  }
 }
 
 body {

@@ -181,6 +181,107 @@ export function WikiIcon() {
   );
 }
 
+const NAV: SVGProps<SVGSVGElement> = {
+  ...BASE,
+  width: 18,
+  height: 18,
+  strokeWidth: 1.8,
+  className: 'gms-nav-icon',
+};
+
+export function ItemsIcon() {
+  return (
+    <svg {...NAV}>
+      <path d="M4 8h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
+      <path d="M4 8 6.5 3h11L20 8" />
+      <path d="M10 12h4" />
+    </svg>
+  );
+}
+
+export function MapIcon() {
+  return (
+    <svg {...NAV}>
+      <path d="m3 6 6-2 6 2 6-2v14l-6 2-6-2-6 2z" />
+      <path d="M9 4v14M15 6v14" />
+    </svg>
+  );
+}
+
+export function GraphsIcon() {
+  return (
+    <svg {...NAV}>
+      <path d="M4 4v16h16" />
+      <path d="m7 15 3.5-4.5 3 2.5L20 6" />
+    </svg>
+  );
+}
+
+export function LedgerIcon() {
+  return (
+    <svg {...NAV}>
+      <path d="M5 4h12a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z" />
+      <path d="M5 17h14" />
+      <path d="M10 8h5" />
+    </svg>
+  );
+}
+
+export function QuestsIcon() {
+  return (
+    <svg {...NAV}>
+      <path d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 0 2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+      <path d="M9 8h6M9 12h6" />
+    </svg>
+  );
+}
+
+export function AchievementsIcon() {
+  return (
+    <svg {...NAV}>
+      <path d="M7 4h10v5a5 5 0 0 1-10 0z" />
+      <path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" />
+      <path d="M12 14v3M9 20h6l-1-3h-4z" />
+    </svg>
+  );
+}
+
+export function ProfileIcon() {
+  return (
+    <svg {...NAV}>
+      <circle cx="12" cy="8" r="3.6" />
+      <path d="M4.8 20a7.2 7.2 0 0 1 14.4 0" />
+    </svg>
+  );
+}
+
+export function MoreIcon() {
+  return (
+    <svg {...NAV} fill="currentColor" stroke="none">
+      <circle cx="5" cy="12" r="1.7" />
+      <circle cx="12" cy="12" r="1.7" />
+      <circle cx="19" cy="12" r="1.7" />
+    </svg>
+  );
+}
+
+export function MenuIcon() {
+  return (
+    <svg {...NAV}>
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  );
+}
+
+export function SettingsIcon() {
+  return (
+    <svg {...NAV}>
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 3v2.4M12 18.6V21M4.2 7.5l2.1 1.2M17.7 15.3l2.1 1.2M4.2 16.5l2.1-1.2M17.7 8.7l2.1-1.2" />
+    </svg>
+  );
+}
+
 export function LayersIcon() {
   return (
     <svg {...CHIP}>

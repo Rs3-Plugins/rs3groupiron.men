@@ -178,13 +178,66 @@
   align-items: center;
   gap: 0.4rem;
   min-width: 0;
-  /* Six tabs no longer fit beside the group name on a narrow toolbar. */
-  flex-wrap: wrap;
   row-gap: 0.35rem;
+}
+
+.gms-toolbar-left,
+.gms-toolbar-right {
+  flex-wrap: wrap;
 }
 
 .gms-toolbar-left {
   flex: 1;
+}
+
+.gms-tabs {
+  position: relative;
+  flex: 1 1 0;
+  flex-wrap: nowrap;
+}
+
+.gms-tab {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.gms-tab--icon {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+.gms-nav-icon {
+  flex: 0 0 auto;
+}
+
+.gms-tabs-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: none;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.gms-tabs-measure-row {
+  display: flex;
+  align-items: center;
+  width: max-content;
+  gap: 0.4rem;
+}
+
+.gms-tabs-measure-row > * {
+  flex: 0 0 auto;
+}
+
+.gms-tabs-spacer {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .gms-group-identity {
@@ -281,7 +334,7 @@
   overflow-y: auto;
   padding-right: 0.15rem;
   scrollbar-width: thin;
-  scrollbar-color: #5c6874 transparent;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
   /* Reserve the scrollbar gutter up front. Without this, expanding a card
      (Skills, Inventory…) makes the column scroll and the classic Windows
      scrollbar steals ~15px, visibly shrinking every card. */
@@ -301,11 +354,11 @@
   border: 2px solid transparent;
   border-radius: 999px;
   background-clip: padding-box;
-  background-color: #4e5966;
+  background-color: var(--scroll-thumb);
 }
 
 .gms-players::-webkit-scrollbar-thumb:hover {
-  background-color: #6d7a88;
+  background-color: var(--scroll-thumb-hover);
 }
 
 .gms-player {
@@ -828,9 +881,12 @@
   overflow: visible;
 }
 
+/* The tab art is a 60x27 sprite, so the columns are sized to it rather than
+   fixed in number — a full-width card gets more of them instead of stretching
+   each one. */
 .gms-skills-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
   gap: 0.18rem;
   width: 100%;
 }
@@ -1437,8 +1493,6 @@
   border-radius: var(--radius-md);
   background: rgba(28, 32, 36, 0.96);
   padding: 0.55rem 0.75rem 0.6rem;
-  min-height: 0;
-  height: 100%;
 }
 
 .gms-item-card-head {
@@ -1535,7 +1589,7 @@
   padding: 0.85rem 1rem;
   overflow: auto;
   scrollbar-width: thin;
-  scrollbar-color: #5c6874 transparent;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
 }
 
 .gms-settings-title {
@@ -2446,7 +2500,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: #5c6874 transparent;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
   padding: 0.35rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
@@ -2665,7 +2719,7 @@
   gap: 0.65rem;
   padding-right: 0.2rem;
   scrollbar-width: thin;
-  scrollbar-color: #5c6874 transparent;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
 }
 
 .gms-graphs-players--totals {
@@ -2899,7 +2953,7 @@
   background: rgba(22, 26, 30, 0.98);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
   scrollbar-width: thin;
-  scrollbar-color: #5c6874 transparent;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
 }
 
 .gms-iconselect-list:focus-visible {
@@ -3003,7 +3057,7 @@
   border-radius: var(--radius-md);
   background: rgba(12, 14, 16, 0.55);
   scrollbar-width: thin;
-  scrollbar-color: #5c6874 transparent;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
 }
 
 .gms-panel-status {
@@ -3890,7 +3944,7 @@
   list-style: none;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #5c6874 transparent;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
 }
 
 .gms-pq-item {
@@ -3968,34 +4022,47 @@
 }
 
 /* —— Responsive —— */
-@media (max-width: 900px) {
-  /* Panels drop below the sidebar, so the toolbar goes back to spanning the
-     viewport and the sidebar tucks under it. */
-  .gms-chrome {
-    left: 50%;
-    right: auto;
-    width: min(920px, calc(100vw - 1.5rem));
-    transform: translateX(-50%);
-  }
+/* Stacked mode: the member cards can't sit beside a panel, so they move to
+   their own Profile tab and everything else spans the viewport. Driven by a
+   class rather than a breakpoint because whether they fit depends on how many
+   members the group has and how tall the window is. */
+.gms-overlay--stacked .gms-chrome {
+  left: 50%;
+  right: auto;
+  width: min(920px, calc(100vw - 1.5rem));
+  transform: translateX(-50%);
+}
 
-  .gms-panel,
-  .gms-items,
-  .gms-settings {
-    left: 0.75rem;
-    top: auto;
-    height: 42vh;
-  }
+.gms-overlay--stacked .gms-players {
+  display: none;
+}
 
-  .gms-players {
-    top: 4.25rem;
-    bottom: auto;
-    max-height: calc(58vh - 5rem);
-  }
+.gms-overlay--stacked.gms-overlay--players .gms-players {
+  display: flex;
+  position: absolute;
+  top: calc(var(--gms-chrome-h, 4.5rem) + 1rem);
+  right: 0.75rem;
+  bottom: 0.75rem;
+  left: 0.75rem;
+  width: auto;
+  max-height: none;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
 
-  .gms-overlay--map .gms-players {
-    top: 6.85rem;
-    max-height: calc(58vh - 7.5rem);
-  }
+.gms-overlay--stacked .gms-player {
+  flex: 0 0 auto;
+}
+
+.gms-overlay--stacked .gms-panel,
+.gms-overlay--stacked .gms-items,
+.gms-overlay--stacked .gms-settings {
+  top: calc(var(--gms-chrome-h, 4.5rem) + 1rem);
+  right: 0.75rem;
+  bottom: 0.75rem;
+  left: 0.75rem;
+  height: auto;
 }
 
 @media (max-width: 720px) {
@@ -4004,26 +4071,28 @@
   }
 
   .gms-toolbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.45rem;
-  }
-
-  .gms-toolbar-left,
-  .gms-toolbar-right {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  .gms-group-name {
-    max-width: none;
-    text-align: center;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.4rem;
   }
 
   .gms-group-identity {
-    width: 100%;
-    justify-content: center;
+    flex: 0 1 auto;
+    width: auto;
+    justify-content: flex-start;
     margin-right: 0;
+    min-width: 0;
+  }
+
+  .gms-group-name {
+    max-width: 7rem;
+    text-align: left;
+  }
+
+  .gms-tabs {
+    flex: 1 1 0;
+    justify-content: flex-start;
   }
 
   .gms-player-nav {
@@ -4032,31 +4101,12 @@
     flex-wrap: nowrap;
   }
 
-  .gms-players {
-    top: auto;
-    bottom: 0.75rem;
-    left: 0.5rem;
-    right: 0.5rem;
-    width: auto;
-    max-height: 34vh;
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
+  .gms-overlay--players .gms-player {
+    scroll-snap-align: start;
   }
 
   .gms-player {
     flex: 0 0 240px;
-  }
-
-  /* 240px card: 2 skill columns keep the tab sprites legible;
-     4 × 38px inventory slots (158px) already fit. */
-  .gms-skills-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .gms-inv-grid {
-    grid-template-columns: repeat(4, 38px);
-    width: 100%;
   }
 
   /* Narrow panel: let the timestamp drop under the text instead of squeezing it. */
@@ -4072,14 +4122,409 @@
     gap: 0.4rem;
   }
 
-  .gms-panel,
-  .gms-items,
-  .gms-settings {
-    top: 4.5rem;
-    bottom: calc(34vh + 1.2rem);
-    left: 0.5rem;
+  .gms-items-pages {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    justify-content: flex-start;
+  }
+
+  .gms-items-pages::-webkit-scrollbar {
+    display: none;
+  }
+
+  .gms-page {
+    flex: 0 0 auto;
+  }
+
+  .gms-player-nav-btn {
+    flex: 0 0 auto;
+    max-width: 11rem;
+    min-width: 0;
+  }
+
+  .gms-player-nav-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gms-player-nav-dot,
+  .gms-player-nav-avatar,
+  .gms-player-nav-offline {
+    flex: 0 0 auto;
+  }
+
+  /* Every panel header becomes the same two-column grid so the filters line
+     up instead of squeezing each other to nothing. The inline labels go
+     screen-reader-only because each control already shows its value. */
+  .gms-panel-toolbar,
+  .gms-items-toolbar,
+  .gms-quests-controls,
+  .gms-graphs-toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .gms-panel-title,
+  .gms-items-heading,
+  .gms-search-wrap,
+  .gms-panel-day,
+  .gms-graphs-title {
+    grid-column: 1 / -1;
+  }
+
+  .gms-panel-field {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .gms-panel-field > select,
+  .gms-panel-field > input,
+  .gms-items-select,
+  .gms-quests-select,
+  .gms-iconselect-trigger {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .gms-panel-field-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .gms-panel-day {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .gms-panel-day .gms-panel-field {
+    flex: 1 1 auto;
+  }
+
+  .gms-items-price-mode {
+    display: flex;
+  }
+
+  .gms-items-mode-btn {
+    flex: 1 1 0;
+  }
+
+  /* The heading sits beside the filters at full size; stacking it gives the
+     controls grid the whole panel width instead of half of it. */
+  .gms-quests-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  /* Six controls pair up cleanly once the refresh button moves to the end. */
+  .gms-graphs-refresh {
+    order: 9;
+    justify-self: end;
+  }
+
+  .gms-graphs-toolbar .gms-menu,
+  .gms-graphs-toolbar .gms-chart-menu,
+  .gms-graphs-toolbar .gms-menu > button,
+  .gms-graphs-toolbar .gms-chart-menu > button {
+    width: 100%;
+  }
+
+  .gms-items-heading-main {
+    flex-wrap: nowrap;
+    gap: 0.45rem;
+    min-width: 0;
+  }
+
+  /* The title yields all of its width before a badge is allowed to shrink,
+     so the totals stay readable at any size. */
+  .gms-items-title {
+    flex: 0 999 auto;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.82rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gms-items-totals {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    margin-left: auto;
+    gap: 0.3rem;
+  }
+
+  .gms-items-stat {
+    flex: 0 0 auto;
+    padding: 0.22rem 0.45rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .gms-items-totals {
+    gap: 0.25rem;
+  }
+
+  .gms-items-stat {
+    padding: 0.2rem 0.35rem;
+    gap: 0.25rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .gms-items-totals {
+    gap: 0.2rem;
+  }
+
+  .gms-items-stat {
+    padding: 0.2rem 0.3rem;
+    font-size: 0.68rem;
+  }
+
+  .gms-items-stat img {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+@media (max-width: 720px) {
+  .gms-items-toolbar .gms-search-wrap {
+    flex: 1 1 7rem;
+    min-width: 0;
+  }
+
+  .gms-items-pages {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .gms-items-select,
+  .gms-items-toolbar .gms-iconselect {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .gms-overlay--stacked.gms-overlay--players .gms-players,
+  .gms-overlay--stacked .gms-panel,
+  .gms-overlay--stacked .gms-items,
+  .gms-overlay--stacked .gms-settings {
     right: 0.5rem;
-    height: auto;
+    left: 0.5rem;
+  }
+}
+
+@media (max-width: 620px) {
+  .gms-group-name {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .gms-ledger-head {
+    display: none;
+  }
+
+  .gms-ledger-row {
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    grid-template-areas:
+      'dot name time'
+      'icon item delta';
+    align-items: center;
+    row-gap: 0.1rem;
+    column-gap: 0.45rem;
+    padding: 0.5rem 0.55rem;
+  }
+
+  .gms-ledger-dot {
+    grid-area: dot;
+    justify-self: center;
+  }
+
+  .gms-ledger-name {
+    grid-area: name;
+    font-weight: 700;
+  }
+
+  .gms-ledger-icon {
+    grid-area: icon;
+    justify-self: center;
+  }
+
+  .gms-ledger-item {
+    grid-area: item;
+  }
+
+  .gms-ledger-delta {
+    grid-area: delta;
+    justify-self: end;
+  }
+
+  .gms-ledger-row .gms-panel-time {
+    grid-area: time;
+    justify-self: end;
+    text-align: right;
+  }
+
+  .gms-quests-table,
+  .gms-quests-table tbody,
+  .gms-quests-row,
+  .gms-quests-name,
+  .gms-quests-qp,
+  .gms-quests-cell {
+    display: block;
+  }
+
+  .gms-quests-table thead {
+    display: none;
+  }
+
+  .gms-quests-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.55rem;
+    margin-bottom: 0.4rem;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .gms-quests-name {
+    flex: 1 1 100%;
+    text-align: left;
+  }
+
+  .gms-quests-qp:not(:empty) {
+    padding: 0.1rem 0.45rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--gold);
+    font-size: 0.68rem;
+    font-weight: 700;
+  }
+
+  .gms-quests-qp:not(:empty)::before {
+    content: 'QP ';
+    color: var(--muted);
+  }
+
+  .gms-quests-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.1rem 0.4rem 0.1rem 0.25rem;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.28);
+    line-height: 1.3;
+  }
+
+  .gms-quests-cell::after {
+    content: attr(data-member);
+    max-width: 7rem;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gms-quests-segmented {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gms-quests-seg {
+    justify-content: center;
+  }
+
+  .gms-panel-summary {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .gms-panel-summary::-webkit-scrollbar {
+    display: none;
+  }
+
+  .gms-panel-summary-chip {
+    flex: 0 0 auto;
+  }
+
+  .gms-graphs-chart-wrap {
+    min-height: 260px;
+  }
+
+  .gms-graphs-toolbar,
+  .gms-panel-toolbar {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+}
+
+@media (pointer: coarse), (max-width: 720px) {
+  .gms-tab,
+  .gms-action,
+  .gms-page,
+  .gms-player-nav-btn,
+  .gms-demo-xp-btn,
+  .gms-items-mode-btn,
+  .gms-quests-seg,
+  .gms-panel-day-all,
+  .gms-settings-text-btn,
+  .gms-menu-item {
+    min-height: 40px;
+  }
+
+  .gms-icon-btn,
+  .gms-settings-icon-btn,
+  .gms-graphs-refresh,
+  .gms-panel-day-step {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .gms-graphs-toggle,
+  .gms-panel-more,
+  .gms-items-search,
+  .gms-quests-search,
+  .gms-items-select,
+  .gms-quests-select,
+  .gms-iconselect-trigger,
+  .gms select,
+  .gms input[type='text'],
+  .gms input[type='search'],
+  .gms input[type='date'],
+  .gms input[type='password'] {
+    min-height: 40px;
+  }
+
+  .gms input[type='checkbox'],
+  .gms input[type='radio'] {
+    width: 22px;
+    height: 22px;
+  }
+
+  .gms input[type='range'] {
+    height: 34px;
   }
 }
 
