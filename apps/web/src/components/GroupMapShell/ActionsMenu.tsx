@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useDismiss } from '../../hooks/useDismiss';
 
 export type ActionsMenuItem = {
   key: string;
   label: string;
+  hint?: string;
+  active?: boolean;
   /** Renders an external link instead of a button. */
   href?: string;
   onSelect?: () => void;
@@ -11,10 +13,33 @@ export type ActionsMenuItem = {
 
 type ActionsMenuProps = {
   label?: string;
+  icon?: ReactNode;
+  title?: string;
+  placement?: 'bottom' | 'top';
   items: ActionsMenuItem[];
 };
 
-export function ActionsMenu({ label = 'Menu', items }: ActionsMenuProps) {
+function ItemBody({ item }: { item: ActionsMenuItem }) {
+  if (!item.hint) return <>{item.label}</>;
+  return (
+    <span className="gms-menu-item-text">
+      <span className="gms-menu-item-label">{item.label}</span>
+      <span className="gms-menu-item-hint">{item.hint}</span>
+    </span>
+  );
+}
+
+function itemClass(item: ActionsMenuItem) {
+  return item.active ? 'gms-menu-item gms-menu-item--active' : 'gms-menu-item';
+}
+
+export function ActionsMenu({
+  label = 'Menu',
+  icon,
+  title,
+  placement = 'bottom',
+  items,
+}: ActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -52,16 +77,18 @@ export function ActionsMenu({ label = 'Menu', items }: ActionsMenuProps) {
   }, [open]);
 
   return (
-    <div className="gms-menu" ref={rootRef}>
+    <div className={placement === 'top' ? 'gms-menu gms-menu--up' : 'gms-menu'} ref={rootRef}>
       <button
         type="button"
         ref={triggerRef}
-        className="gms-action"
+        className={icon ? 'gms-action gms-action--with-icon' : 'gms-action'}
+        title={title}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((v) => !v)}
       >
+        {icon}
         {label}
         <span className="gms-menu-caret" aria-hidden>
           ▾
@@ -74,7 +101,7 @@ export function ActionsMenu({ label = 'Menu', items }: ActionsMenuProps) {
             item.href ? (
               <a
                 key={item.key}
-                className="gms-menu-item"
+                className={itemClass(item)}
                 role="menuitem"
                 data-menu-item
                 href={item.href}
@@ -82,21 +109,22 @@ export function ActionsMenu({ label = 'Menu', items }: ActionsMenuProps) {
                 rel="noopener noreferrer"
                 onClick={() => setOpen(false)}
               >
-                {item.label}
+                <ItemBody item={item} />
               </a>
             ) : (
               <button
                 key={item.key}
                 type="button"
-                className="gms-menu-item"
-                role="menuitem"
+                className={itemClass(item)}
+                role={item.active === undefined ? 'menuitem' : 'menuitemradio'}
+                aria-checked={item.active}
                 data-menu-item
                 onClick={() => {
                   setOpen(false);
                   item.onSelect?.();
                 }}
               >
-                {item.label}
+                <ItemBody item={item} />
               </button>
             ),
           )}

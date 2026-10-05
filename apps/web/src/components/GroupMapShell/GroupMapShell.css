@@ -248,6 +248,26 @@
   background: rgba(55, 42, 28, 0.95);
 }
 
+.gms-action--with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.gms-action--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem;
+  min-width: 1.95rem;
+}
+
+.gms-action--icon[aria-pressed='true'] {
+  border-color: var(--gold-dim);
+  color: var(--gold);
+  background: rgba(55, 42, 28, 0.95);
+}
+
 .gms-players {
   position: absolute;
   top: 0.75rem;
@@ -363,11 +383,29 @@
   }
 }
 
-.gms-demo-xp-btn {
+.gms-corner-tools {
   position: fixed;
   right: 1rem;
   bottom: 1rem;
-  z-index: var(--z-overlay);
+  z-index: var(--z-map-tools);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.gms-maptools {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--gms-panel-fill, rgba(28, 32, 36, 0.82));
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+
+.gms-demo-xp-btn {
   appearance: none;
   padding: 0.65rem 1rem;
   border: 1px solid rgba(232, 160, 74, 0.45);
@@ -528,6 +566,7 @@
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
+  bottom: auto;
   z-index: var(--z-menu);
   display: flex;
   flex-direction: column;
@@ -537,6 +576,11 @@
   border-radius: var(--radius-md);
   background: rgba(22, 26, 30, 0.98);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+}
+
+.gms-menu--up .gms-menu-list {
+  top: auto;
+  bottom: calc(100% + 4px);
 }
 
 .gms-menu-item {
@@ -562,6 +606,44 @@
 .gms-menu-item:focus-visible {
   background: rgba(52, 58, 64, 0.95);
   color: var(--gold-bright);
+}
+
+.gms-menu-list:has(.gms-menu-item-text) {
+  min-width: 13rem;
+}
+
+.gms-menu-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.gms-menu-item-label {
+  line-height: 1.3;
+}
+
+.gms-menu-item-hint {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.gms-menu-item--active {
+  background: rgba(55, 42, 28, 0.95);
+  color: var(--gold);
+}
+
+.gms-menu-item--active::after {
+  content: '✓';
+  margin-left: auto;
+  padding-left: 0.5rem;
+  font-size: 0.85em;
+}
+
+.gms-menu-item--active .gms-menu-item-hint {
+  color: var(--gold-dim);
 }
 
 .gms-player-presence--online {

@@ -19,6 +19,8 @@ import {
   mapLabelGroup,
   type GameMap,
 } from './leaflet-extensions';
+import { ELEVATION_MIN_ZOOM, findMapMode, readMapMode, type MapMode } from './mapModes';
+import { applyElevation, ElevationSource, satelliteTileLayer } from './satelliteLayer';
 import './Rs3Map.css';
 
 ensureLeafletExtensions();
@@ -56,14 +58,17 @@ export type Rs3MapProps = {
   labelsSheetId?: string;
   /** When false, map is display-only (no pan/zoom/controls). */
   interactive?: boolean;
+  mode?: MapMode;
 };
 
-const TILE_OPTS = {
+const CLASSIC_TILE_OPTS = {
   minZoom: -4,
   maxNativeZoom: 3,
   maxZoom: 5,
   errorTileUrl: alphaPixel,
 };
+
+const OVERLAY_Z_INDEX = 20;
 
 function playerDotIcon(
   color: string,
@@ -120,7 +125,7 @@ export function Rs3Map({
   plane = 0,
   mapId = DEFAULT_MAP_ID,
   minZoom = -4,
-  maxZoom = 4,
+  maxZoom,
   showIcons = true,
   showLabels = true,
   markers = [],
@@ -129,12 +134,24 @@ export function Rs3Map({
   labelsApiKey = DEFAULT_LABELS_API_KEY,
   labelsSheetId = DEFAULT_LABELS_SHEET_ID,
   interactive = true,
+  mode: modeProp,
 }: Rs3MapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<GameMap | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const markerEntriesRef = useRef<Map<string, MarkerEntry>>(new Map());
+  const elevationRef = useRef<ElevationSource | null>(null);
   const [mapReady, setMapReady] = useState(false);
+
+  const [savedMode] = useState(readMapMode);
+  const onMainMap = mapId === DEFAULT_MAP_ID;
+  const mode: MapMode = onMainMap ? (modeProp ?? savedMode) : 'classic';
+  const modeDef = findMapMode(mode);
+  const effectiveMaxZoom = maxZoom ?? modeDef.maxZoom;
+
+  const [detailZoom, setDetailZoom] = useState(() => zoom >= ELEVATION_MIN_ZOOM);
+  const [heightsLoaded, setHeightsLoaded] = useState(0);
+  const elevation = detailZoom ? modeDef.elevation : undefined;
 
   // The Leaflet map is created once; these options are read at mount only
   // (later prop changes are applied by the dedicated effects below).
@@ -145,7 +162,7 @@ export function Rs3Map({
     plane,
     mapId,
     minZoom,
-    maxZoom,
+    maxZoom: effectiveMaxZoom,
     showIcons,
     showLabels,
     labelsApiKey,
@@ -165,7 +182,6 @@ export function Rs3Map({
       ],
       maxBoundsViscosity: 0.5,
       customZoomControl: false,
-      fullscreenControl: opts.interactive,
       planeControl: false,
       zoomControl: false,
       initialMapId: opts.mapId,
@@ -187,10 +203,11 @@ export function Rs3Map({
       baseMaps: BASEMAPS_URL,
     });
 
-    mainTileLayer(MAP_TILES_URL, TILE_OPTS).addTo(map).bringToBack();
-
     if (opts.showIcons) {
-      mainTileLayer(ICON_TILES_URL, TILE_OPTS).addTo(map);
+      mainTileLayer(ICON_TILES_URL, {
+        ...CLASSIC_TILE_OPTS,
+        zIndex: OVERLAY_Z_INDEX,
+      }).addTo(map);
     }
 
     if (opts.showLabels) {
@@ -203,6 +220,7 @@ export function Rs3Map({
     const markersLayer = L.layerGroup().addTo(map);
     const markerEntries = markerEntriesRef.current;
     markersLayerRef.current = markersLayer;
+    elevationRef.current = new ElevationSource(() => setHeightsLoaded((n) => n + 1));
     mapRef.current = map;
     setMapReady(true);
     requestAnimationFrame(() => map.invalidateSize());
@@ -212,9 +230,53 @@ export function Rs3Map({
       map.remove();
       mapRef.current = null;
       markersLayerRef.current = null;
+      elevationRef.current?.dispose();
+      elevationRef.current = null;
       markerEntries.clear();
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map) return;
+
+    const layers =
+      modeDef.layers.length === 0
+        ? [mainTileLayer(MAP_TILES_URL, CLASSIC_TILE_OPTS)]
+        : modeDef.layers.map((layer) =>
+            satelliteTileLayer(layer.sources, {
+              errorTileUrl: alphaPixel,
+              maxNativeZoom: layer.maxNativeZoom,
+              className: layer.smooth ? 'rs3-map-tiles--smooth' : undefined,
+            }),
+          );
+
+    layers.forEach((layer, i) => {
+      (layer as L.GridLayer).setZIndex(i + 1);
+      layer.addTo(map);
+    });
+
+    return () => {
+      for (const layer of layers) layer.remove();
+    };
+  }, [mapReady, modeDef]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map) return;
+    map.setMaxZoom(effectiveMaxZoom);
+  }, [mapReady, effectiveMaxZoom]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map) return;
+    const sync = () => setDetailZoom(map.getZoom() >= ELEVATION_MIN_ZOOM);
+    sync();
+    map.on('zoomend', sync);
+    return () => {
+      map.off('zoomend', sync);
+    };
+  }, [mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -248,7 +310,13 @@ export function Rs3Map({
       const online = marker.online !== false;
       const active = marker.id === activeMarkerId;
       const iconKey = markerIconKey(marker, active);
-      const latLng = L.latLng(marker.y, marker.x);
+      const latLng = applyElevation(
+        marker.x,
+        marker.y,
+        marker.plane,
+        elevation,
+        elevationRef.current,
+      );
       const existing = entries.get(marker.id);
 
       if (existing) {
@@ -280,7 +348,7 @@ export function Rs3Map({
       layer.removeLayer(entry.pin);
       entries.delete(id);
     }
-  }, [markers, plane, activeMarkerId, mapReady, interactive]);
+  }, [markers, plane, activeMarkerId, mapReady, interactive, elevation, heightsLoaded]);
 
   const styleHeight = typeof height === 'number' ? `${height}px` : height;
 

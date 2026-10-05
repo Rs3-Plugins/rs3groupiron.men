@@ -195,6 +195,7 @@
 
 /* —— Shell / panels (CSS bevel — do NOT stretch border sprites) —— */
 .gms[data-appearance='rs3'] .gms-toolbar,
+.gms[data-appearance='rs3'] .gms-maptools,
 .gms[data-appearance='rs3'] .gms-player,
 .gms[data-appearance='rs3'] .gms-side-status,
 .gms[data-appearance='rs3'] .gms-items,
@@ -262,7 +263,7 @@
   gap: 0.45rem;
 }
 
-/* —— Text / action buttons (stretch width only, lock height to sprite) —— */
+/* —— Text / action buttons —— */
 .gms[data-appearance='rs3'] .gms-tab,
 .gms[data-appearance='rs3'] .gms-action,
 .gms[data-appearance='rs3'] .gms-modal-cancel,
@@ -271,20 +272,20 @@
 [data-appearance='rs3'] .gms-modal-cancel {
   border: 0 !important;
   border-radius: 0 !important;
-  height: 23px;
-  min-height: 23px;
-  padding: 0 0.85rem;
-  line-height: 23px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 0.8rem;
+  line-height: 32px;
   color: var(--rs3-ink) !important;
   background-color: transparent !important;
   background-image: var(--rs3-btn) !important;
-  background-size: 100% 23px !important;
+  background-size: 100% 100% !important;
   background-repeat: no-repeat !important;
   background-position: center !important;
   box-shadow: none !important;
   text-shadow: 0 1px 0 #000;
   font-weight: 700;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
 }
 
 /* Taller text buttons: repeat/slice the button art without blowing the border */
@@ -957,18 +958,6 @@
   width: min(calc(28rem + 2 * var(--rs3-frame-crop-x, 16px)), 100%);
 }
 
-/* Map fullscreen control — square brown chrome like the rest of the RS3 UI. */
-.gms[data-appearance='rs3'] .leaflet-control-fullscreen a {
-  border-radius: 0;
-  border: 1px solid var(--rs3-gold-dim);
-  background: rgba(var(--rs3-modal-rgb), 0.92);
-}
-
-.gms[data-appearance='rs3'] .leaflet-control-fullscreen a:hover {
-  border-color: var(--rs3-gold-bright);
-  background: rgba(var(--rs3-panel-rgb), 0.96);
-}
-
 /* Presence chip — square RS3 chrome; the dot still carries the state colour. */
 .gms[data-appearance='rs3'] .gms-player-presence {
   border-radius: 0;
@@ -1001,6 +990,33 @@
 .gms[data-appearance='rs3'] .gms-menu-item:focus-visible {
   background: rgba(60, 42, 22, 0.95);
   color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-menu-item--active {
+  background: rgba(60, 42, 22, 0.95);
+  color: var(--rs3-gold-bright);
+}
+
+.gms[data-appearance='rs3'] .gms-menu-item-hint {
+  color: var(--rs3-muted);
+}
+
+.gms[data-appearance='rs3'] .gms-menu-item--active .gms-menu-item-hint {
+  color: var(--rs3-gold);
+}
+
+.gms[data-appearance='rs3'] .gms-action--icon {
+  padding: 0 0.55rem !important;
+}
+
+.gms[data-appearance='rs3'] .gms-action .gms-btn-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.gms[data-appearance='rs3'] .gms-action--icon[aria-pressed='true'] {
+  background-image: var(--rs3-btn-hover) !important;
+  color: var(--rs3-gold-bright) !important;
 }
 
 /* Screenshots need a wide frame; without this the 22rem default clips them.
