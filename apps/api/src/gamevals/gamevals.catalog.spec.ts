@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Logger } from '@nestjs/common';
 import {
   ACHIEVEMENT_KIND_TO_GAMEVAL,
   gamevalDedupeKey,
@@ -87,10 +88,13 @@ describe('GamevalsService', () => {
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'gamevals-'));
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
+    jest.restoreAllMocks();
   });
 
   it('loads present files and leaves missing kinds empty', () => {
@@ -113,9 +117,14 @@ describe('GamevalsService', () => {
   });
 
   it('survives an unparseable file', () => {
+    const logged = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
     writeFileSync(join(dir, 'inv.json'), '{not json');
     const service = new GamevalsService();
     expect(() => service.loadAll(dir)).not.toThrow();
     expect(service.hasName('inv', 'axeshop')).toBe(false);
+    expect(logged).toHaveBeenCalledWith(
+      expect.stringContaining('failed to load'),
+      expect.any(SyntaxError),
+    );
   });
 });
