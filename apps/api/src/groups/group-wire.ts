@@ -16,6 +16,20 @@ import {
 } from './item-codec';
 import { skillsToWire } from './skill-codec';
 
+/**
+ * A plugin that crashes or loses its connection never sends its logout, so
+ * `online` alone can stay true forever. The plugin heartbeats every 5 minutes
+ * while idle; a member quiet for longer than this is shown offline.
+ */
+export const ONLINE_STALE_MS = 12 * 60 * 1000;
+
+export function isOnline(
+  member: { online: boolean; lastUpdated: Date },
+  now: number = Date.now(),
+): boolean {
+  return member.online && now - member.lastUpdated.getTime() < ONLINE_STALE_MS;
+}
+
 type InventoryRowLike = { slot: number; itemId: number; quantity: number };
 
 /** Any inventory with its contents, member-owned or group-owned. */
@@ -60,7 +74,7 @@ export function toWireMember(member: MemberWithData) {
     discord_id: member.discordId ?? undefined,
     color: member.color ?? undefined,
     use_discord_avatar: member.useDiscordAvatar,
-    online: member.online,
+    online: isOnline(member),
     last_updated: member.lastUpdated.toISOString(),
     stats: statsToArray(member),
     coordinates: [member.x, member.y, member.plane],
@@ -85,7 +99,7 @@ export function toPartialWireMember(member: Member) {
     discord_id: member.discordId ?? undefined,
     color: member.color ?? undefined,
     use_discord_avatar: member.useDiscordAvatar,
-    online: member.online,
+    online: isOnline(member),
     last_updated: member.lastUpdated.toISOString(),
     stats: statsToArray(member),
     coordinates: [member.x, member.y, member.plane],
@@ -105,7 +119,7 @@ export function toSharedWireMember(
     use_discord_avatar: false,
     online: false,
     last_updated: updatedAt.toISOString(),
-    stats: statsToArray(statsFromArray([])),
+    stats: statsToArray({ ...statsFromArray([]), world: 0 }),
     coordinates: [0, 0, 0],
     ...inventoriesToWire(inventories),
     skills: skillsToWire([]),

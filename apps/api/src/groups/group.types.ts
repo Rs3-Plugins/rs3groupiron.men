@@ -14,6 +14,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { MAX_ACHIEVEMENT_UPDATES } from './achievement-sync';
 import { MAX_QUEST_UPDATES, QUEST_STATE_INPUTS } from './quests';
 
 /**
@@ -81,9 +82,10 @@ export const MAX_STATS = 16;
 export const MAX_COORDINATES = 3;
 export const MAX_INVENTORY = 56;
 export const MAX_EQUIPMENT = 40;
-export const MAX_BANK = 4000;
-export const MAX_DEPOSITED = 4000;
-export const MAX_SHARED_BANK = 4000;
+/** 4000 items as [id, qty] pairs; RS3 banks top out well under that. */
+export const MAX_BANK = 8000;
+export const MAX_DEPOSITED = 8000;
+export const MAX_SHARED_BANK = 8000;
 export const MAX_MEMBER_NAMES = 10;
 /** Distinct inventories one update may carry (inv, worn, bank, pouches...). */
 export const MAX_INVENTORIES = 32;
@@ -144,6 +146,14 @@ export class UpdateMemberBody {
   @Max(MAX_INT32, { each: true })
   coordinates?: number[];
 
+  /** Game world number. Also the 7th `stats` element, which this overrides. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(MAX_INT32)
+  world?: number;
+
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(MAX_INVENTORY)
@@ -197,6 +207,25 @@ export class UpdateMemberBody {
   @Min(0, { each: true })
   @Max(MAX_INT32, { each: true })
   deposited?: ItemPairs;
+
+  /**
+   * Per-item changes instead of a full snapshot, keyed like the fields above
+   * (`bank`, `equipment`, `shared_bank`, or an inv gameval). Each is a flat
+   * [itemId, newTotal, ...] list; a total of 0 removes the item. The backpack
+   * is positional and must always come as a full `inventory` snapshot.
+   * Validated in the service.
+   */
+  @IsOptional()
+  @IsObject()
+  inventory_changes?: Record<string, ItemPairs>;
+
+  /**
+   * Set false to opt out of the group achievement feed, so level milestones
+   * crossed by this update are not recorded. Defaults to true.
+   */
+  @IsOptional()
+  @IsBoolean()
+  achievements?: boolean;
 }
 
 export class MemberNameBody {
@@ -369,6 +398,47 @@ export class CreateAchievementBody {
   achieved_at?: string;
 }
 
+/** One achievement reference: `gameval` wins over `achievement_id`. */
+export class AchievementRefInput {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(MAX_INT32)
+  achievement_id?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(MAX_GAMEVAL_NAME)
+  gameval?: string;
+}
+
+/**
+ * Plugin-posted achievement completions. Send `full: true` with the member's
+ * whole completed list (e.g. on login) so anything missing is cleared;
+ * otherwise the listed ones are simply added.
+ */
+export class UpdateMemberAchievementsBody {
+  @IsString()
+  @MaxLength(MAX_INPUT_NAME)
+  name!: string;
+
+  @IsArray()
+  @ArrayMaxSize(MAX_ACHIEVEMENT_UPDATES)
+  @ValidateNested({ each: true })
+  @Type(() => AchievementRefInput)
+  completed!: AchievementRefInput[];
+
+  @IsOptional()
+  @IsBoolean()
+  full?: boolean;
+
+  /** Set false to skip the group achievement feed. Defaults to true. */
+  @IsOptional()
+  @IsBoolean()
+  achievements?: boolean;
+}
+
 /** One quest reference: `gameval` wins over `quest_id` when both are sent. */
 export class QuestStateInput {
   @IsOptional()
@@ -406,4 +476,12 @@ export class UpdateMemberQuestsBody {
   @IsOptional()
   @IsBoolean()
   full?: boolean;
+
+  /**
+   * Set false to opt out of the group achievement feed, so quests finished by
+   * this update are not recorded. Defaults to true.
+   */
+  @IsOptional()
+  @IsBoolean()
+  achievements?: boolean;
 }

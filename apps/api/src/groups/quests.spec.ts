@@ -19,10 +19,11 @@ describe('resolveQuestInputs', () => {
       ],
       resolver,
     );
-    expect([...out]).toEqual([
+    expect([...out.states]).toEqual([
       ['cooks_assistant', 'finished'],
       ['cabinfever', 'started'],
     ]);
+    expect(out.skipped).toEqual([]);
   });
 
   it('lets gameval win over quest_id and the last entry win per quest', () => {
@@ -33,17 +34,28 @@ describe('resolveQuestInputs', () => {
       ],
       resolver,
     );
-    expect(out.get('cooks_assistant')).toBe('finished');
-    expect(out.has('cabinfever')).toBe(false);
+    expect(out.states.get('cooks_assistant')).toBe('finished');
+    expect(out.states.has('cabinfever')).toBe(false);
   });
 
-  it('rejects unknown ids, unknown names, bad states and empty refs', () => {
-    expect(() =>
-      resolveQuestInputs([{ quest_id: 9999, state: 'finished' }], resolver),
-    ).toThrow(BadRequestException);
-    expect(() =>
-      resolveQuestInputs([{ gameval: 'nope', state: 'finished' }], resolver),
-    ).toThrow(BadRequestException);
+  // A quest newer than the server's dump must not block the rest of the sync.
+  it('skips unknown ids and names but keeps the known ones', () => {
+    const out = resolveQuestInputs(
+      [
+        { quest_id: 9999, state: 'finished' },
+        { gameval: 'nope', state: 'finished' },
+        { quest_id: 257, state: 'finished' },
+      ],
+      resolver,
+    );
+    expect([...out.states]).toEqual([['cooks_assistant', 'finished']]);
+    expect(out.skipped).toEqual([
+      { quest_id: 9999, gameval: undefined },
+      { quest_id: undefined, gameval: 'nope' },
+    ]);
+  });
+
+  it('rejects bad states and empty refs', () => {
     expect(() =>
       resolveQuestInputs([{ quest_id: 257, state: 'done' }], resolver),
     ).toThrow(BadRequestException);

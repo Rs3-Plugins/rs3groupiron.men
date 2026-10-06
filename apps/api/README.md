@@ -39,6 +39,33 @@ rotates, and travels verbatim in the `Authorization` header.
 | `am-i-logged-in`, `get-group-data`, `xp-history` | no token needed | token required |
 | everything else | rejected | token required |
 
+Plugin pushes (`update-group-member`, `player-moved`, `set-member-online`,
+`update-member-quests`) carry the character's display name and only update
+names already on the roster; anything else is a 404. The token is shared by the
+whole group, so this is what stops a member logged into another account from
+adding it. Members are added through `add-group-member`.
+
+`update-group-member` accepts full inventory snapshots (`inventory`,
+`equipment`, `bank`, `shared_bank`, `inventories`) and, for everything except
+the positional backpack, `inventory_changes`: per-item `[itemId, newTotal, ...]`
+deltas the plugin sends while a bank is open. A snapshot and deltas for the
+same inventory in one request resolve to the snapshot. The response lists the
+fields it `applied` and whether the heavy data actually changed.
+
+`update-member-achievements` stores completed RS3 achievements and diaries by
+gameval, and `GET achievement-progress` reads them back. A member's first sync
+establishes a baseline without posting to the feed; later completions are
+posted. Achievements that mirror a quest (`quest_*`) are stored but kept out of
+the feed, since the quest sync already posts those.
+
+`update-member-quests` skips quests the server's gameval dump does not know
+and reports them as `skipped`, so a quest newer than the dump never blocks the
+rest of the sync.
+
+A member is reported `online` only while the plugin has been heard from in
+the last 12 minutes (it heartbeats every 5 while idle), so a crashed client
+does not stay online forever.
+
 The seeded demo group is public sample data and read-only.
 
 ## Reading group data

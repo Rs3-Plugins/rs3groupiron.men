@@ -30,6 +30,7 @@ import {
   MemberNameBody,
   RenameMemberBody,
   UpdateGroupSettingsBody,
+  UpdateMemberAchievementsBody,
   UpdateMemberBody,
   UpdateMemberProfileBody,
   UpdateMemberQuestsBody,
@@ -234,6 +235,29 @@ export class GroupsAuthedController {
     @Body() body: UpdateMemberQuestsBody,
   ) {
     return this.groups.updateMemberQuests(groupName, authorization, body);
+  }
+
+  /**
+   * Completed RS3 achievements and diaries per member, keyed by gameval.
+   * Anything absent is not complete.
+   */
+  @Get('achievement-progress')
+  getAchievementProgress(
+    @Param('groupName') groupName: string,
+    @Headers('authorization') authorization: string | undefined,
+  ) {
+    return this.groups.getMemberAchievements(groupName, authorization);
+  }
+
+  /** Plugin achievement sync. Newly completed ones also land in the feed. */
+  @Post('update-member-achievements')
+  @HttpCode(200)
+  updateMemberAchievements(
+    @Param('groupName') groupName: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: UpdateMemberAchievementsBody,
+  ) {
+    return this.groups.updateMemberAchievements(groupName, authorization, body);
   }
 
   @Post('update-group-member')

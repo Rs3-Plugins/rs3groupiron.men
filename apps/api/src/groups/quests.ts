@@ -26,16 +26,27 @@ export type QuestNameResolver = {
   hasName(kind: 'quest', name: string): boolean;
 };
 
+export type ResolvedQuestInputs = {
+  states: Map<string, QuestStateInputName>;
+  /** Inputs naming a quest this server does not know; reported, not fatal. */
+  skipped: Array<{ quest_id?: number; gameval?: string }>;
+};
+
 /**
- * Normalise inputs to gameval -> state. `gameval` wins over `quest_id`; each
- * must exist in the quest gameval table. The last entry for a quest wins so
- * a client that appends events can send them in order.
+ * Normalise inputs to gameval -> state. `gameval` wins over `quest_id`. The
+ * last entry for a quest wins so a client that appends events can send them
+ * in order.
+ *
+ * A quest the server's gameval table lacks (a quest newer than the dump) is
+ * skipped rather than rejected: one unknown entry must not block the other
+ * five hundred, and the client cannot know which one it was.
  */
 export function resolveQuestInputs(
   inputs: QuestInput[],
   resolver: QuestNameResolver,
-): Map<string, QuestStateInputName> {
-  const out = new Map<string, QuestStateInputName>();
+): ResolvedQuestInputs {
+  const states = new Map<string, QuestStateInputName>();
+  const skipped: ResolvedQuestInputs['skipped'] = [];
   for (const [index, input] of inputs.entries()) {
     if (!(QUEST_STATE_INPUTS as readonly string[]).includes(input.state)) {
       throw new BadRequestException(`quests[${index}].state is invalid`);
@@ -44,28 +55,24 @@ export function resolveQuestInputs(
     let gameval: string | undefined;
     const rawName = input.gameval?.trim().toLowerCase();
     if (rawName) {
-      if (!isGamevalName(rawName) || !resolver.hasName('quest', rawName)) {
-        throw new BadRequestException(
-          `quests[${index}].gameval is not a known quest`,
-        );
+      if (isGamevalName(rawName) && resolver.hasName('quest', rawName)) {
+        gameval = rawName;
       }
-      gameval = rawName;
     } else if (input.quest_id != null) {
       gameval = resolver.nameOf('quest', input.quest_id);
-      if (!gameval) {
-        throw new BadRequestException(
-          `quests[${index}].quest_id is not a known quest`,
-        );
-      }
     } else {
       throw new BadRequestException(
         `quests[${index}] needs a quest_id or gameval`,
       );
     }
 
-    out.set(gameval, input.state as QuestStateInputName);
+    if (!gameval) {
+      skipped.push({ quest_id: input.quest_id, gameval: input.gameval });
+      continue;
+    }
+    states.set(gameval, input.state as QuestStateInputName);
   }
-  return out;
+  return { states, skipped };
 }
 
 export type QuestUpdatePlan = {

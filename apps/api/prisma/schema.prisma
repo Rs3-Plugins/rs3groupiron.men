@@ -126,6 +126,7 @@ model Member {
   skills MemberSkill[]
   xpSamples SkillXpSample[]
   quests MemberQuest[]
+  completedAchievements MemberAchievement[]
 
   @@unique([groupId, name])
   @@index([groupId])
@@ -221,6 +222,21 @@ model MemberQuest {
 
   @@unique([memberId, gameval])
   @@map("member_quests")
+}
+
+/// Achievements and diaries a member has completed, keyed by the RS3
+/// gameval name so a cache renumbering cannot reattribute one. Presence is
+/// completion: there is no row for an incomplete achievement.
+model MemberAchievement {
+  id        String   @id @default(cuid())
+  memberId  String   @map("member_id")
+  gameval   String
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, gameval])
+  @@map("member_achievements")
 }
 
 /// Per-member RS3 skill XP/levels (max XP 200m; max level 99/110/120 per skill)

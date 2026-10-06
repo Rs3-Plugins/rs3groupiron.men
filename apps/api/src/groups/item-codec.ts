@@ -139,6 +139,11 @@ function toInt(value: number | undefined): number {
   return Number.isFinite(value) ? Math.round(value as number) : 0;
 }
 
+/**
+ * The world slot is only written when the caller actually sent it, so a
+ * six-element vitals array from the plugin cannot reset a world set through
+ * the dedicated `world` field.
+ */
 export function statsFromArray(stats: number[] | undefined) {
   return {
     hpCurrent: toInt(stats?.[0]),
@@ -147,7 +152,7 @@ export function statsFromArray(stats: number[] | undefined) {
     prayerMax: toInt(stats?.[3]),
     summonCurrent: toInt(stats?.[4]),
     summonMax: toInt(stats?.[5]),
-    world: toInt(stats?.[6]),
+    ...(stats?.[6] === undefined ? {} : { world: toInt(stats[6]) }),
   };
 }
 

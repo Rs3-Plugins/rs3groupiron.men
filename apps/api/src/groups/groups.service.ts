@@ -70,6 +70,7 @@ import {
   SetMemberOnlineBody,
   type SkillPayloadValue,
   UpdateGroupSettingsBody,
+  UpdateMemberAchievementsBody,
   UpdateMemberBody,
   UpdateMemberProfileBody,
   UpdateMemberQuestsBody,
@@ -84,6 +85,13 @@ import {
   rowsToPairs,
   statsFromArray,
 } from './item-codec';
+import {
+  achievementTitle,
+  isFeedWorthyAchievement,
+  planAchievementUpdate,
+  resolveAchievementRefs,
+} from './achievement-sync';
+import { planItemChanges } from './item-changes';
 import { planQuestUpdate, resolveQuestInputs } from './quests';
 import { normalizeSeedSkills } from './skill-codec';
 import { type DbClient, XpHistoryService } from './xp-history.service';
@@ -97,9 +105,8 @@ type SkillRow = {
   baseLevel: number;
 };
 
-/** Whether a skill sync actually moved anything. */
+/** True when any incoming skill differs from what is stored for it. */
 function skillsDiffer(before: SkillRow[], after: SkillRow[]): boolean {
-  if (before.length !== after.length) return true;
   const byId = new Map(before.map((row) => [row.skillId, row]));
   return after.some((row) => {
     const previous = byId.get(row.skillId);
@@ -124,6 +131,24 @@ const SNAPSHOT_CACHE_MAX = 256;
 
 const DEFAULT_STATS = [10, 10, 1, 1, 1, 1, 1];
 const DEFAULT_COORDS = [3200, 3200, 0];
+
+/** `inventory_changes` key for the group storage, matching the snapshot field. */
+const SHARED_BANK_FIELD = 'shared_bank';
+
+/** Fields an update-group-member body may carry, echoed back as `applied`. */
+const UPDATE_FIELDS = [
+  'stats',
+  'coordinates',
+  'world',
+  'inventory',
+  'equipment',
+  'bank',
+  'inventories',
+  'skills',
+  'shared_bank',
+  'deposited',
+  'inventory_changes',
+] as const;
 
 @Injectable()
 export class GroupsService {
@@ -718,7 +743,10 @@ export class GroupsService {
     if (!member) throw new NotFoundException('Member not found');
 
     // Validate everything before opening a transaction.
-    const next = resolveQuestInputs(body.quests, this.gamevals);
+    const { states: next, skipped } = resolveQuestInputs(
+      body.quests,
+      this.gamevals,
+    );
     const full = body.full === true;
     const now = new Date();
 
@@ -750,7 +778,8 @@ export class GroupsService {
       }
 
       const isBaseline = previous.size === 0;
-      if (plan.finished.length && !isBaseline) {
+      const recordAchievements = body.achievements !== false;
+      if (plan.finished.length && !isBaseline && recordAchievements) {
         await tx.achievement.createMany({
           data: plan.finished.map((gameval) => ({
             groupId: group.id,
@@ -777,6 +806,126 @@ export class GroupsService {
       removed: plan.remove.length,
       finished: plan.finished,
       baseline: plan.isBaseline,
+      skipped,
+    };
+  }
+
+  /** Completed achievements per member, keyed by gameval. */
+  async getMemberAchievements(groupName: string, token: string | undefined) {
+    const group = await this.access.read(groupName, token);
+    const members = group.members.filter((m) => m.name !== SHARED_MEMBER);
+    const rows = members.length
+      ? await this.prisma.memberAchievement.findMany({
+          where: { memberId: { in: members.map((m) => m.id) } },
+          select: { memberId: true, gameval: true },
+        })
+      : [];
+
+    const byMember = new Map<string, string[]>();
+    for (const row of rows) {
+      const list = byMember.get(row.memberId);
+      if (list) list.push(row.gameval);
+      else byMember.set(row.memberId, [row.gameval]);
+    }
+
+    return {
+      members: members.map((m) => ({
+        name: m.name,
+        completed: (byMember.get(m.id) ?? []).sort(),
+      })),
+    };
+  }
+
+  /**
+   * Plugin achievement sync. Newly completed achievements also land in the
+   * group feed, except on a member's first ever sync: that establishes the
+   * baseline, and posting thousands of historical completions would bury it.
+   */
+  async updateMemberAchievements(
+    groupName: string,
+    token: string | undefined,
+    body: UpdateMemberAchievementsBody,
+  ) {
+    const group = await this.access.write(groupName, token);
+    const name = validateDisplayName(body.name, 'Player username');
+    if (name === SHARED_MEMBER) {
+      throw new BadRequestException('Invalid member name');
+    }
+    const member = findMemberRef(group.members, name);
+    if (!member) throw new NotFoundException('Member not found');
+
+    const { completed: next, skipped } = resolveAchievementRefs(
+      body.completed,
+      this.gamevals,
+    );
+    const full = body.full === true;
+    const recordFeed = body.achievements !== false;
+    const now = new Date();
+
+    const plan = await this.prisma.$transaction(
+      async (tx) => {
+        const stored = await tx.memberAchievement.findMany({
+          where: { memberId: member.id },
+          select: { gameval: true },
+        });
+        const previous = new Set(stored.map((row) => row.gameval));
+        const plan = planAchievementUpdate(previous, next, full);
+        const isBaseline = previous.size === 0;
+
+        if (plan.remove.length) {
+          await tx.memberAchievement.deleteMany({
+            where: { memberId: member.id, gameval: { in: plan.remove } },
+          });
+        }
+        if (plan.add.length) {
+          await tx.memberAchievement.createMany({
+            data: plan.add.map((gameval) => ({
+              memberId: member.id,
+              gameval,
+              updatedAt: now,
+            })),
+            skipDuplicates: true,
+          });
+
+          const feed =
+            recordFeed && !isBaseline
+              ? plan.add.filter(isFeedWorthyAchievement)
+              : [];
+          if (feed.length) {
+            await tx.achievement.createMany({
+              data: feed.map((gameval) => ({
+                groupId: group.id,
+                memberName: member.name,
+                kind: AchievementKind.other,
+                title: achievementTitle(gameval),
+                detail: 'Achievement complete',
+                gameval,
+                dedupeKey: gamevalDedupeKey(
+                  member.name,
+                  'achievement',
+                  gameval,
+                ),
+                achievedAt: now,
+              })),
+              skipDuplicates: true,
+            });
+          }
+        }
+        return { ...plan, isBaseline };
+      },
+      { maxWait: 5_000, timeout: 20_000 },
+    );
+
+    this.notifyChanged(group.id);
+    return {
+      ok: true,
+      name: member.name,
+      added: plan.add.length,
+      removed: plan.remove.length,
+      baseline: plan.isBaseline,
+      // A count, not the list: a client built against a newer cache dump than
+      // this server's can legitimately skip thousands.
+      skipped: skipped.length,
     };
   }
 
@@ -798,13 +947,24 @@ export class GroupsService {
           this.gamevals.hasName('inv', key),
         )
       : undefined;
+    // Changes are per-item totals, so the positional backpack is excluded.
+    const changes = body.inventory_changes
+      ? validateInventoriesPayload(
+          body.inventory_changes,
+          (key) =>
+            key !== 'inventory' &&
+            key !== WIRE_INVENTORIES.inventory &&
+            (key in WIRE_INVENTORIES ||
+              key === SHARED_BANK_FIELD ||
+              this.gamevals.hasName('inv', key)),
+        )
+      : undefined;
 
+    // Pushes only update roster members. The token is shared by the whole
+    // group, so a holder logged into another account must not be able to add
+    // it; the roster is managed through add-group-member.
     const existing = findMemberRef(group.members, name);
-    if (!existing && playableCount(group.members) >= group.memberSlots) {
-      throw new ConflictException(
-        `Group is full (${group.memberSlots} players)`,
-      );
-    }
+    if (!existing) throw new NotFoundException('Member not found');
 
     const now = new Date();
     const vitals = body.stats ? statsFromArray(body.stats) : undefined;
@@ -824,44 +984,31 @@ export class GroupsService {
       !!body.bank ||
       !!body.inventories ||
       !!body.skills ||
+      !!changes ||
       hasDeposit;
 
+    let dataChanged = false;
     await this.prisma.$transaction(
       async (tx) => {
-        let memberId: string;
-        if (existing) {
-          memberId = existing.id;
-          // dataUpdatedAt is set afterwards, once the writes below have said
-          // whether the heavy payload really moved.
-          await tx.member.update({
-            where: { id: memberId },
-            data: {
-              lastUpdated: now,
-              online: true,
-              ...(vitals ?? {}),
-              ...(coords ?? {}),
-            },
-            select: { id: true },
-          });
-        } else {
-          const created = await tx.member.create({
-            data: {
-              groupId: group.id,
-              name,
-              lastUpdated: now,
-              dataUpdatedAt: now,
-              online: true,
-              ...statsFromArray(body.stats ?? DEFAULT_STATS),
-              ...coordsFromArray(body.coordinates ?? DEFAULT_COORDS),
-            },
-            select: { id: true },
-          });
-          memberId = created.id;
-        }
+        const memberId = existing.id;
+        // dataUpdatedAt is set afterwards, once the writes below have said
+        // whether the heavy payload really moved.
+        await tx.member.update({
+          where: { id: memberId },
+          data: {
+            lastUpdated: now,
+            online: true,
+            ...(vitals ?? {}),
+            ...(coords ?? {}),
+            ...(body.world === undefined
+              ? {}
+              : { world: Math.round(body.world) }),
+          },
+          select: { id: true },
+        });
 
-        // A new member's data is all new by definition; for an existing one
-        // this is only true once a write below reports a real change.
-        let heavyChanged = !existing;
+        // Only true once a write below reports a real change.
+        let heavyChanged = false;
 
         // Named wire fields first, then the generic map. A key present in
         // both is written twice and the generic one wins, which is harmless.
@@ -891,13 +1038,11 @@ export class GroupsService {
         } else if (body.bank) {
           finalBank = body.bank;
         } else if (hasDeposit) {
-          const currentBank = existing
-            ? await this.memberInventoryPairs(
-                tx,
-                memberId,
-                WIRE_INVENTORIES.bank,
-              )
-            : [];
+          const currentBank = await this.memberInventoryPairs(
+            tx,
+            memberId,
+            WIRE_INVENTORIES.bank,
+          );
           finalBank = mergeItemPairs(currentBank, body.deposited!);
         }
         if (finalBank) {
@@ -930,10 +1075,13 @@ export class GroupsService {
             name,
             skills,
             now,
+            body.achievements !== false,
           );
         }
 
-        if (body.shared_bank?.length) {
+        // An empty list is a real snapshot (the group emptied its storage), so
+        // only an absent field skips this.
+        if (body.shared_bank) {
           // The shared bank is the group's own `bank` inventory. Snapshot
           // BEFORE replacing so the ledger can diff against it.
           const previousShared = await this.groupInventoryPairs(
@@ -949,17 +1097,52 @@ export class GroupsService {
             now,
           );
 
-          const movements = diffItemTotals(previousShared, body.shared_bank);
-          if (movements.length) {
-            await tx.sharedBankEntry.createMany({
-              data: movements.map((m) => ({
-                groupId: group.id,
-                memberName: name,
-                itemId: m.itemId,
-                delta: m.delta,
-                createdAt: now,
-              })),
-            });
+          await this.recordSharedMovements(
+            tx,
+            group.id,
+            name,
+            diffItemTotals(previousShared, body.shared_bank),
+            now,
+          );
+        }
+
+        // Per-item deltas. A full snapshot of the same inventory in this
+        // request already holds the final state, so its deltas are skipped.
+        if (changes) {
+          const snapshotKeys = new Set<string>(Object.keys(inventories ?? {}));
+          if (body.inventory) snapshotKeys.add(WIRE_INVENTORIES.inventory);
+          if (body.equipment) snapshotKeys.add(WIRE_INVENTORIES.equipment);
+          if (finalBank) snapshotKeys.add(WIRE_INVENTORIES.bank);
+
+          for (const [field, pairs] of Object.entries(changes)) {
+            if (field === SHARED_BANK_FIELD) {
+              if (body.shared_bank) continue;
+              const movements = await this.applyGroupInventoryChanges(
+                tx,
+                group.id,
+                WIRE_INVENTORIES.bank,
+                pairs,
+                now,
+              );
+              await this.recordSharedMovements(
+                tx,
+                group.id,
+                name,
+                movements,
+                now,
+              );
+              continue;
+            }
+            const key =
+              (WIRE_INVENTORIES as Record<string, string>)[field] ?? field;
+            if (snapshotKeys.has(key)) continue;
+            heavyChanged ||= await this.applyMemberInventoryChanges(
+              tx,
+              memberId,
+              key,
+              pairs,
+              now,
+            );
           }
         }
 
@@ -967,19 +1150,129 @@ export class GroupsService {
         // exchange for not making every viewer of this group re-download the
         // member's bank after a no-op resend. Guarded by mayTouchHeavyData so a
         // position-only ping still cannot reach it.
-        if (existing && mayTouchHeavyData && heavyChanged) {
+        if (mayTouchHeavyData && heavyChanged) {
           await tx.member.update({
             where: { id: memberId },
             data: { dataUpdatedAt: now },
             select: { id: true },
           });
         }
+        dataChanged = heavyChanged;
       },
       { maxWait: 5_000, timeout: 20_000 },
     );
 
     this.notifyChanged(group.id);
-    return { ok: true };
+    return {
+      ok: true,
+      name: existing.name,
+      updated_at: now.toISOString(),
+      applied: UPDATE_FIELDS.filter((field) => body[field] !== undefined),
+      data_changed: dataChanged,
+    };
+  }
+
+  private async recordSharedMovements(
+    db: DbClient,
+    groupId: string,
+    memberName: string,
+    movements: Array<{ itemId: number; delta: number }>,
+    now: Date,
+  ) {
+    if (!movements.length) return;
+    await db.sharedBankEntry.createMany({
+      data: movements.map((m) => ({
+        groupId,
+        memberName,
+        itemId: m.itemId,
+        delta: m.delta,
+        createdAt: now,
+      })),
+    });
+  }
+
+  /** Apply [itemId, newTotal, ...] to a member inventory; true when it changed. */
+  private async applyMemberInventoryChanges(
+    db: DbClient,
+    memberId: string,
+    key: string,
+    pairs: number[],
+    now: Date,
+  ): Promise<boolean> {
+    const inventory = await db.memberInventory.upsert({
+      where: { memberId_key: { memberId, key } },
+      create: { memberId, key, updatedAt: now },
+      update: {},
+      select: { id: true },
+    });
+    const current = await db.memberInventoryItem.findMany({
+      where: { inventoryId: inventory.id },
+      select: { slot: true, itemId: true, quantity: true },
+    });
+    const plan = planItemChanges(current, pairs);
+    if (!plan.changed) return false;
+
+    if (plan.deleteItemIds.length) {
+      await db.memberInventoryItem.deleteMany({
+        where: {
+          inventoryId: inventory.id,
+          itemId: { in: plan.deleteItemIds },
+        },
+      });
+    }
+    if (plan.insert.length) {
+      await db.memberInventoryItem.createMany({
+        data: plan.insert.map((row) => ({ ...row, inventoryId: inventory.id })),
+      });
+    }
+    await db.memberInventory.update({
+      where: { id: inventory.id },
+      data: { updatedAt: now, contentHash: inventoryContentHash(plan.rows) },
+      select: { id: true },
+    });
+    return true;
+  }
+
+  /** Same as above for a group-owned inventory; returns the ledger movements. */
+  private async applyGroupInventoryChanges(
+    db: DbClient,
+    groupId: string,
+    key: string,
+    pairs: number[],
+    now: Date,
+  ): Promise<Array<{ itemId: number; delta: number }>> {
+    const inventory = await db.groupInventory.upsert({
+      where: { groupId_key: { groupId, key } },
+      create: { groupId, key, updatedAt: now },
+      update: {},
+      select: { id: true },
+    });
+    const current = await db.groupInventoryItem.findMany({
+      where: { inventoryId: inventory.id },
+      select: { slot: true, itemId: true, quantity: true },
+    });
+    const plan = planItemChanges(current, pairs);
+    if (!plan.changed) return [];
+
+    if (plan.deleteItemIds.length) {
+      await db.groupInventoryItem.deleteMany({
+        where: {
+          inventoryId: inventory.id,
+          itemId: { in: plan.deleteItemIds },
+        },
+      });
+    }
+    if (plan.insert.length) {
+      await db.groupInventoryItem.createMany({
+        data: plan.insert.map((row) => ({ ...row, inventoryId: inventory.id })),
+      });
+    }
+    await db.groupInventory.update({
+      where: { id: inventory.id },
+      data: { updatedAt: now, contentHash: inventoryContentHash(plan.rows) },
+      select: { id: true },
+    });
+    return plan.movements;
   }
 
   /** Fast path for live map — coordinates only. */
@@ -1410,24 +1703,28 @@ export class GroupsService {
     memberName: string,
     skills: Record<string, SkillPayloadValue>,
     sampledAt: Date,
+    recordAchievements = true,
   ): Promise<boolean> {
-    // Read BEFORE deleting so milestone crossings can be diffed.
+    // Read BEFORE writing so milestone crossings can be diffed.
     const previous = await db.memberSkill.findMany({
       where: { memberId },
       select: { skillId: true, xp: true, level: true, baseLevel: true },
     });
 
-    await db.memberSkill.deleteMany({ where: { memberId } });
+    // Merge, never replace: the plugin sends only the skills that changed
+    // (all of them on login), so a partial map must leave the rest alone.
     const rows = normalizeSeedSkills(skills).map((skill) => ({
       ...skill,
       memberId,
     }));
-    // The rows are rewritten either way; this only decides whether clients are
-    // told the heavy payload moved. A plugin that resyncs identical skills
-    // should not make every viewer re-download them.
     const changed = skillsDiffer(previous, rows);
     if (rows.length) {
-      await db.memberSkill.createMany({ data: rows });
+      if (changed) {
+        await db.memberSkill.deleteMany({
+          where: { memberId, skillId: { in: rows.map((r) => r.skillId) } },
+        });
+        await db.memberSkill.createMany({ data: rows });
+      }
       await this.xpHistory.recordXpSamples(
         memberId,
         rows.map((r) => ({ skillId: r.skillId, xp: r.xp })),
@@ -1435,7 +1732,9 @@ export class GroupsService {
         db,
       );
 
-      const milestones = detectSkillMilestones(memberName, previous, rows);
+      const milestones = recordAchievements
+        ? detectSkillMilestones(memberName, previous, rows)
+        : [];
       if (milestones.length) {
         await db.achievement.createMany({
           data: milestones.map((m) => ({
