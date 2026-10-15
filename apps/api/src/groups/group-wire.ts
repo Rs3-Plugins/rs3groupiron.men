@@ -67,6 +67,22 @@ export function inventoriesToWire(inventories: InventoryLike[]) {
   };
 }
 
+/**
+ * A member who opted out of the live map — or who is sitting in the lobby —
+ * reports no position at all. The empty array is what the clients already treat
+ * as "nothing to plot", so hiding costs them no extra branch.
+ */
+export function wireCoordinates(member: {
+  x: number;
+  y: number;
+  plane: number;
+  shareLocation: boolean;
+  inLobby: boolean;
+}) {
+  if (!member.shareLocation || member.inLobby) return [];
+  return [member.x, member.y, member.plane];
+}
+
 export function toWireMember(member: MemberWithData) {
   return {
     name: member.name,
@@ -77,7 +93,9 @@ export function toWireMember(member: MemberWithData) {
     online: isOnline(member),
     last_updated: member.lastUpdated.toISOString(),
     stats: statsToArray(member),
-    coordinates: [member.x, member.y, member.plane],
+    coordinates: wireCoordinates(member),
+    share_location: member.shareLocation,
+    in_lobby: member.inLobby,
     ...inventoriesToWire(member.inventories),
     skills: skillsToWire(member.skills),
   };
@@ -102,7 +120,9 @@ export function toPartialWireMember(member: Member) {
     online: isOnline(member),
     last_updated: member.lastUpdated.toISOString(),
     stats: statsToArray(member),
-    coordinates: [member.x, member.y, member.plane],
+    coordinates: wireCoordinates(member),
+    share_location: member.shareLocation,
+    in_lobby: member.inLobby,
   };
 }
 

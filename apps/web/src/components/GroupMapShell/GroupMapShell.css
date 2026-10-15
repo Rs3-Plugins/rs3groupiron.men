@@ -153,13 +153,18 @@
   opacity: 0.85;
 }
 
-.gms-player-nav-offline {
+.gms-player-nav-offline,
+.gms-player-nav-lobby {
   margin-left: 0.1rem;
   color: #9aa3ad;
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+}
+
+.gms-player-nav-lobby {
+  color: #d8b24a;
 }
 
 .gms-player-nav-dot {
@@ -4128,7 +4133,8 @@
 
   .gms-player-nav-dot,
   .gms-player-nav-avatar,
-  .gms-player-nav-offline {
+  .gms-player-nav-offline,
+  .gms-player-nav-lobby {
     flex: 0 0 auto;
   }
 

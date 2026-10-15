@@ -238,6 +238,10 @@
   color: var(--rs3-muted);
 }
 
+.gms[data-appearance='rs3'] .gms-player-nav-lobby {
+  color: var(--rs3-accent, #d8b24a);
+}
+
 .gms[data-appearance='rs3'] .gms-player-nav-dot {
   border-color: var(--rs3-ink);
 }

@@ -67,6 +67,7 @@ import {
   PlayerMovedBody,
   RenameMemberBody,
   SHARED_MEMBER,
+  SetLocationSharingBody,
   SetMemberOnlineBody,
   type SkillPayloadValue,
   UpdateGroupSettingsBody,
@@ -1310,12 +1311,37 @@ export class GroupsService {
       ...(hasPlane ? { plane: Math.round(plane) } : {}),
     };
 
+    // A member who opted out keeps their presence but stores no position, so
+    // an old tile cannot resurface if they share again later.
+    const current = await this.prisma.member.findUnique({
+      where: { id: member.id },
+      select: { shareLocation: true },
+    });
+    if (current && !current.shareLocation) {
+      await this.prisma.member.update({
+        where: { id: member.id },
+        data: { online: true, inLobby: false, lastUpdated: now },
+        select: { id: true },
+      });
+      this.notifyChanged(group.id);
+      return {
+        ok: true,
+        name,
+        online: true,
+        coordinates: [],
+        share_location: false,
+        updated_at: now.toISOString(),
+      };
+    }
+
     // Single write; the returned row gives us the (possibly unchanged) plane.
+    // A position proves they are in game, so the lobby flag clears itself.
     const updated = await this.prisma.member.update({
       where: { id: member.id },
       data: {
         ...rounded,
         online: true,
+        inLobby: false,
         lastUpdated: now,
       },
       select: { plane: true },
@@ -1327,6 +1353,44 @@ export class GroupsService {
       name,
       online: true,
       coordinates: [rounded.x, rounded.y, updated.plane],
+      share_location: true,
+      updated_at: now.toISOString(),
+    };
+  }
+
+  /** Opt a member in or out of the live map without changing presence. */
+  async setLocationSharing(
+    groupName: string,
+    token: string | undefined,
+    body: SetLocationSharingBody,
+  ) {
+    const group = await this.access.write(groupName, token);
+    const name = body.name?.trim();
+    if (!name || name === SHARED_MEMBER) {
+      throw new BadRequestException('Invalid member name');
+    }
+    const member = findMemberRef(group.members, name);
+    if (!member) throw new NotFoundException('Member not found');
+
+    const shared = Boolean(body.shared);
+    const now = new Date();
+    // Opting out clears the stored tile outright; hiding it only at the wire
+    // would leave the last known position sitting in the database.
+    const result = await this.prisma.member.updateMany({
+      where: { id: member.id, groupId: group.id },
+      data: {
+        shareLocation: shared,
+        lastUpdated: now,
+        ...(shared ? {} : { x: 0, y: 0, plane: 0 }),
+      },
+    });
+    if (result.count === 0) throw new NotFoundException('Member not found');
+
+    this.notifyChanged(group.id);
+    return {
+      ok: true,
+      name,
+      share_location: shared,
       updated_at: now.toISOString(),
     };
   }
@@ -1345,11 +1409,15 @@ export class GroupsService {
     if (!member) throw new NotFoundException('Member not found');
 
     const online = Boolean(body.online);
+    // Going offline cannot leave the lobby flag set, or a closed client would
+    // read as "in lobby" forever.
+    const inLobby = online && Boolean(body.in_lobby);
     const now = new Date();
     const result = await this.prisma.member.updateMany({
       where: { id: member.id, groupId: group.id },
       data: {
         online,
+        inLobby,
         lastUpdated: now,
       },
     });
@@ -1360,6 +1428,7 @@ export class GroupsService {
       ok: true,
       name,
       online,
+      in_lobby: inLobby,
       updated_at: now.toISOString(),
     };
   }

@@ -575,11 +575,13 @@ function PlayerNav({
               .filter(Boolean)
               .join(' ')}
             title={
-              !hasLocation
-                ? 'Location unknown'
-                : player.online
-                  ? `Go to ${player.name}`
-                  : `Go to last location (${player.name} offline)`
+              player.inLobby
+                ? `${player.name} is in the lobby`
+                : !hasLocation
+                  ? 'Location unknown'
+                  : player.online
+                    ? `Go to ${player.name}`
+                    : `Go to last location (${player.name} offline)`
             }
             disabled={!hasLocation}
             onClick={() => onSelect(player)}
@@ -601,6 +603,9 @@ function PlayerNav({
             )}
             <span className="gms-player-nav-name">{player.displayName}</span>
             {!player.online && <span className="gms-player-nav-offline">offline</span>}
+            {player.online && player.inLobby && (
+              <span className="gms-player-nav-lobby">lobby</span>
+            )}
           </button>
         );
       })}

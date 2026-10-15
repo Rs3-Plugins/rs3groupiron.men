@@ -307,6 +307,21 @@ export class SetMemberOnlineBody {
 
   @IsBoolean()
   online!: boolean;
+
+  /** Online but sitting on the lobby screen, so there is no position to plot. */
+  @IsOptional()
+  @IsBoolean()
+  in_lobby?: boolean;
+}
+
+/** Opt this member in or out of the live map. */
+export class SetLocationSharingBody {
+  @IsString()
+  @MaxLength(MAX_INPUT_NAME)
+  name!: string;
+
+  @IsBoolean()
+  shared!: boolean;
 }
 
 export class UpdateGroupSettingsBody {

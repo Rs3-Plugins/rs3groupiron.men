@@ -21,9 +21,21 @@ function healthFromStats(
   skills: PlayerSkill[],
 ): { current: number; max: number } {
   const constitution = skills.find((s) => s.id === 'constitution');
-  const max = lifePointsForLevel(constitution?.baseLevel ?? 0);
-
   let current = Math.max(0, Math.floor(stats[0] ?? 0));
+  let max = Math.max(0, Math.floor(stats[1] ?? 0));
+
+  if (max > 0) {
+    // The plugin reports its own maximum, which beats guessing from the skill
+    // table. Any cap below the level-10 minimum is levels, not life points —
+    // a real life point maximum starts at 1000.
+    if (max < lifePointsForLevel(0)) {
+      current *= LIFE_POINTS_PER_LEVEL;
+      max *= LIFE_POINTS_PER_LEVEL;
+    }
+    return { current: Math.min(current, max), max };
+  }
+
+  max = lifePointsForLevel(constitution?.baseLevel ?? 0);
   // Below a tenth of the cap almost certainly means levels, not life points.
   if (current > 0 && current * LIFE_POINTS_PER_LEVEL <= max) {
     current *= LIFE_POINTS_PER_LEVEL;
@@ -45,6 +57,10 @@ export type WireMember = {
   color?: string;
   use_discord_avatar?: boolean;
   online?: boolean;
+  /** False when the member opted out of the live map; coordinates arrive empty. */
+  share_location?: boolean;
+  /** Online but on the lobby screen, so there is no position to plot. */
+  in_lobby?: boolean;
   last_updated?: string;
   stats?: number[];
   coordinates?: number[];
@@ -72,6 +88,8 @@ export type WirePartialMember = {
   color?: string;
   use_discord_avatar?: boolean;
   online?: boolean;
+  share_location?: boolean;
+  in_lobby?: boolean;
   last_updated?: string;
   stats?: number[];
   coordinates?: number[];
@@ -117,6 +135,8 @@ export type PlayerView = {
   avatarUrl: string | null;
   useDiscordAvatar: boolean;
   online: boolean;
+  /** Online but on the lobby screen: shown as "lobby" instead of a position. */
+  inLobby: boolean;
   /** Game world the member is on, or 0 when the plugin hasn't reported one. */
   world: number;
   lastSeen: string | null;
@@ -254,6 +274,7 @@ export function toPlayerView(member: WireMember): PlayerView | null {
     useDiscordAvatar,
     avatarUrl: useDiscordAvatar ? discordUrl : null,
     online: member.online === true,
+    inLobby: member.in_lobby === true,
     world: stats[6] ?? 0,
     lastSeen: member.last_updated ?? null,
     avatarColor: resolveAvatarColor(member.name, member.color),

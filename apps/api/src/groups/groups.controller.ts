@@ -35,6 +35,7 @@ import {
   UpdateMemberProfileBody,
   UpdateMemberQuestsBody,
   PlayerMovedBody,
+  SetLocationSharingBody,
   SetMemberOnlineBody,
 } from './group.types';
 import { GroupsService } from './groups.service';
@@ -279,6 +280,17 @@ export class GroupsAuthedController {
     @Body() body: PlayerMovedBody,
   ) {
     return this.groups.playerMoved(groupName, authorization, body);
+  }
+
+  /** Opt a member in or out of the live map. */
+  @Post('set-location-sharing')
+  @HttpCode(200)
+  setLocationSharing(
+    @Param('groupName') groupName: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: SetLocationSharingBody,
+  ) {
+    return this.groups.setLocationSharing(groupName, authorization, body);
   }
 
   /** Mark a member online/offline (plugin login/logout). */

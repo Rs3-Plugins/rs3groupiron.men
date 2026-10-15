@@ -104,6 +104,11 @@ model Member {
   useDiscordAvatar Boolean @default(true) @map("use_discord_avatar")
   /// Plugin/client presence — offline members are hidden on the map.
   online      Boolean  @default(false)
+  /// Opt-out from the live map. False hides this member's position from the
+  /// rest of the group without touching their online flag or any other panel.
+  shareLocation Boolean @default(true) @map("share_location")
+  /// Logged in but sitting on the lobby screen: online, with no position.
+  inLobby     Boolean  @default(false) @map("in_lobby")
   /// Any change at all: position, vitals, online flag, profile, inventories.
   lastUpdated DateTime @default(now()) @map("last_updated")
   /// Only the expensive payload: inventories and skills. A position ping bumps
