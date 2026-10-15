@@ -1,0 +1,154 @@
+name: Sync cache catalogues
+
+# Unpacks the live RS3 cache and regenerates the static catalogues the API
+# serves (items, npc names, achievements). Commits to main and production
+# independently — production is not a fast-forward of main, so merging or
+# pushing one onto the other would rewind a deploy.
+#
+# Pushing to production is what triggers deploy-api.yml, so a run that finds
+# changes ends with the API restarting on the new data.
+
+on:
+  schedule:
+    - cron: "0 8 * * 1" # Mondays 08:00 UTC
+  workflow_dispatch:
+    inputs:
+      cache:
+        description: "Which cache to unpack"
+        type: choice
+        options: [beta, live]
+        default: beta
+      cache_id:
+        description: "OpenRS2 cache id for the asset ids (default: matched to the dump's revision)"
+        type: string
+        default: ""
+      dry_run:
+        description: "Generate and show the diff, but do not commit"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: catalogue-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # Downloading and unpacking a full game cache is the slow part.
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_TOKEN || github.token }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check out the unpacker
+        uses: actions/checkout@v4
+        with:
+          repository: zwyz/rs3-cache
+          path: .rs3-cache
+
+      # The project has no shade or exec plugin and compiles with preview
+      # features, so the classpath is built explicitly and --enable-preview is
+      # needed at runtime as well as at compile time.
+      - name: Unpack the cache
+        working-directory: .rs3-cache
+        run: |
+          set -euo pipefail
+          mvn -q -B compile
+          mvn -q -B dependency:build-classpath -Dmdep.outputFile=cp.txt
+          java --enable-preview -cp "target/classes:$(cat cp.txt)" \
+            rs3.Main "${{ inputs.cache || 'beta' }}" "$RUNNER_TEMP/dump"
+
+      # Only the config dumps are needed; ids come from the cache's own asset
+      # name tables, so the .sym files are not consulted.
+      - name: Check the dump looks complete
+        run: |
+          set -euo pipefail
+          for f in dump.obj dump.npc dump.achievement dump.quest dump.param; do
+            test -s "$RUNNER_TEMP/dump/config/$f" || { echo "::error::missing or empty config/$f"; exit 1; }
+          done
+
+      - name: Build the catalogues
+        run: |
+          node apps/api/tools/build-catalogue.mjs "$RUNNER_TEMP/dump" \
+            ${{ inputs.cache_id && format('--cache-id {0}', inputs.cache_id) || '' }}
+
+      # Quest and achievement icons. Item icons are model renders rather than
+      # stored images, so they are not extractable here.
+      - name: Extract the referenced sprites
+        run: |
+          node apps/api/tools/build-sprites.mjs "$RUNNER_TEMP/dump" \
+            ${{ inputs.cache_id && format('--cache-id {0}', inputs.cache_id) || '' }}
+
+      - name: Stash the generated files
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/out"
+          cp apps/api/data/items.json \
+             apps/api/data/npc-names.json \
+             apps/api/data/achievements.json \
+             apps/api/data/quests.json "$RUNNER_TEMP/out/"
+          cp -r apps/api/data/sprites "$RUNNER_TEMP/out-sprites"
+          node -e '
+            const fs = require("fs");
+            const dir = process.env.RUNNER_TEMP + "/out/";
+            for (const f of fs.readdirSync(dir)) {
+              const j = JSON.parse(fs.readFileSync(dir + f, "utf8"));
+              console.log(f.padEnd(20), String(j.count).padStart(6), "entries, revision", j.revision);
+            }
+          ' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit to main and production
+        if: ${{ !inputs.dry_run }}
+        env:
+          GIT_AUTHOR_NAME: catalogue-sync
+          GIT_AUTHOR_EMAIL: noreply@github.com
+          GIT_COMMITTER_NAME: catalogue-sync
+          GIT_COMMITTER_EMAIL: noreply@github.com
+        run: |
+          set -euo pipefail
+          changed=0
+          for branch in main production; do
+            # -f because the generated files are sitting in the work tree.
+            git checkout -f "$branch"
+            git reset --hard "origin/$branch"
+            cp "$RUNNER_TEMP/out/"*.json apps/api/data/
+            rm -rf apps/api/data/sprites
+            cp -r "$RUNNER_TEMP/out-sprites" apps/api/data/sprites
+            # The web bundles its own copy of the quest catalogue; the two are
+            # kept byte-identical so the site and API never disagree.
+            cp "$RUNNER_TEMP/out/quests.json" apps/web/src/data/quests.json
+            if git diff --quiet -- apps/api/data apps/web/src/data; then
+              echo "$branch is already current"
+              continue
+            fi
+            git add apps/api/data apps/web/src/data/quests.json
+            git commit -m "data: refresh cache catalogues"
+            git push origin "$branch"
+            echo "pushed to $branch"
+            changed=1
+          done
+          if [ "$changed" = "0" ]; then
+            echo "Catalogues already match the live cache." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Show the diff only
+        if: ${{ inputs.dry_run }}
+        run: |
+          cp "$RUNNER_TEMP/out/"*.json apps/api/data/
+          cp "$RUNNER_TEMP/out/quests.json" apps/web/src/data/quests.json
+          git --no-pager diff --stat -- apps/api/data apps/web/src/data

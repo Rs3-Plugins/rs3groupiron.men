@@ -37,6 +37,15 @@ export type Timestamp = {
   ago: string;
 };
 
+/**
+ * Unix time in whole seconds, which is what exports carry: a spreadsheet or a
+ * script can do arithmetic on it without parsing an ISO string first.
+ */
+export function toUnix(iso: string | number | Date): number {
+  const ms = iso instanceof Date ? iso.getTime() : new Date(iso).getTime();
+  return Number.isNaN(ms) ? 0 : Math.floor(ms / 1000);
+}
+
 export function timestamp(iso: string, showDate = true): Timestamp {
   const at = new Date(iso);
   const valid = !Number.isNaN(at.getTime());

@@ -1,10 +1,8 @@
-import type { AppearanceTheme } from '../../api/groupClient';
 import { Modal } from '../Modal';
 import { RemoveIcon } from './icons';
 
 type RemoveMemberModalProps = {
   name: string;
-  appearance: AppearanceTheme;
   busy: boolean;
   onClose: () => void;
   onConfirm: () => void;
@@ -12,7 +10,6 @@ type RemoveMemberModalProps = {
 
 export function RemoveMemberModal({
   name,
-  appearance,
   busy,
   onClose,
   onConfirm,
@@ -23,7 +20,6 @@ export function RemoveMemberModal({
       onClose={onClose}
       titleId="gms-remove-member-title"
       title="Remove member"
-      appearance={appearance}
       closeDisabled={busy}
     >
       <div className="gms-modal-body">

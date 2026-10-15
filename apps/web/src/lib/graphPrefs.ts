@@ -6,7 +6,8 @@ export type GraphMode = 'cumulative' | 'interval';
 
 export type ChartKind = 'line' | 'area' | 'bar' | 'pie';
 
-export const TIME_CHARTS: ChartKind[] = ['line', 'area'];
+/** Charts plotted against time, with zoom, a timeline and Total/Per step. */
+export const TIME_CHARTS: ChartKind[] = ['line', 'area', 'bar'];
 
 export type GraphPrefs = {
   period: XpHistoryPeriod;

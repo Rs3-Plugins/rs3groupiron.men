@@ -23,12 +23,16 @@ import { allowDevReset } from '../config/env';
 import { GroupAccessService } from './group-access.service';
 import { GroupEventsService } from './group-events.service';
 import { GroupsSeedService } from './groups-seed.service';
+import { redactWireEntries, type WireEntry } from './group-wire';
 import {
   AddMemberBody,
   CreateAchievementBody,
   CreateGroupBody,
+  DropRulesBody,
   MemberNameBody,
   RenameMemberBody,
+  ReportKillsBody,
+  ReportDropBody,
   UpdateGroupSettingsBody,
   UpdateMemberAchievementsBody,
   UpdateMemberBody,
@@ -36,6 +40,7 @@ import {
   UpdateMemberQuestsBody,
   PlayerMovedBody,
   SetLocationSharingBody,
+  SetTargetBody,
   SetMemberOnlineBody,
 } from './group.types';
 import { GroupsService } from './groups.service';
@@ -57,6 +62,32 @@ export class GroupsPublicController {
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   createGroup(@Body() body: CreateGroupBody) {
     return this.groups.createGroup(body);
+  }
+
+  @Get('public-groups')
+  @Header('Cache-Control', 'no-store')
+  publicGroups(@Query('q') query?: string, @Query('limit') limit?: string) {
+    return this.groups.findPublicGroups(query, limit);
+  }
+
+  @Get('leaderboard')
+  @Header('Cache-Control', 'no-store')
+  leaderboard(
+    @Query('metric') metric?: string,
+    @Query('period') period?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.groups.getLeaderboard(metric, period, limit);
+  }
+
+  @Post('group/:groupName/view')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  recordGroupView(
+    @Param('groupName') groupName: string,
+    @Headers('authorization') authorization: string | undefined,
+  ) {
+    return this.groups.recordGroupView(groupName, authorization);
   }
 
   /** Wipes the DB and reloads seed.json. Off unless ALLOW_DEV_RESET=1, never in production. */
@@ -118,9 +149,14 @@ export class GroupsAuthedController {
     if (!this.events$.hasCapacityFor(group.id)) {
       throw new ServiceUnavailableException('Too many open streams');
     }
-    return this.events$
-      .stream(group.id)
-      .pipe(map((event) => ({ type: event.type, data: event })));
+    return this.events$.stream(group.id).pipe(
+      map((event) => {
+        const data = Array.isArray(event.data)
+          ? redactWireEntries(event.data as WireEntry[], group.scope)
+          : event.data;
+        return { type: event.type, data: { ...event, data } };
+      }),
+    );
   }
 
   /**
@@ -280,6 +316,67 @@ export class GroupsAuthedController {
     @Body() body: PlayerMovedBody,
   ) {
     return this.groups.playerMoved(groupName, authorization, body);
+  }
+
+  /** The group's drop rules: value threshold plus its own item opinions. */
+  @Get('drop-rules')
+  getDropRules(
+    @Param('groupName') groupName: string,
+    @Headers('authorization') authorization: string | undefined,
+  ) {
+    return this.groups.getDropRules(groupName, authorization);
+  }
+
+  @Post('drop-rules')
+  @HttpCode(200)
+  updateDropRules(
+    @Param('groupName') groupName: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: DropRulesBody,
+  ) {
+    return this.groups.updateDropRules(groupName, authorization, body);
+  }
+
+  /** A drop the plugin saw; recorded only when the group's rules keep it. */
+  @Post('report-drop')
+  @HttpCode(200)
+  reportDrop(
+    @Param('groupName') groupName: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: ReportDropBody,
+  ) {
+    return this.groups.reportDrop(groupName, authorization, body);
+  }
+
+  /** NPC kills since the member's last report; counts are added, not set. */
+  @Post('report-kills')
+  @HttpCode(200)
+  reportKills(
+    @Param('groupName') groupName: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: ReportKillsBody,
+  ) {
+    return this.groups.reportKills(groupName, authorization, body);
+  }
+
+  /** Kill counts per member, biggest first. */
+  @Get('npc-kills')
+  getNpcKills(
+    @Param('groupName') groupName: string,
+    @Headers('authorization') authorization: string | undefined,
+  ) {
+    return this.groups.getNpcKills(groupName, authorization);
+  }
+
+  /** What a member is fighting; an absent target clears it. */
+  @Post('set-target')
+  @HttpCode(200)
+  setTarget(
+    @Param('groupName') groupName: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: SetTargetBody,
+  ) {
+    return this.groups.setTarget(groupName, authorization, body);
   }
 
   /** Opt a member in or out of the live map. */

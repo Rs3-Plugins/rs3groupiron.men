@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GroupAccessService } from './group-access.service';
 import { GroupsService } from './groups.service';
 import { XpHistoryService } from './xp-history.service';
+import { RareItemsService } from '../items/rare-items.service';
 
 const DEMO_TOKEN = 'demo-token-value';
 const REAL_TOKEN = 'real-token-value';
@@ -19,6 +20,7 @@ function groupRow(name: string, token: string) {
     mode: GroupMode.normal,
     appearance: AppearanceTheme.rs3,
     memberSlots: 5,
+    createdAt: new Date('2026-01-15T12:00:00.000Z'),
     members: [{ id: 'm1', name: 'IronJackery' }],
   };
 }
@@ -43,6 +45,12 @@ function fakePrisma() {
     },
   } as unknown as PrismaService;
   return { prisma, selects };
+}
+
+function rareItems() {
+  const service = new RareItemsService();
+  service.load('data/rare-items.json');
+  return service;
 }
 
 describe('GroupAccessService', () => {
@@ -182,6 +190,7 @@ describe('amILoggedIn', () => {
       {} as XpHistoryService,
       new GamevalsService(),
       new QuestCatalogService(),
+      rareItems(),
     );
   });
 

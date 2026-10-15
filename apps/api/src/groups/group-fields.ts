@@ -8,12 +8,17 @@
  * state, which only the services can know about.
  */
 import { BadRequestException } from '@nestjs/common';
-import { AppearanceTheme, GroupMode } from '@prisma/client';
+import { AppearanceTheme, GroupMode, GroupVisibility } from '@prisma/client';
+import { DEFAULT_SCOPE } from './group-access.service';
 import {
   MAX_BANK,
   MAX_INVENTORIES,
   MAX_NAME_LENGTH,
+  MAX_PUBLIC_GROUPS_LIMIT,
+  MAX_SEARCH_QUERY,
+  PUBLIC_GROUPS_LIMIT,
   SHARED_MEMBER,
+  type GroupSharesInput,
   type SkillPayloadValue,
 } from './group.types';
 
@@ -28,6 +33,45 @@ export function parseGroupMode(raw?: string): GroupMode {
 export function parseAppearance(raw?: string): AppearanceTheme {
   if (raw === 'modern') return AppearanceTheme.modern;
   return AppearanceTheme.rs3;
+}
+
+export function parseVisibility(raw?: string): GroupVisibility {
+  if (raw === 'public') return GroupVisibility.public;
+  return GroupVisibility.private;
+}
+
+export function sharesToColumns(shares: GroupSharesInput | undefined) {
+  return {
+    publicMap: shares?.map ?? DEFAULT_SCOPE.map,
+    publicSkills: shares?.skills ?? DEFAULT_SCOPE.skills,
+    publicItems: shares?.items ?? DEFAULT_SCOPE.items,
+    publicQuests: shares?.quests ?? DEFAULT_SCOPE.quests,
+    publicAchievements: shares?.achievements ?? DEFAULT_SCOPE.achievements,
+  };
+}
+
+export function sharesPatch(shares: GroupSharesInput | undefined) {
+  if (!shares) return {};
+  return {
+    ...(shares.map !== undefined ? { publicMap: shares.map } : {}),
+    ...(shares.skills !== undefined ? { publicSkills: shares.skills } : {}),
+    ...(shares.items !== undefined ? { publicItems: shares.items } : {}),
+    ...(shares.quests !== undefined ? { publicQuests: shares.quests } : {}),
+    ...(shares.achievements !== undefined
+      ? { publicAchievements: shares.achievements }
+      : {}),
+  };
+}
+
+export function parseSearchQuery(raw?: string): string | null {
+  const query = (raw ?? '').trim().slice(0, MAX_SEARCH_QUERY);
+  return query ? query.toLowerCase() : null;
+}
+
+export function parsePublicGroupsLimit(raw?: string): number {
+  const limit = Number(raw);
+  if (!Number.isFinite(limit) || limit < 1) return PUBLIC_GROUPS_LIMIT;
+  return Math.min(Math.floor(limit), MAX_PUBLIC_GROUPS_LIMIT);
 }
 
 export function normalizeDiscordId(raw?: string | null): string | null {

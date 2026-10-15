@@ -13,6 +13,15 @@ export const LEVEL_MILESTONES = [99, 110, 120] as const;
 /** XP milestone (the RS3 per-skill cap). */
 export const XP_MILESTONE = MAX_SKILL_XP;
 
+/**
+ * Total level milestones. Coarse at the bottom where levels come quickly and
+ * every hundred at the top, so the feed marks real effort rather than noise.
+ */
+export const TOTAL_LEVEL_MILESTONES = [
+  500, 1000, 1500, 1750, 2000, 2200, 2400, 2600, 2800, 3000, 3100, 3200, 3300,
+  3400, 3480,
+] as const;
+
 export const ACHIEVEMENT_KINDS = [
   'level',
   'drop',
@@ -44,7 +53,8 @@ export type DetectedMilestone = {
   kind: 'level';
   title: string;
   detail: string;
-  skillId: string;
+  /** Absent for milestones that belong to no single skill, like total level. */
+  skillId?: string;
   dedupeKey: string;
 };
 
@@ -68,6 +78,22 @@ export function levelDedupeKey(
 
 export function xpDedupeKey(memberName: string, skillId: string): string {
   return `xp200m:${memberName}:${skillId}`;
+}
+
+export function totalLevelDedupeKey(
+  memberName: string,
+  milestone: number,
+): string {
+  return `total:${memberName}:${milestone}`;
+}
+
+/** Unboosted levels only; a boosted total is not an achievement. */
+function totalLevelOf(rows: SkillSnapshot[]): number {
+  let total = 0;
+  for (const row of rows) {
+    if (SKILL_BY_ID[row.skillId as SkillId]) total += levelOf(row);
+  }
+  return total;
 }
 
 /**
@@ -125,6 +151,26 @@ export function detectSkillMilestones(
         detail: 'Reached 200,000,000 XP',
         skillId: def.id,
         dedupeKey: xpDedupeKey(memberName, def.id),
+      });
+    }
+  }
+
+  // The update may carry only the skills that changed, so the totals are taken
+  // from the stored snapshot with those skills overlaid.
+  const merged = new Map<string, SkillSnapshot>();
+  for (const row of previous) merged.set(row.skillId, row);
+  const beforeTotal = totalLevelOf([...merged.values()]);
+  for (const row of next) merged.set(row.skillId, row);
+  const afterTotal = totalLevelOf([...merged.values()]);
+
+  for (const milestone of TOTAL_LEVEL_MILESTONES) {
+    if (beforeTotal < milestone && afterTotal >= milestone) {
+      out.push({
+        memberName,
+        kind: 'level',
+        title: `${milestone} total level`,
+        detail: `Reached a total level of ${milestone.toLocaleString()}`,
+        dedupeKey: totalLevelDedupeKey(memberName, milestone),
       });
     }
   }
@@ -236,6 +282,8 @@ export type AchievementEntry = {
   detail: string | null;
   skill_id: string | null;
   item_id: number | null;
+  /** Stack size for drops, so the feed can draw the item as the game does. */
+  quantity: number | null;
   /** RS3 gameval name for quests/diaries (stable across cache revisions). */
   gameval: string | null;
   image_url: string | null;
@@ -250,6 +298,7 @@ export function toAchievementEntry(row: {
   detail: string | null;
   skillId: string | null;
   itemId: number | null;
+  quantity?: number | null;
   gameval?: string | null;
   imageUrl: string | null;
   achievedAt: Date;
@@ -262,6 +311,7 @@ export function toAchievementEntry(row: {
     detail: row.detail ?? null,
     skill_id: row.skillId ?? null,
     item_id: row.itemId ?? null,
+    quantity: row.quantity ?? null,
     gameval: row.gameval ?? null,
     image_url: row.imageUrl ?? null,
     at: row.achievedAt.toISOString(),

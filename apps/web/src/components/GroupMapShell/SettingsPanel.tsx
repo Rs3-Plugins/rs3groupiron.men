@@ -5,34 +5,50 @@ import {
   DEMO_GROUP,
   updateGroupSettings,
   updateMemberProfile,
-  type AppearanceTheme,
   type GroupMode,
+  type GroupShares,
+  type GroupVisibility,
 } from '../../api/groupClient';
-import { MIN_SLOTS } from '../../lib/constants';
+import { MIN_SLOTS, SITE_URL } from '../../lib/constants';
 import type { PlayerView } from '../../lib/items';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
 import { AddMemberModal } from './AddMemberModal';
-import { AppearanceSection } from './AppearanceSection';
+import { AppearanceSection, GroupModeSection } from './AppearanceSection';
+import type { LayoutDir, ThemePref } from '../../lib/uiPrefs';
 import { Banner } from './PanelChrome';
 import { PlusIcon } from './icons';
 import { MemberCard } from './MemberCard';
 import { RemoveMemberModal } from './RemoveMemberModal';
+import { VisibilitySection } from './VisibilitySection';
 
 const READ_ONLY_NOTICE =
-  'This is the read-only demo. You can still switch the look below. Create your own group to change anything else.';
+  'You are a visitor here. You can still change the theme below; everything else needs this group’s token.';
 
 type SettingsPanelProps = {
   groupName?: string;
   groupToken?: string;
   players: PlayerView[];
   memberSlots: number;
-  appearance: AppearanceTheme;
+  theme: ThemePref;
+  dir: LayoutDir;
+  navFull: boolean;
+  navHide: boolean;
+  mapBg: boolean;
   groupMode: GroupMode;
+  visibility: GroupVisibility;
+  shares: GroupShares;
   panelOpacity: number;
   onPanelOpacityChange: (value: number) => void;
   onChanged: () => void;
-  onAppearanceChange: (theme: AppearanceTheme) => void;
+  onThemeChange: (theme: ThemePref) => void;
+  onDirChange: (dir: LayoutDir) => void;
+  onNavFullChange: (full: boolean) => void;
+  onNavHideChange: (hide: boolean) => void;
+  onMapBgChange: (on: boolean) => void;
   onModeChange: (mode: GroupMode) => void;
+  onVisibilityChange: (visibility: GroupVisibility) => void;
+  onSharesChange: (shares: GroupShares) => void;
+  onOpenSetup: () => void;
 };
 
 export function SettingsPanel({
@@ -40,13 +56,26 @@ export function SettingsPanel({
   groupToken = '',
   players,
   memberSlots,
-  appearance,
+  theme,
+  dir,
+  navFull,
+  navHide,
+  mapBg,
   groupMode,
+  visibility,
+  shares,
   panelOpacity,
   onPanelOpacityChange,
   onChanged,
-  onAppearanceChange,
+  onThemeChange,
+  onDirChange,
+  onNavFullChange,
+  onNavHideChange,
+  onMapBgChange,
   onModeChange,
+  onVisibilityChange,
+  onSharesChange,
+  onOpenSetup,
 }: SettingsPanelProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [removeName, setRemoveName] = useState<string | null>(null);
@@ -76,26 +105,39 @@ export function SettingsPanel({
 
   return (
     <section className="gms-settings" aria-label="Settings">
-      <h2 className="gms-settings-title">Settings</h2>
-
-      {readOnly && (
-        <Banner>
-          You are viewing the read-only demo group. Try the RS3 and Modern looks below — anything
-          else needs your own group.
-        </Banner>
-      )}
-      {error && <Banner tone="error">{error}</Banner>}
-      {message && <Banner>{message}</Banner>}
-
-      <div className="gms-settings-section">
-        <div className="gms-settings-section-head">
-          <div>
-            <h3 className="gms-settings-heading">Members</h3>
-            <p className="gms-settings-hint">
-              {players.length}/{memberSlots} slots filled
-              {canAdd ? ' · open slot available' : ' · group full'}
-            </p>
+      {/* On a card like every other section, rather than floating loose above
+          them: the title, the setup shortcut and whatever the page needs to
+          say about this group all belong to the same block. */}
+      <section className="gms-panel gms-settings-card gms-settings-intro">
+        <div className="gms-settings-head">
+          <div className="gms-settings-head-text">
+            <h1 className="gms-page-title">Settings</h1>
+            <span className="gms-settings-hint">Group “{groupName}”</span>
           </div>
+          <button type="button" className="gms-setup-btn" onClick={onOpenSetup}>
+            <strong>Open setup</strong>
+            <em>Token &amp; plugin guide</em>
+          </button>
+        </div>
+
+        {readOnly && (
+          <Banner>
+            {groupName === DEMO_GROUP
+              ? 'You are viewing the read-only demo group. The theme and panel opacity below are yours to change — anything else needs your own group.'
+              : `You are viewing “${groupName}” as a visitor. The theme and panel opacity below are yours to change — anything else needs this group’s token.`}
+          </Banner>
+        )}
+        {error && <Banner tone="error">{error}</Banner>}
+        {message && <Banner>{message}</Banner>}
+      </section>
+
+      <section className="gms-panel gms-settings-card">
+        <div className="gms-settings-card-head">
+          <h2 className="gms-section-title">Members</h2>
+          <span className="gms-settings-hint">
+            {players.length} / {memberSlots} slots filled
+            {canAdd ? ' · open slot available' : ' · group full'}
+          </span>
         </div>
 
         <ul className="gms-settings-members">
@@ -136,30 +178,73 @@ export function SettingsPanel({
             </li>
           )}
         </ul>
-      </div>
+      </section>
 
       <AppearanceSection
-        appearance={appearance}
-        groupMode={groupMode}
+        theme={theme}
+        dir={dir}
+        navFull={navFull}
+        navHide={navHide}
+        mapBg={mapBg}
         panelOpacity={panelOpacity}
-        busy={isBusy}
         onPanelOpacityChange={onPanelOpacityChange}
-        onSelectAppearance={(theme) => {
-          const label = theme === 'rs3' ? 'RS3' : 'Modern';
-          // The look is a client-side skin, not group data, so the tokenless
-          // demo can still switch it — it just isn't saved anywhere.
-          if (readOnly) {
-            onAppearanceChange(theme);
-            setError(null);
-            setMessage(`Previewing the ${label} look`);
-            return;
-          }
-          save(`appearance-${theme}`, async () => {
-            const info = await updateGroupSettings(groupName, groupToken, { appearance: theme });
-            onAppearanceChange(info.appearance);
-            setMessage(`Appearance set to ${label}`);
-          });
+        // Appearance is a personal preference kept in localStorage, not group
+        // data, so it never travels to the server and works without a token.
+        onSelectTheme={(next) => {
+          onThemeChange(next);
+          setError(null);
         }}
+        onSelectDir={(next) => {
+          onDirChange(next);
+          setError(null);
+        }}
+        onSelectNavFull={(next) => {
+          onNavFullChange(next);
+          setError(null);
+        }}
+        onSelectNavHide={(next) => {
+          onNavHideChange(next);
+          setError(null);
+        }}
+        onSelectMapBg={(next) => {
+          onMapBgChange(next);
+          setError(null);
+        }}
+      />
+
+      <VisibilitySection
+        visibility={visibility}
+        shares={shares}
+        busy={isBusy}
+        publicUrl={`${SITE_URL}/g/${encodeURIComponent(groupName)}`}
+        onSelectVisibility={(next) =>
+          save(`visibility-${next}`, async () => {
+            const info = await updateGroupSettings(groupName, groupToken, {
+              visibility: next,
+            });
+            onVisibilityChange(info.visibility);
+            onSharesChange(info.shares);
+            setMessage(
+              next === 'public'
+                ? 'Your group can now be found by name'
+                : 'Your group is private again',
+            );
+          })
+        }
+        onToggleShare={(key, on) =>
+          save(`share-${key}`, async () => {
+            const info = await updateGroupSettings(groupName, groupToken, {
+              shares: { [key]: on },
+            });
+            onSharesChange(info.shares);
+            setMessage(on ? 'Now shared' : 'No longer shared');
+          })
+        }
+      />
+
+      <GroupModeSection
+        groupMode={groupMode}
+        busy={isBusy}
         onSelectMode={(mode) =>
           save(`mode-${mode}`, async () => {
             const info = await updateGroupSettings(groupName, groupToken, { mode });
@@ -171,7 +256,6 @@ export function SettingsPanel({
 
       {addOpen && (
         <AddMemberModal
-          appearance={appearance}
           busy={isBusy}
           onClose={() => setAddOpen(false)}
           onSubmit={(member) => {
@@ -188,7 +272,6 @@ export function SettingsPanel({
       {removeName != null && (
         <RemoveMemberModal
           name={removeName}
-          appearance={appearance}
           busy={isBusy}
           onClose={() => setRemoveName(null)}
           onConfirm={() =>

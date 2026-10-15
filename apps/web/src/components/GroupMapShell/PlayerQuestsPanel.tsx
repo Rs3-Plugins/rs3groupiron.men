@@ -17,7 +17,8 @@ import {
 import { SKILL_BY_ID, type SkillId } from '../../lib/skills';
 import type { PlayerSkill } from '../../lib/items';
 import { useDismiss } from '../../hooks/useDismiss';
-import { FilterIcon, LockIcon } from './icons';
+import { Dropdown } from './Dropdown';
+import { LockIcon } from './icons';
 
 /** Sort orders in the same order as the in-game journal menu. */
 type Sort =
@@ -186,6 +187,7 @@ export function PlayerQuestsPanel({
     miniquests: false,
   });
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const filterRef = useRef<HTMLDivElement>(null);
 
   useDismiss(
@@ -219,13 +221,15 @@ export function PlayerQuestsPanel({
   );
 
   const rows = useMemo(() => {
+    const q = query.trim().toLowerCase();
     const list = all.filter(({ quest, state, locked }) => {
       if (!show.completed && state === 'finished') return false;
       if (!show.locked && locked) return false;
+      if (q && !quest.name.toLowerCase().includes(q)) return false;
       return inScope(quest);
     });
     return list.sort(comparator(sort));
-  }, [all, sort, show.completed, show.locked, inScope]);
+  }, [all, sort, query, show.completed, show.locked, inScope]);
 
   const total = all.filter((r) => inScope(r.quest)).length;
 
@@ -235,47 +239,64 @@ export function PlayerQuestsPanel({
     <div className="gms-player-panel">
       <div className="gms-player-panel-title">Quests</div>
 
+      <input
+        className="gms-pq-search"
+        value={query}
+        placeholder="Search quests"
+        aria-label="Search quests"
+        onChange={(e) => setQuery(e.target.value)}
+      />
+
       <div className="gms-pq-toolbar">
         <div className="gms-pq-filter" ref={filterRef}>
           <button
             type="button"
-            className="gms-pq-filter-btn"
-            aria-label="Filter quests"
+            className={
+              filtersOpen ? 'gms-pq-filter-btn gms-pq-filter-btn--open' : 'gms-pq-filter-btn'
+            }
+            aria-label="Filters"
+            title="Filters"
             aria-expanded={filtersOpen}
-            aria-haspopup="true"
+            aria-haspopup="menu"
             onClick={() => setFiltersOpen((v) => !v)}
           >
-            <FilterIcon className="gms-pq-filter-icon" />
+            <span className="gms-pq-filter-icon" aria-hidden />
           </button>
           {filtersOpen && (
-            <div className="gms-pq-popover" role="group" aria-label="Show">
+            <div className="gms-pq-popover" role="menu" aria-label="Show">
               {FILTERS.map(({ key, label }) => (
-                <Check
-                  key={key}
-                  label={label}
-                  on={show[key]}
-                  onChange={(next) => setShow((prev) => ({ ...prev, [key]: next }))}
-                />
+                <label key={key} className="gms-pq-check">
+                  <input
+                    type="checkbox"
+                    checked={show[key]}
+                    onChange={(e) =>
+                      setShow((prev) => ({ ...prev, [key]: e.target.checked }))
+                    }
+                  />
+                  {label}
+                </label>
               ))}
             </div>
           )}
         </div>
-        <select
-          className="gms-pq-select"
-          aria-label="Sort quests"
+
+        <Dropdown
+          className="gms-pq-sort"
+          small
+          ariaLabel="Sort quests"
           value={sort}
-          onChange={(e) => setSort(e.target.value as Sort)}
-        >
-          {SORTS.map((s) => (
-            <option key={s.key} value={s.key} disabled={!s.available} title={s.hint}>
-              {s.label}
-            </option>
-          ))}
-        </select>
+          options={SORTS.map((s) => ({
+            id: s.key,
+            label: s.label,
+            disabled: !s.available,
+            title: s.hint,
+          }))}
+          onChange={setSort}
+        />
       </div>
 
       <p className="gms-pq-count">
-        Showing {rows.length} of {total} items
+        Showing {rows.length} of {total}
       </p>
 
       <ul className="gms-pq-list">
@@ -299,32 +320,13 @@ export function PlayerQuestsPanel({
             </li>
           );
         })}
-        {rows.length === 0 && <li className="gms-player-panel-empty">Nothing to show</li>}
+        {rows.length === 0 && <li className="gms-pq-none">No quests match.</li>}
       </ul>
 
       <div className="gms-pq-footer">
-        Quest Points: <strong>{points}</strong> / {MAX_QUEST_POINTS}
+        Quest points: <strong>{points}</strong> / {MAX_QUEST_POINTS}
       </div>
     </div>
   );
 }
 
-function Check({
-  label,
-  on,
-  onChange,
-}: {
-  label: string;
-  on: boolean;
-  onChange: (next: boolean) => void;
-}) {
-  return (
-    <label className="gms-pq-check">
-      <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} />
-      <span className="gms-pq-check-box" aria-hidden>
-        {on ? '✓' : ''}
-      </span>
-      {label}
-    </label>
-  );
-}

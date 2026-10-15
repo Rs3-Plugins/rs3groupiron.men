@@ -377,10 +377,30 @@ describe('toAchievementEntry', () => {
       detail: 'Reached level 99',
       skill_id: 'slayer',
       item_id: null,
+      quantity: null,
       gameval: null,
       image_url: null,
       at: '2026-09-18T04:00:00.000Z',
     });
+  });
+
+  // Carried through so the drops feed can draw the game's stacked art rather
+  // than reading the count back out of the title.
+  it('passes a drop quantity through', () => {
+    expect(
+      toAchievementEntry({
+        id: 'clx2',
+        memberName: 'IronMayo',
+        kind: 'drop',
+        title: 'Blood rune x1200',
+        detail: null,
+        skillId: null,
+        itemId: 565,
+        quantity: 1200,
+        imageUrl: null,
+        achievedAt: new Date('2026-09-18T04:00:00.000Z'),
+      }),
+    ).toMatchObject({ item_id: 565, quantity: 1200 });
   });
 });
 

@@ -8,6 +8,7 @@ import {
   AchievementKind,
   AppearanceTheme,
   GroupMode,
+  GroupVisibility,
   Prisma,
   type MemberInventory,
   type MemberInventoryItem,
@@ -23,6 +24,7 @@ import {
 import { GamevalsService } from '../gamevals/gamevals.service';
 import { QuestCatalogService } from '../gamevals/quest-catalog.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RareItemsService } from '../items/rare-items.service';
 import { SKILL_BY_ID, type SkillId } from '../skills/skills.catalog';
 import {
   detectSkillMilestones,
@@ -38,7 +40,23 @@ import {
   parseLedgerCursor,
   parseLedgerLimit,
 } from './bank-ledger';
-import { GroupAccessService, groupNameKey } from './group-access.service';
+import {
+  GroupAccessService,
+  groupNameKey,
+  isPublicGroup,
+  requireShare,
+  sharesScope,
+} from './group-access.service';
+import {
+  leaderboardQuery,
+  parseLeaderboardLimit,
+  parseLeaderboardMetric,
+  parseLeaderboardPeriod,
+  periodStart,
+  startOfUtcDay,
+  toLeaderboardEntries,
+  type LeaderboardRow,
+} from './leaderboard';
 import {
   findMemberRef,
   normalizeColor,
@@ -47,12 +65,18 @@ import {
   normalizeUseDiscordAvatar,
   parseAppearance,
   parseGroupMode,
+  parsePublicGroupsLimit,
+  parseSearchQuery,
+  parseVisibility,
   playableCount,
+  sharesPatch,
+  sharesToColumns,
   validateDisplayName,
   validateInventoriesPayload,
   validateSkillsPayload,
 } from './group-fields';
 import {
+  redactWireEntries,
   toPartialWireMember,
   toSharedWireMember,
   toWireMember,
@@ -62,12 +86,16 @@ import {
   AddMemberBody,
   CreateAchievementBody,
   CreateGroupBody,
+  DropRulesBody,
   MAX_MEMBERS,
   MIN_MEMBERS,
   PlayerMovedBody,
   RenameMemberBody,
+  ReportKillsBody,
+  ReportDropBody,
   SHARED_MEMBER,
   SetLocationSharingBody,
+  SetTargetBody,
   SetMemberOnlineBody,
   type SkillPayloadValue,
   UpdateGroupSettingsBody,
@@ -91,6 +119,7 @@ import {
   isFeedWorthyAchievement,
   planAchievementUpdate,
   resolveAchievementRefs,
+  resolveAchievementTallies,
 } from './achievement-sync';
 import { planItemChanges } from './item-changes';
 import { planQuestUpdate, resolveQuestInputs } from './quests';
@@ -159,6 +188,7 @@ export class GroupsService {
     private readonly xpHistory: XpHistoryService,
     private readonly gamevals: GamevalsService,
     private readonly questCatalog: QuestCatalogService,
+    private readonly rareItems: RareItemsService,
   ) {}
 
   /**
@@ -230,6 +260,8 @@ export class GroupsService {
     }
 
     const mode = parseGroupMode(body.mode);
+    const visibility = parseVisibility(body.visibility);
+    const shares = sharesToColumns(body.shares);
     const token = randomUUID();
     const defaults = statsFromArray(DEFAULT_STATS);
     const coords = coordsFromArray(DEFAULT_COORDS);
@@ -243,6 +275,8 @@ export class GroupsService {
           mode,
           appearance: AppearanceTheme.rs3,
           memberSlots: slots,
+          visibility,
+          ...shares,
           members: {
             create: memberNames.map((memberName) => ({
               name: memberName,
@@ -268,6 +302,8 @@ export class GroupsService {
       appearance: 'rs3' as const,
       member_slots: slots,
       member_names: memberNames,
+      visibility,
+      shares: sharesScope(shares),
       token,
     };
   }
@@ -284,6 +320,13 @@ export class GroupsService {
       appearance: group.appearance,
       member_count: playableCount(group.members),
       member_slots: group.memberSlots,
+      visibility: group.visibility,
+      shares: sharesScope(group),
+      visible: group.scope,
+      // Bounds the ledger's day picker — there is nothing to show before it.
+      // Optional rather than asserted: the client treats a missing date as "no
+      // lower bound", which beats a 500 if a read ever lands without one.
+      created_at: group.createdAt?.toISOString(),
     };
   }
 
@@ -297,11 +340,12 @@ export class GroupsService {
     // below, so loading the relation here is a wasted round trip on the
     // hottest endpoint in the API.
     const group = await this.access.readWithoutMembers(groupName, token);
-    return this.buildGroupData(
+    const data = await this.buildGroupData(
       group.id,
       fromTime ? Date.parse(fromTime) : 0,
       split,
     );
+    return redactWireEntries(data, group.scope);
   }
 
   /**
@@ -461,7 +505,11 @@ export class GroupsService {
     return this.xpHistory.getXpHistory(
       groupName,
       token,
-      (g, t) => this.access.read(g, t),
+      async (g, t) => {
+        const group = await this.access.read(g, t);
+        requireShare(group, 'skills');
+        return group;
+      },
       period,
       skill,
     );
@@ -481,6 +529,7 @@ export class GroupsService {
   ) {
     // Only group.id is needed, so skip loading the members relation.
     const group = await this.access.readWithoutMembers(groupName, token);
+    requireShare(group, 'items');
     const limit = parseLedgerLimit(limitRaw);
     const before = parseLedgerCursor(beforeRaw);
     // `from`/`to` bound a calendar day. The client sends real instants so the
@@ -534,6 +583,7 @@ export class GroupsService {
   ) {
     // Only group.id is needed, so skip loading the members relation.
     const group = await this.access.readWithoutMembers(groupName, token);
+    requireShare(group, 'achievements');
     const limit = parseAchievementLimit(limitRaw);
     const before = parseLedgerCursor(beforeRaw);
     const kind = parseAchievementKind(kindRaw);
@@ -563,6 +613,7 @@ export class GroupsService {
         detail: true,
         skillId: true,
         itemId: true,
+        quantity: true,
         gameval: true,
         imageUrl: true,
         achievedAt: true,
@@ -622,6 +673,7 @@ export class GroupsService {
       detail: true,
       skillId: true,
       itemId: true,
+      quantity: true,
       gameval: true,
       imageUrl: true,
       achievedAt: true,
@@ -654,6 +706,199 @@ export class GroupsService {
 
     this.notifyChanged(group.id);
     return toAchievementEntry(row);
+  }
+
+  /**
+   * A drop the plugin saw. The list of what counts lives here rather than in
+   * the client, so it can be corrected without a plugin release; a client
+   * running an older copy of the list cannot post something off it.
+   */
+  async reportDrop(
+    groupName: string,
+    token: string | undefined,
+    body: ReportDropBody,
+  ) {
+    const group = await this.access.write(groupName, token);
+    const name = validateDisplayName(body.name, 'Player username');
+
+    const member = findMemberRef(group.members, name);
+    if (!member) throw new NotFoundException('Member not found');
+
+    const itemId = Math.round(body.item_id);
+    const value = body.value && body.value > 0 ? Math.round(body.value) : 0;
+    const quantity = body.quantity && body.quantity > 1 ? Math.round(body.quantity) : 1;
+    if (!(await this.dropCounts(group.id, itemId, value, quantity))) {
+      return { ok: true, recorded: false, item_id: itemId };
+    }
+
+    const itemName = body.item_name?.trim() || `Item ${itemId}`;
+    const title = quantity > 1 ? `${itemName} x${quantity}` : itemName;
+    const source = body.source?.trim();
+    const now = new Date();
+
+    const row = await this.prisma.achievement.create({
+      data: {
+        groupId: group.id,
+        memberName: name,
+        kind: AchievementKind.drop,
+        title,
+        detail: source ? `Dropped by ${source}` : null,
+        itemId,
+        quantity,
+        achievedAt: now,
+      },
+      select: {
+        id: true,
+        memberName: true,
+        kind: true,
+        title: true,
+        detail: true,
+        skillId: true,
+        itemId: true,
+        quantity: true,
+        gameval: true,
+        imageUrl: true,
+        achievedAt: true,
+      },
+    });
+
+    this.notifyChanged(group.id);
+    return { ok: true, recorded: true, achievement: toAchievementEntry(row) };
+  }
+
+  /**
+   * Whether a drop is worth announcing for this group. The group's own word
+   * comes first either way, then the shared list, then the group's value
+   * threshold — so a group can add what the list misses, silence what it has,
+   * and still catch anything expensive.
+   */
+  private async dropCounts(
+    groupId: string,
+    itemId: number,
+    value: number,
+    quantity: number,
+  ): Promise<boolean> {
+    const [override, group] = await Promise.all([
+      this.prisma.groupRareItem.findUnique({
+        where: { groupId_itemId: { groupId, itemId } },
+        select: { include: true, minQty: true, maxQty: true },
+      }),
+      this.prisma.group.findUnique({
+        where: { id: groupId },
+        select: { dropThreshold: true },
+      }),
+    ]);
+    if (override) {
+      if (!override.include) return false;
+      // A range narrows the group's own opinion: outside it, this drop is not
+      // the one they asked for, so it falls through to nothing rather than
+      // back to the shared list — they have already overridden that.
+      if (override.minQty != null && quantity < override.minQty) return false;
+      if (override.maxQty != null && quantity > override.maxQty) return false;
+      return true;
+    }
+    if (this.rareItems.has(itemId)) return true;
+    const threshold = group?.dropThreshold ?? 0;
+    return threshold > 0 && value >= threshold;
+  }
+
+  /** The group's drop rules, with the shared list's size for context. */
+  async getDropRules(groupName: string, token: string | undefined) {
+    const group = await this.access.readWithoutMembers(groupName, token);
+    requireShare(group, 'achievements');
+    const rows = await this.prisma.groupRareItem.findMany({
+      where: { groupId: group.id },
+      select: { itemId: true, include: true, minQty: true, maxQty: true },
+      orderBy: { itemId: 'asc' },
+    });
+    const full = await this.prisma.group.findUnique({
+      where: { id: group.id },
+      select: { dropThreshold: true },
+    });
+    const include = rows.filter((r) => r.include).map((r) => r.itemId);
+    const exclude = rows.filter((r) => !r.include).map((r) => r.itemId);
+
+    // The resolved list, so a client can decide locally and stop reporting
+    // every bone it picks up. The rules still run here on arrival.
+    const silenced = new Set(exclude);
+    const items = new Set<number>(include);
+    for (const itemId of this.rareItems.list()) {
+      if (!silenced.has(itemId)) items.add(itemId);
+    }
+
+    // Only rows that actually carry a window, so an untouched group sends an
+    // empty array rather than a null for every item it tracks.
+    const quantities = rows
+      .filter((r) => r.include && (r.minQty != null || r.maxQty != null))
+      .map((r) => ({ item_id: r.itemId, min: r.minQty, max: r.maxQty }));
+
+    return {
+      threshold: full?.dropThreshold ?? 0,
+      include,
+      exclude,
+      quantities,
+      items: [...items].sort((a, b) => a - b),
+      shared_list_size: this.rareItems.count,
+    };
+  }
+
+  async updateDropRules(
+    groupName: string,
+    token: string | undefined,
+    body: DropRulesBody,
+  ) {
+    const group = await this.access.write(groupName, token);
+
+    await this.prisma.$transaction(async (tx) => {
+      if (body.threshold !== undefined) {
+        await tx.group.update({
+          where: { id: group.id },
+          data: { dropThreshold: Math.round(body.threshold!) },
+        });
+      }
+      // Clear first, so one request may move an item between the two lists.
+      const clear = body.clear ?? [];
+      if (clear.length) {
+        await tx.groupRareItem.deleteMany({
+          where: { groupId: group.id, itemId: { in: clear.map(Math.round) } },
+        });
+      }
+      for (const [ids, include] of [
+        [body.include ?? [], true],
+        [body.exclude ?? [], false],
+      ] as Array<[number[], boolean]>) {
+        for (const raw of ids) {
+          const itemId = Math.round(raw);
+          await tx.groupRareItem.upsert({
+            where: { groupId_itemId: { groupId: group.id, itemId } },
+            // A row switching lists keeps no window: a range set while the item
+            // was tracked would silently narrow it again if it came back.
+            update: { include, minQty: null, maxQty: null },
+            create: { groupId: group.id, itemId, include },
+          });
+        }
+      }
+
+      // Ranges last, so one request can add an item and give it a window.
+      for (const range of body.quantities ?? []) {
+        const itemId = Math.round(range.item_id);
+        const minQty = range.min == null ? null : Math.round(range.min);
+        const maxQty = range.max == null ? null : Math.round(range.max);
+        if (minQty != null && maxQty != null && minQty > maxQty) {
+          throw new BadRequestException(
+            `Minimum quantity is above the maximum for item ${itemId}`,
+          );
+        }
+        await tx.groupRareItem.upsert({
+          where: { groupId_itemId: { groupId: group.id, itemId } },
+          update: { minQty, maxQty },
+          create: { groupId: group.id, itemId, include: true, minQty, maxQty },
+        });
+      }
+    });
+
+    this.notifyChanged(group.id);
+    return this.getDropRules(groupName, token);
   }
 
   /**
@@ -698,6 +943,7 @@ export class GroupsService {
    */
   async getMemberQuests(groupName: string, token: string | undefined) {
     const group = await this.access.read(groupName, token);
+    requireShare(group, 'quests');
     const members = group.members.filter((m) => m.name !== SHARED_MEMBER);
     const rows = members.length
       ? await this.prisma.memberQuest.findMany({
@@ -814,11 +1060,25 @@ export class GroupsService {
   /** Completed achievements per member, keyed by gameval. */
   async getMemberAchievements(groupName: string, token: string | undefined) {
     const group = await this.access.read(groupName, token);
+    requireShare(group, 'quests');
     const members = group.members.filter((m) => m.name !== SHARED_MEMBER);
     const rows = members.length
       ? await this.prisma.memberAchievement.findMany({
           where: { memberId: { in: members.map((m) => m.id) } },
           select: { memberId: true, gameval: true },
+        })
+      : [];
+
+    const tallyRows = members.length
+      ? await this.prisma.memberAchievementTally.findMany({
+          where: { memberId: { in: members.map((m) => m.id) } },
+          select: {
+            memberId: true,
+            gameval: true,
+            progress: true,
+            target: true,
+          },
+          orderBy: { gameval: 'asc' },
         })
       : [];
 
@@ -829,10 +1089,26 @@ export class GroupsService {
       else byMember.set(row.memberId, [row.gameval]);
     }
 
+    const talliesByMember = new Map<
+      string,
+      Array<{ gameval: string; progress: number; target: number }>
+    >();
+    for (const row of tallyRows) {
+      const entry = {
+        gameval: row.gameval,
+        progress: row.progress,
+        target: row.target,
+      };
+      const list = talliesByMember.get(row.memberId);
+      if (list) list.push(entry);
+      else talliesByMember.set(row.memberId, [entry]);
+    }
+
     return {
       members: members.map((m) => ({
         name: m.name,
         completed: (byMember.get(m.id) ?? []).sort(),
+        in_progress: talliesByMember.get(m.id) ?? [],
       })),
     };
   }
@@ -861,6 +1137,7 @@ export class GroupsService {
     );
     const full = body.full === true;
     const recordFeed = body.achievements !== false;
+    const tallies = resolveAchievementTallies(body.tallies ?? [], this.gamevals);
     const now = new Date();
 
     const plan = await this.prisma.$transaction(
@@ -912,7 +1189,45 @@ export class GroupsService {
             });
           }
         }
-        return { ...plan, isBaseline };
+        // Tallies are a snapshot of what is in progress. A full update owns
+        // the set, so anything missing from it has finished or been abandoned;
+        // a partial one only writes what it carries.
+        if (body.tallies) {
+          const keep = tallies.map((t) => t.gameval);
+          await tx.memberAchievementTally.deleteMany({
+            where: full
+              ? { memberId: member.id, gameval: { notIn: keep } }
+              : { memberId: member.id, gameval: { in: next ? [...next] : [] } },
+          });
+          for (const tally of tallies) {
+            await tx.memberAchievementTally.upsert({
+              where: {
+                memberId_gameval: { memberId: member.id, gameval: tally.gameval },
+              },
+              update: {
+                progress: tally.progress,
+                target: tally.target,
+                updatedAt: now,
+              },
+              create: {
+                memberId: member.id,
+                gameval: tally.gameval,
+                progress: tally.progress,
+                target: tally.target,
+                updatedAt: now,
+              },
+            });
+          }
+        }
+
+        // A completed achievement is no longer in progress.
+        if (plan.add.length) {
+          await tx.memberAchievementTally.deleteMany({
+            where: { memberId: member.id, gameval: { in: plan.add } },
+          });
+        }
+
+        return { ...plan, isBaseline, tallies: tallies.length };
       },
       { maxWait: 5_000, timeout: 20_000 },
     );
@@ -924,6 +1239,7 @@ export class GroupsService {
       added: plan.add.length,
       removed: plan.remove.length,
       baseline: plan.isBaseline,
+      tallies: plan.tallies,
       // A count, not the list: a client built against a newer cache dump than
       // this server's can legitimately skip thousands.
       skipped: skipped.length,
@@ -999,11 +1315,13 @@ export class GroupsService {
           data: {
             lastUpdated: now,
             online: true,
+            inLobby: false,
             ...(vitals ?? {}),
             ...(coords ?? {}),
             ...(body.world === undefined
               ? {}
               : { world: Math.round(body.world) }),
+            ...(body.baseline === true ? { baselineAt: now } : {}),
           },
           select: { id: true },
         });
@@ -1358,6 +1676,136 @@ export class GroupsService {
     };
   }
 
+  /**
+   * Kills a member has made since their last report, added to the running
+   * totals. Counts are deltas, not absolutes, so a client that reconnects
+   * mid-session cannot reset anyone's tally by sending a smaller number.
+   */
+  async reportKills(
+    groupName: string,
+    token: string | undefined,
+    body: ReportKillsBody,
+  ) {
+    const group = await this.access.write(groupName, token);
+    const name = validateDisplayName(body.name, 'Player username');
+    const member = findMemberRef(group.members, name);
+    if (!member) throw new NotFoundException('Member not found');
+
+    // Fold repeats so one name is written once per request.
+    const byName = new Map<string, number>();
+    for (const entry of body.kills) {
+      const npc = entry.npc?.trim();
+      const kills = Math.round(entry.kills);
+      if (!npc || kills <= 0) continue;
+      byName.set(npc, (byName.get(npc) ?? 0) + kills);
+    }
+    if (byName.size === 0) {
+      return { ok: true, name, recorded: 0, total: 0 };
+    }
+
+    const now = new Date();
+    let recorded = 0;
+    const total = await this.prisma.$transaction(async (tx) => {
+      for (const [npcName, kills] of byName) {
+        recorded += kills;
+        await tx.memberNpcKill.upsert({
+          where: { memberId_npcName: { memberId: member.id, npcName } },
+          update: { kills: { increment: kills }, lastAt: now },
+          create: { memberId: member.id, npcName, kills, lastAt: now },
+        });
+      }
+      const updated = await tx.member.update({
+        where: { id: member.id },
+        data: { npcKillsTotal: { increment: recorded }, lastUpdated: now },
+        select: { npcKillsTotal: true },
+      });
+      return updated.npcKillsTotal;
+    });
+
+    this.notifyChanged(group.id);
+    return { ok: true, name, recorded, total };
+  }
+
+  /** Every member's kill counts, biggest first. */
+  async getNpcKills(groupName: string, token: string | undefined) {
+    const group = await this.access.read(groupName, token);
+    requireShare(group, 'achievements');
+    const members = group.members.filter((m) => m.name !== SHARED_MEMBER);
+    const rows = members.length
+      ? await this.prisma.memberNpcKill.findMany({
+          where: { memberId: { in: members.map((m) => m.id) } },
+          select: { memberId: true, npcName: true, kills: true, lastAt: true },
+          orderBy: { kills: 'desc' },
+        })
+      : [];
+
+    const byMember = new Map<
+      string,
+      Array<{ npc: string; kills: number; last_at: string }>
+    >();
+    for (const row of rows) {
+      const entry = {
+        npc: row.npcName,
+        kills: row.kills,
+        last_at: row.lastAt.toISOString(),
+      };
+      const list = byMember.get(row.memberId);
+      if (list) list.push(entry);
+      else byMember.set(row.memberId, [entry]);
+    }
+
+    return {
+      members: members.map((m) => {
+        const kills = byMember.get(m.id) ?? [];
+        return {
+          name: m.name,
+          total: kills.reduce((sum, k) => sum + k.kills, 0),
+          kills,
+        };
+      }),
+    };
+  }
+
+  /** What a member is fighting, or nothing when the fight is over. */
+  async setTarget(
+    groupName: string,
+    token: string | undefined,
+    body: SetTargetBody,
+  ) {
+    const group = await this.access.write(groupName, token);
+    const name = body.name?.trim();
+    if (!name || name === SHARED_MEMBER) {
+      throw new BadRequestException('Invalid member name');
+    }
+    const member = findMemberRef(group.members, name);
+    if (!member) throw new NotFoundException('Member not found');
+
+    const target = body.target?.trim();
+    const now = new Date();
+    const result = await this.prisma.member.updateMany({
+      where: { id: member.id, groupId: group.id },
+      data: target
+        ? {
+            targetName: target,
+            targetHp: body.hp ?? null,
+            targetPercent: body.percent ?? null,
+            targetAt: now,
+            lastUpdated: now,
+          }
+        : {
+            targetName: null,
+            targetHp: null,
+            targetPercent: null,
+            targetAt: null,
+            lastUpdated: now,
+          },
+    });
+    if (result.count === 0) throw new NotFoundException('Member not found');
+
+    this.notifyChanged(group.id);
+    return { ok: true, name, target: target ?? null, updated_at: now.toISOString() };
+  }
+
   /** Opt a member in or out of the live map without changing presence. */
   async setLocationSharing(
     groupName: string,
@@ -1550,9 +1998,16 @@ export class GroupsService {
       mode?: GroupMode;
       name?: string;
       nameKey?: string;
-    } = {};
+      visibility?: GroupVisibility;
+      publicMap?: boolean;
+      publicSkills?: boolean;
+      publicItems?: boolean;
+      publicQuests?: boolean;
+      publicAchievements?: boolean;
+    } = { ...sharesPatch(body.shares) };
     if (body.appearance) data.appearance = parseAppearance(body.appearance);
     if (body.mode) data.mode = parseGroupMode(body.mode);
+    if (body.visibility) data.visibility = parseVisibility(body.visibility);
 
     if (body.name !== undefined) {
       const nextName = validateDisplayName(body.name, 'Group name');
@@ -1573,6 +2028,12 @@ export class GroupsService {
       mode: GroupMode;
       appearance: AppearanceTheme;
       memberSlots: number;
+      visibility: GroupVisibility;
+      publicMap: boolean;
+      publicSkills: boolean;
+      publicItems: boolean;
+      publicQuests: boolean;
+      publicAchievements: boolean;
     };
     try {
       updated = await this.prisma.group.update({
@@ -1584,6 +2045,12 @@ export class GroupsService {
           mode: true,
           appearance: true,
           memberSlots: true,
+          visibility: true,
+          publicMap: true,
+          publicSkills: true,
+          publicItems: true,
+          publicQuests: true,
+          publicAchievements: true,
         },
       });
     } catch (err) {
@@ -1603,6 +2070,94 @@ export class GroupsService {
       mode: updated.mode,
       appearance: updated.appearance,
       member_slots: updated.memberSlots,
+      visibility: updated.visibility,
+      shares: sharesScope(updated),
+    };
+  }
+
+  async findPublicGroups(queryRaw?: string, limitRaw?: string) {
+    const query = parseSearchQuery(queryRaw);
+    const limit = parsePublicGroupsLimit(limitRaw);
+
+    const rows = await this.prisma.group.findMany({
+      where: {
+        visibility: GroupVisibility.public,
+        ...(query ? { nameKey: { contains: query } } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        name: true,
+        mode: true,
+        createdAt: true,
+        memberSlots: true,
+        viewsTotal: true,
+        publicMap: true,
+        publicSkills: true,
+        publicItems: true,
+        publicQuests: true,
+        publicAchievements: true,
+        members: { select: { name: true } },
+      },
+    });
+
+    return {
+      groups: rows.map((row) => ({
+        name: row.name,
+        mode: row.mode,
+        views: row.viewsTotal,
+        member_count: playableCount(row.members),
+        member_slots: row.memberSlots,
+        member_names: row.members
+          .filter((m) => m.name !== SHARED_MEMBER)
+          .map((m) => m.name)
+          .sort(),
+        shares: sharesScope(row),
+        created_at: row.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  async recordGroupView(groupName: string, token: string | undefined) {
+    const group = await this.access.readWithoutMembers(groupName, token);
+    if (token || !isPublicGroup(group)) {
+      return { ok: true, counted: false };
+    }
+
+    const day = startOfUtcDay(new Date());
+    await this.prisma.$transaction([
+      this.prisma.groupViewDay.upsert({
+        where: { groupId_day: { groupId: group.id, day } },
+        create: { groupId: group.id, day, views: 1 },
+        update: { views: { increment: 1 } },
+      }),
+      this.prisma.group.update({
+        where: { id: group.id },
+        data: { viewsTotal: { increment: 1 } },
+      }),
+    ]);
+
+    return { ok: true, counted: true };
+  }
+
+  async getLeaderboard(
+    metricRaw?: string,
+    periodRaw?: string,
+    limitRaw?: string,
+  ) {
+    const metric = parseLeaderboardMetric(metricRaw);
+    const period = parseLeaderboardPeriod(periodRaw);
+    const limit = parseLeaderboardLimit(limitRaw);
+    const since = periodStart(period);
+
+    const rows = await this.prisma.$queryRaw<LeaderboardRow[]>(
+      leaderboardQuery(metric, since, limit),
+    );
+
+    return {
+      metric,
+      period,
+      entries: toLeaderboardEntries(rows),
     };
   }
 

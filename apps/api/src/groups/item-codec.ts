@@ -16,6 +16,7 @@ export type WireInventoryField = keyof typeof WIRE_INVENTORIES;
 /** Inventories whose slot positions matter, so empty slots are kept. */
 const POSITIONAL_INVENTORIES: ReadonlySet<string> = new Set([
   WIRE_INVENTORIES.inventory,
+  WIRE_INVENTORIES.equipment,
 ]);
 
 export type InventoryRow = { slot: number; itemId: number; quantity: number };
@@ -134,15 +135,24 @@ export function diffItemTotals(
   return out;
 }
 
-/** Vitals/coords may arrive as doubles; DB columns are Int. */
+/**
+ * Vitals/coords may arrive as doubles; DB columns are Int. None of them can be
+ * negative — only the weight slot can — so a negative reads as zero here rather
+ * than being stored.
+ */
 function toInt(value: number | undefined): number {
-  return Number.isFinite(value) ? Math.round(value as number) : 0;
+  return Number.isFinite(value) ? Math.max(0, Math.round(value as number)) : 0;
+}
+
+/** Weight is kilograms with one decimal, and goes negative with sculpting gear. */
+function toWeight(value: number | undefined): number {
+  return Number.isFinite(value) ? Math.round((value as number) * 10) / 10 : 0;
 }
 
 /**
- * The world slot is only written when the caller actually sent it, so a
- * six-element vitals array from the plugin cannot reset a world set through
- * the dedicated `world` field.
+ * The world and weight slots are only written when the caller actually sent
+ * them, so a six-element vitals array from the plugin cannot reset a world set
+ * through the dedicated `world` field, nor zero a known weight.
  */
 export function statsFromArray(stats: number[] | undefined) {
   return {
@@ -153,8 +163,11 @@ export function statsFromArray(stats: number[] | undefined) {
     summonCurrent: toInt(stats?.[4]),
     summonMax: toInt(stats?.[5]),
     ...(stats?.[6] === undefined ? {} : { world: toInt(stats[6]) }),
+    ...(stats?.[7] === undefined ? {} : { weight: toWeight(stats[7]) }),
   };
 }
+
+export const WORLD_STAT_INDEX = 6;
 
 export function statsToArray(m: {
   hpCurrent: number;
@@ -164,6 +177,7 @@ export function statsToArray(m: {
   summonCurrent: number;
   summonMax: number;
   world: number;
+  weight: number;
 }): number[] {
   return [
     m.hpCurrent,
@@ -173,6 +187,7 @@ export function statsToArray(m: {
     m.summonCurrent,
     m.summonMax,
     m.world,
+    m.weight,
   ];
 }
 

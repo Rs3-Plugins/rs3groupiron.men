@@ -1,4 +1,9 @@
-import { inventoryContentHash, pairsToRows } from './item-codec';
+import {
+  inventoryContentHash,
+  pairsToRows,
+  statsFromArray,
+  statsToArray,
+} from './item-codec';
 
 describe('inventoryContentHash', () => {
   it('is stable for identical contents', () => {
@@ -43,5 +48,36 @@ describe('inventoryContentHash', () => {
     expect(inventoryContentHash([])).not.toBe(
       inventoryContentHash(pairsToRows([995, 1], 'bank')),
     );
+  });
+});
+
+describe('weight slot', () => {
+  const VITALS = [100, 990, 10, 100, 1, 10, 84];
+
+  // A plugin that predates the slot must not zero a weight already stored.
+  it('is omitted when the array stops at the world', () => {
+    expect(statsFromArray(VITALS)).not.toHaveProperty('weight');
+  });
+
+  it('keeps one decimal', () => {
+    expect(statsFromArray([...VITALS, 23.46])).toMatchObject({ weight: 23.5 });
+  });
+
+  // Weight-reducing gear takes it below zero, unlike every other slot.
+  it('accepts a negative weight', () => {
+    expect(statsFromArray([...VITALS, -4.5])).toMatchObject({ weight: -4.5 });
+  });
+
+  it('clamps the vitals it sits beside to zero', () => {
+    expect(statsFromArray([-5, 990, 10, 100, 1, 10])).toMatchObject({
+      hpCurrent: 0,
+    });
+  });
+
+  it('round-trips through the wire array', () => {
+    const decoded = statsFromArray([...VITALS, 23.5]);
+    expect(
+      statsToArray({ ...decoded, world: 84, weight: 23.5 }),
+    ).toEqual([...VITALS, 23.5]);
   });
 });

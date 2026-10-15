@@ -2,22 +2,23 @@ import type { InputHTMLAttributes, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { SITE_NAME } from '../lib/constants';
 
+/** Back link and brand line above a login/create card. */
 export function AuthHeader() {
   return (
     <>
-      <Link className="auth-back" to="/">
+      <Link className="hero-back" to="/">
         ← Home
       </Link>
-      <p className="auth-brand">{SITE_NAME}</p>
+      <span className="hero-brand">{SITE_NAME}</span>
     </>
   );
 }
 
 export function AuthError({ children }: { children: ReactNode }) {
   return (
-    <p className="auth-error" role="alert">
+    <span className="hero-error" role="alert">
       {children}
-    </p>
+    </span>
   );
 }
 
@@ -30,27 +31,35 @@ type CountedFieldProps = Omit<
   max: number;
   onChange: (value: string) => void;
   className?: string;
+  /** Replaces the counter, e.g. with a show/hide button. */
+  trailing?: ReactNode;
 };
 
+/** A labelled input with the characters-used count inside its right edge. */
 export function CountedField({
   label,
   value,
   max,
   onChange,
   className,
+  trailing,
   ...rest
 }: CountedFieldProps) {
   return (
-    <label className={['auth-field', className].filter(Boolean).join(' ')}>
+    <label className={['hero-field', className].filter(Boolean).join(' ')}>
       {label}
-      <input
-        value={value}
-        maxLength={max}
-        onChange={(e) => onChange(e.target.value.slice(0, max))}
-        {...rest}
-      />
-      <span className="auth-count">
-        {value.trim().length}/{max}
+      <span className="hero-input">
+        <input
+          value={value}
+          maxLength={max}
+          onChange={(e) => onChange(e.target.value.slice(0, max))}
+          {...rest}
+        />
+        {trailing ?? (
+          <span className="hero-count">
+            {value.trim().length}/{max}
+          </span>
+        )}
       </span>
     </label>
   );

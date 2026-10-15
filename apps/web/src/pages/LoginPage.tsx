@@ -1,22 +1,28 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { fetchGroupInfo } from '../api/groupClient';
 import { AuthError, AuthHeader, CountedField } from '../components/AuthFields';
-import { MarketingLayout } from '../components/MarketingLayout';
-import { MAX_NAME } from '../lib/constants';
+import { DiscoverLink } from '../components/DiscoverLink';
+import { MarketingLayout, useFormTheme } from '../components/MarketingLayout';
+import { ThemeToggle } from '../components/ThemeToggle';
+import { MAX_NAME, PAGE_SEO } from '../lib/constants';
 import { writeGroupSession } from '../lib/groupSession';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import '../styles/auth.css';
-import './LoginPage.css';
 
 export function LoginPage() {
-  useDocumentTitle('Login', { canonicalPath: '/login' });
+  useDocumentTitle(PAGE_SEO.login.title, {
+    canonicalPath: '/login',
+    description: PAGE_SEO.login.description,
+  });
   const navigate = useNavigate();
+  const formTheme = useFormTheme();
   const [name, setName] = useState('');
   const [token, setToken] = useState('');
   const [showToken, setShowToken] = useState(false);
   const { isBusy, error, setError, run } = useAsyncAction('Could not log in');
+
+  const ready = name.trim().length > 0 && token.trim().length > 0;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -40,51 +46,72 @@ export function LoginPage() {
   }
 
   return (
-    <MarketingLayout className="auth-page" mainClassName="login-content">
-      <AuthHeader />
-      <h1 className="auth-title">Login</h1>
-      <p className="auth-lead">Enter your group name and token to continue.</p>
+    <MarketingLayout
+      topRight={
+        <>
+          <DiscoverLink />
+          <ThemeToggle />
+        </>
+      }
+    >
+      <div className="hero-col hero-stagger">
+        <AuthHeader />
 
-      <form className="auth-form" onSubmit={(e) => void onSubmit(e)}>
-        {error && <AuthError>{error}</AuthError>}
+        <h1 className="hero-title">Login</h1>
+        <p className="hero-lead">Enter your group name and token to continue.</p>
 
-        <CountedField
-          label="Group name"
-          value={name}
-          max={MAX_NAME}
-          disabled={isBusy}
-          autoFocus
-          autoComplete="username"
-          placeholder={`1–${MAX_NAME} characters`}
-          onChange={setName}
-        />
+        <div className={formTheme}>
+          <form className="hero-card" onSubmit={(e) => void onSubmit(e)}>
+            <CountedField
+              label="GROUP NAME"
+              value={name}
+              max={MAX_NAME}
+              disabled={isBusy}
+              autoFocus
+              autoComplete="username"
+              placeholder={`1–${MAX_NAME} characters`}
+              onChange={setName}
+            />
 
-        <label className="auth-field">
-          Group token
-          <input
-            type={showToken ? 'text' : 'password'}
-            value={token}
-            disabled={isBusy}
-            autoComplete="current-password"
-            spellCheck={false}
-            placeholder="Paste your group token"
-            onChange={(e) => setToken(e.target.value)}
-          />
-          <button
-            type="button"
-            className="auth-field-toggle"
-            aria-pressed={showToken}
-            aria-label={showToken ? 'Hide token' : 'Show token'}
-            onClick={() => setShowToken((v) => !v)}
-          >
-            {showToken ? 'Hide' : 'Show'}
-          </button>
-        </label>
+            <CountedField
+              label="GROUP TOKEN"
+              value={token}
+              max={200}
+              type={showToken ? 'text' : 'password'}
+              disabled={isBusy}
+              autoComplete="current-password"
+              spellCheck={false}
+              placeholder="Paste your group token"
+              onChange={setToken}
+              trailing={
+                <button
+                  type="button"
+                  className="hero-reveal"
+                  aria-pressed={showToken}
+                  aria-label={showToken ? 'Hide token' : 'Show token'}
+                  onClick={() => setShowToken((v) => !v)}
+                >
+                  {showToken ? 'Hide' : 'Show'}
+                </button>
+              }
+            />
 
-        <button type="submit" className="home-btn home-btn--primary auth-submit" disabled={isBusy}>
-          {isBusy ? 'Signing in…' : 'Go to group'}
-        </button>
-      </form>
+            {error && <AuthError>{error}</AuthError>}
+
+            <button
+              type="submit"
+              className={ready ? 'hero-submit hero-submit--ready' : 'hero-submit'}
+              disabled={!ready || isBusy}
+            >
+              {isBusy ? 'Signing in…' : 'Go to group'}
+            </button>
+          </form>
+        </div>
+
+        <p className="hero-foot">
+          New here? <Link to="/get-started">Create a group</Link>
+        </p>
+      </div>
     </MarketingLayout>
   );
 }

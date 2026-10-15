@@ -115,8 +115,8 @@ type XpChartProps = {
   rows: ChartRow[];
   slices: Slice[];
   seriesNames: string[];
-  hidden: Set<string>;
-  onToggleSeries: (name: string) => void;
+  /** Member to emphasise; the rest fade back. Null means show them evenly. */
+  highlight: string | null;
   start: number;
   end: number;
   drag: { from: number; to: number } | null;
@@ -128,7 +128,8 @@ type XpChartProps = {
 
 export function XpChart(props: XpChartProps) {
   if (props.kind === 'pie') return <SharePie {...props} />;
-  if (props.kind === 'bar') return <TotalsBar {...props} />;
+  // Bar is a time series like line and area — one stacked bar per bucket —
+  // not a totals-per-member chart.
   return <TimeChart {...props} />;
 }
 
@@ -141,25 +142,6 @@ function activeIndex(state: { activeTooltipIndex?: number | string | null }): nu
   return Number.isInteger(i) && i >= 0 ? i : null;
 }
 
-function legendProps({
-  hidden,
-  onToggleSeries,
-}: Pick<XpChartProps, 'hidden' | 'onToggleSeries'>) {
-  return {
-    onClick: (entry: { dataKey?: unknown; value?: unknown }) =>
-      onToggleSeries(String(entry.dataKey ?? entry.value)),
-    formatter: (value: string) => (
-      <span
-        className={
-          hidden.has(value) ? 'gms-graphs-legend gms-graphs-legend--off' : 'gms-graphs-legend'
-        }
-      >
-        {value}
-      </span>
-    ),
-  };
-}
-
 function TimeChart({
   kind,
   period,
@@ -167,8 +149,7 @@ function TimeChart({
   logScale,
   rows,
   seriesNames,
-  hidden,
-  onToggleSeries,
+  highlight,
   start,
   end,
   drag,
@@ -177,7 +158,10 @@ function TimeChart({
   onDragEnd,
   onBrush,
 }: XpChartProps) {
-  const Chart = kind === 'area' ? AreaChart : LineChart;
+  // Everything stays on the chart; a highlight only changes emphasis.
+  const dim = (name: string) => (highlight && highlight !== name ? 0.18 : 1);
+  const lead = (name: string) => highlight === name;
+  const Chart = kind === 'area' ? AreaChart : kind === 'bar' ? BarChart : LineChart;
 
   const handlers = {
     onMouseDown: (state: { activeTooltipIndex?: number | string | null }) => {
@@ -212,42 +196,64 @@ function TimeChart({
           scale={logScale ? 'log' : 'auto'}
           domain={logScale ? [1, 'auto'] : [0, 'auto']}
           label={{
-            value: mode === 'interval' ? 'XP per step' : 'XP Gain',
+            value: mode === 'interval' ? 'XP per step' : 'Total XP',
             angle: -90,
             position: 'insideLeft',
             fill: AXIS,
             style: { textAnchor: 'middle' },
           }}
         />
-        <Tooltip content={<ChartTooltip period={period} />} />
-        <Legend {...legendProps({ hidden, onToggleSeries })} />
-        {seriesNames.map((name) =>
-          kind === 'area' ? (
-            <Area
-              key={name}
-              type="monotone"
-              dataKey={name}
-              stackId="xp"
-              stroke={colorForName(name)}
-              fill={colorForName(name)}
-              fillOpacity={0.35}
-              strokeWidth={2}
-              isAnimationActive={false}
-              hide={hidden.has(name)}
-            />
-          ) : (
+        {/* The panel renders the only legend, under the hint line; Recharts'
+            own would be a second copy floating inside the plot.
+            Bar's default cursor is a solid #ccc rectangle — a white slab on a
+            dark panel — so it gets a faint gold wash; line and area keep the
+            default vertical guide. */}
+        <Tooltip
+          cursor={kind === 'bar' ? { fill: 'rgba(202, 164, 77, 0.12)' } : undefined}
+          content={<ChartTooltip period={period} />}
+        />
+        {seriesNames.map((name) => {
+          if (kind === 'area') {
+            return (
+              <Area
+                key={name}
+                type="monotone"
+                dataKey={name}
+                stackId="xp"
+                stroke={colorForName(name)}
+                fill={colorForName(name)}
+                fillOpacity={0.35 * dim(name)}
+                strokeOpacity={dim(name)}
+                strokeWidth={lead(name) ? 3 : 2}
+                isAnimationActive={false}
+              />
+            );
+          }
+          if (kind === 'bar') {
+            return (
+              <Bar
+                key={name}
+                dataKey={name}
+                stackId="xp"
+                fill={colorForName(name)}
+                fillOpacity={dim(name)}
+                isAnimationActive={false}
+              />
+            );
+          }
+          return (
             <Line
               key={name}
               type="monotone"
               dataKey={name}
               stroke={colorForName(name)}
-              strokeWidth={2}
+              strokeOpacity={dim(name)}
+              strokeWidth={lead(name) ? 3 : 2}
               dot={false}
               isAnimationActive={false}
-              hide={hidden.has(name)}
             />
-          ),
-        )}
+          );
+        })}
         {drag && drag.from !== drag.to && (
           <ReferenceArea
             x1={String(rows[drag.from]?.t ?? '')}
@@ -260,10 +266,10 @@ function TimeChart({
         {rows.length > 2 && (
           <Brush
             dataKey="t"
-            height={22}
+            height={28}
             travellerWidth={8}
-            stroke="#8a7340"
-            fill="rgba(12, 14, 16, 0.6)"
+            stroke="var(--line2)"
+            fill="var(--surface2)"
             startIndex={start}
             endIndex={end}
             tickFormatter={(value: string) => formatTick(period)(value)}
@@ -272,44 +278,26 @@ function TimeChart({
               if (typeof next?.endIndex !== 'number') return;
               onBrush(next.startIndex, next.endIndex);
             }}
-          />
+          >
+            {/* Panorama: the whole period in miniature, so the strip shows
+                where the activity is while you are zoomed into part of it. */}
+            <AreaChart>
+              {seriesNames.map((name) => (
+                <Area
+                  key={name}
+                  type="monotone"
+                  dataKey={name}
+                  stackId="timeline"
+                  stroke="none"
+                  fill={colorForName(name)}
+                  fillOpacity={0.55 * dim(name)}
+                  isAnimationActive={false}
+                />
+              ))}
+            </AreaChart>
+          </Brush>
         )}
       </Chart>
-    </ResponsiveContainer>
-  );
-}
-
-function TotalsBar({ slices, logScale }: XpChartProps) {
-  const total = slices.reduce((sum, s) => sum + s.value, 0);
-
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart
-        data={slices}
-        layout="vertical"
-        margin={{ top: 8, right: 48, left: 8, bottom: 8 }}
-      >
-        <CartesianGrid stroke="#2c3238" strokeDasharray="3 3" horizontal={false} />
-        <XAxis
-          type="number"
-          stroke={AXIS}
-          tick={TICK}
-          tickFormatter={formatAxisXp}
-          allowDataOverflow
-          scale={logScale ? 'log' : 'auto'}
-          domain={logScale ? [1, 'auto'] : [0, 'auto']}
-        />
-        <YAxis type="category" dataKey="name" stroke={AXIS} tick={TICK} width={110} />
-        <Tooltip
-          cursor={{ fill: 'rgba(232, 160, 74, 0.08)' }}
-          content={<ChartTooltip categorical total={total} />}
-        />
-        <Bar dataKey="value" isAnimationActive={false} radius={[0, 3, 3, 0]}>
-          {slices.map((slice) => (
-            <Cell key={slice.name} fill={colorForName(slice.name)} />
-          ))}
-        </Bar>
-      </BarChart>
     </ResponsiveContainer>
   );
 }

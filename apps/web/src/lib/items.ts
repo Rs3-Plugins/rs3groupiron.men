@@ -1,3 +1,4 @@
+import { lookupItemName } from './itemNames';
 import {
   LIFE_POINTS_PER_LEVEL,
   SKILLS,
@@ -61,6 +62,10 @@ export type WireMember = {
   share_location?: boolean;
   /** Online but on the lobby screen, so there is no position to plot. */
   in_lobby?: boolean;
+  /** Set when the plugin last sent its login baseline, so catch-up XP is known. */
+  baseline_at?: string;
+  /** What this member is fighting right now, absent when they are not. */
+  target?: { name: string; hp?: number; percent?: number; at: string };
   last_updated?: string;
   stats?: number[];
   coordinates?: number[];
@@ -90,6 +95,8 @@ export type WirePartialMember = {
   online?: boolean;
   share_location?: boolean;
   in_lobby?: boolean;
+  baseline_at?: string;
+  target?: { name: string; hp?: number; percent?: number; at: string };
   last_updated?: string;
   stats?: number[];
   coordinates?: number[];
@@ -137,6 +144,10 @@ export type PlayerView = {
   online: boolean;
   /** Online but on the lobby screen: shown as "lobby" instead of a position. */
   inLobby: boolean;
+  /** Timestamp of the plugin's last login baseline, or null. */
+  baselineAt: string | null;
+  /** The NPC this member is fighting, or null when they are not. */
+  target: { name: string; hp: number | null; percent: number | null } | null;
   /** Game world the member is on, or 0 when the plugin hasn't reported one. */
   world: number;
   lastSeen: string | null;
@@ -144,10 +155,17 @@ export type PlayerView = {
   health: { current: number; max: number };
   prayer: { current: number; max: number };
   summoning: { current: number; max: number };
+  /** Carried weight in kilograms; negative with weight-reducing gear. */
+  weight: number;
   coordinates: number[];
   inventory: ItemStack[];
   bank: ItemStack[];
   equipment: ItemStack[];
+  /** Same items with empty slots kept, for the fixed-grid panels. */
+  inventorySlots: Array<ItemStack | null>;
+  equipmentSlots: Array<ItemStack | null>;
+  /** Coins in the money pouch, shown under the inventory grid. */
+  moneyPouch: number;
   skills: PlayerSkill[];
   totalLevel: number;
   /** Change key used by membersToPlayers() to reuse unchanged views. */
@@ -189,12 +207,73 @@ const ITEM_NAMES: Record<number, string> = {
   23354: 'Holy agony',
 };
 
+/**
+ * Served by our API rather than straight from the renderer: that origin sends
+ * no Cache-Control, ETag or Last-Modified, so a browser re-fetches every icon
+ * on every page load. The API fetches each once and serves it with cache
+ * headers.
+ */
 export function itemIconUrl(itemId: number) {
-  return `https://chisel.weirdgloop.org/gazproj/icons/png/${itemId}.png`;
+  return `/api/items/icon/${itemId}`;
 }
 
+/**
+ * The catalogue covers every item in the game but arrives asynchronously, so
+ * the small built-in table above still backs the first render. Components that
+ * show names call useItemNames() to redraw once it has loaded.
+ */
 export function itemName(itemId: number) {
-  return ITEM_NAMES[itemId] ?? `Item ${itemId}`;
+  return lookupItemName(itemId) ?? ITEM_NAMES[itemId] ?? `Item ${itemId}`;
+}
+
+/** Backpack capacity: the panel always draws this many slots. */
+export const BACKPACK_SLOTS = 28;
+
+/** RS3 inv gameval for the coin pouch, carried in the generic map. */
+const MONEY_POUCH_KEY = 'money_pouch';
+
+/**
+ * The pouch holds more than a 32-bit stack can count, so the game splits it:
+ * one slot of plain coins and one of `coins_b`, where each counts a billion.
+ * Both arrive as sent — collapsing them before storage would overflow the
+ * server's integer column — so the total is worked out here.
+ */
+const COINS = 995;
+const COINS_BILLION = 54830;
+const BILLION = 1_000_000_000;
+
+export function moneyPouchTotal(member: WireMember): number {
+  const pairs = member.inventories?.[MONEY_POUCH_KEY];
+  if (!pairs?.length) return 0;
+  let total = 0;
+  for (let i = 0; i + 1 < pairs.length; i += 2) {
+    const id = pairs[i] ?? 0;
+    const quantity = pairs[i + 1] ?? 0;
+    if (id === COINS_BILLION) total += quantity * BILLION;
+    else if (id === COINS) total += quantity;
+  }
+  return total;
+}
+
+/**
+ * Pairs with their empty slots kept, so a panel can draw a fixed grid and the
+ * items stay where they are instead of shifting left as things are used.
+ */
+export function unpackSlots(
+  pairs: number[] | undefined,
+  slots?: number,
+): Array<ItemStack | null> {
+  const out: Array<ItemStack | null> = [];
+  if (pairs?.length) {
+    for (let i = 0; i + 1 < pairs.length; i += 2) {
+      const id = pairs[i] ?? 0;
+      const quantity = pairs[i + 1] ?? 0;
+      out.push(id > 0 && quantity > 0 ? { id, quantity } : null);
+    }
+  }
+  if (slots === undefined) return out;
+  while (out.length < slots) out.push(null);
+  return out.slice(0, slots);
 }
 
 export function unpackPairs(pairs: number[] | undefined): ItemStack[] {
@@ -275,16 +354,28 @@ export function toPlayerView(member: WireMember): PlayerView | null {
     avatarUrl: useDiscordAvatar ? discordUrl : null,
     online: member.online === true,
     inLobby: member.in_lobby === true,
+    baselineAt: member.baseline_at ?? null,
+    target: member.target
+      ? {
+          name: member.target.name,
+          hp: member.target.hp ?? null,
+          percent: member.target.percent ?? null,
+        }
+      : null,
     world: stats[6] ?? 0,
     lastSeen: member.last_updated ?? null,
     avatarColor: resolveAvatarColor(member.name, member.color),
     health: healthFromStats(stats, skills),
     prayer: { current: stats[2] ?? 0, max: stats[3] ?? 0 },
     summoning: { current: stats[4] ?? 0, max: stats[5] ?? 0 },
+    weight: stats[7] ?? 0,
     coordinates: member.coordinates ?? [],
     inventory: unpackPairs(member.inventory),
     bank: unpackPairs(member.bank),
     equipment: unpackPairs(member.equipment),
+    inventorySlots: unpackSlots(member.inventory, BACKPACK_SLOTS),
+    equipmentSlots: unpackSlots(member.equipment),
+    moneyPouch: moneyPouchTotal(member),
     skills,
     totalLevel: skills.reduce((sum, s) => sum + s.baseLevel, 0),
   };
@@ -302,6 +393,7 @@ function memberViewKey(member: WireMember) {
     member.color ?? '',
     member.use_discord_avatar === false ? '0' : '1',
     member.online === true ? '1' : '0',
+    member.target ? `${member.target.name}:${member.target.hp ?? ''}` : '',
   ].join('|');
 }
 
@@ -309,6 +401,10 @@ function memberViewKey(member: WireMember) {
  * Convert wire members to PlayerViews (shared bank skipped). When `prev` is
  * given, members whose data hasn't changed keep their previous PlayerView
  * object so memoised children don't re-render.
+ *
+ * Sorted by username so the roster never reshuffles: the payload arrives in
+ * whatever order the members last updated, which would otherwise reorder every
+ * list on screen each poll.
  */
 export function membersToPlayers(
   members: WireMember[],
@@ -326,27 +422,46 @@ export function membersToPlayers(
     const view = toPlayerView(member);
     if (view) out.push({ ...view, viewKey: key });
   }
+  out.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+  );
   return out;
 }
 
-/** Aggregate inventory + bank + shared bank across members for the Items tab. */
-export function aggregateGroupItems(members: WireMember[]): GroupItem[] {
+export type ItemSource = 'bank' | 'inventory' | 'equipment';
+
+export const ITEM_SOURCES: ItemSource[] = ['bank', 'inventory', 'equipment'];
+
+const SOURCE_FIELD: Record<ItemSource, keyof WireMember> = {
+  bank: 'bank',
+  inventory: 'inventory',
+  equipment: 'equipment',
+};
+
+/**
+ * Aggregate items across members for the Items tab, plus the group's shared
+ * bank. `sources` picks which containers count, so a total can mean the bank
+ * alone or everything a group owns.
+ */
+export function aggregateGroupItems(
+  members: WireMember[],
+  sources: ReadonlyArray<ItemSource> = ITEM_SOURCES,
+): GroupItem[] {
   const map = new Map<number, Map<string, number>>();
 
   for (const member of members) {
-    const stacks = [
-      ...unpackPairs(member.inventory),
-      ...unpackPairs(member.bank),
-      ...unpackPairs(member.equipment),
-    ];
     const label = member.name === SHARED ? 'Shared bank' : member.name;
-    for (const stack of stacks) {
-      let byPlayer = map.get(stack.id);
-      if (!byPlayer) {
-        byPlayer = new Map();
-        map.set(stack.id, byPlayer);
+    for (const source of sources) {
+      // Only the shared bank has a bank; carried items belong to a member.
+      const stacks = unpackPairs(member[SOURCE_FIELD[source]] as number[] | undefined);
+      for (const stack of stacks) {
+        let byPlayer = map.get(stack.id);
+        if (!byPlayer) {
+          byPlayer = new Map();
+          map.set(stack.id, byPlayer);
+        }
+        byPlayer.set(label, (byPlayer.get(label) ?? 0) + stack.quantity);
       }
-      byPlayer.set(label, (byPlayer.get(label) ?? 0) + stack.quantity);
     }
   }
 
@@ -368,4 +483,14 @@ export function aggregateGroupItems(members: WireMember[]): GroupItem[] {
 
 export function formatQty(n: number) {
   return n.toLocaleString();
+}
+
+/**
+ * Stack count as the game draws it in a slot: plain below 100K, then K, then M.
+ * Keeps the overlay inside a 38px slot without truncating.
+ */
+export function formatStack(n: number) {
+  if (n < 100_000) return String(n);
+  if (n < 10_000_000) return `${Math.floor(n / 1000)}K`;
+  return `${Math.floor(n / 1_000_000)}M`;
 }

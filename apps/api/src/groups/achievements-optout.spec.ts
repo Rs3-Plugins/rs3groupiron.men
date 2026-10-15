@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GroupAccessService } from './group-access.service';
 import { GroupsService } from './groups.service';
 import { XpHistoryService } from './xp-history.service';
+import { RareItemsService } from '../items/rare-items.service';
 
 const TOKEN = 'group-token-value';
 const MEMBER = 'IronJackery';
@@ -66,12 +67,19 @@ function makeService() {
     } as unknown as XpHistoryService,
     gamevals,
     questCatalog,
+    rareItems(),
   );
   return { groups, tx };
 }
 
 /** Crossing 99 Mining, which is a milestone by default. */
 const MAXED_MINING = { mining: { xp: 13_034_431, level: 99 } };
+
+function rareItems() {
+  const service = new RareItemsService();
+  service.load('data/rare-items.json');
+  return service;
+}
 
 describe('achievements opt-out', () => {
   it('records a skill milestone by default', async () => {

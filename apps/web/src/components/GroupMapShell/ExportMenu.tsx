@@ -1,42 +1,51 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { useDismiss } from '../../hooks/useDismiss';
-import { DownloadIcon, FileTextIcon, ImageIcon, TableIcon } from './icons';
+import { BracesIcon, DownloadIcon, FileTextIcon, ImageIcon, TableIcon } from './icons';
 
-export type ExportFormat = 'csv' | 'xlsx' | 'png';
+export type ExportFormat = 'csv' | 'json' | 'xlsx' | 'png';
 
-const FORMATS: Array<{
-  value: ExportFormat;
-  label: string;
-  hint: string;
-  icon: ReactNode;
-}> = [
-  {
-    value: 'csv',
+const FORMATS: Record<
+  ExportFormat,
+  { label: string; hint: string; icon: ReactNode }
+> = {
+  csv: {
     label: 'CSV',
-    hint: 'The plotted numbers as comma-separated text',
+    hint: 'Comma-separated text, for a spreadsheet',
     icon: <FileTextIcon />,
   },
-  {
-    value: 'xlsx',
+  json: {
+    label: 'JSON',
+    hint: 'The raw rows, for scripting',
+    icon: <BracesIcon />,
+  },
+  xlsx: {
     label: 'Excel',
-    hint: 'The plotted numbers as an .xlsx workbook',
+    hint: 'An .xlsx workbook',
     icon: <TableIcon />,
   },
-  {
-    value: 'png',
+  png: {
     label: 'PNG',
     hint: 'A picture of the chart, with its title and legend',
     icon: <ImageIcon />,
   },
-];
+};
+
+const DEFAULT_FORMATS: ExportFormat[] = ['csv', 'xlsx', 'png'];
 
 type ExportMenuProps = {
   busy: ExportFormat | null;
   disabled: boolean;
+  /** Which formats this panel can produce. */
+  formats?: ReadonlyArray<ExportFormat>;
   onExport: (format: ExportFormat) => void;
 };
 
-export function ExportMenu({ busy, disabled, onExport }: ExportMenuProps) {
+export function ExportMenu({
+  busy,
+  disabled,
+  formats = DEFAULT_FORMATS,
+  onExport,
+}: ExportMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -71,22 +80,25 @@ export function ExportMenu({ busy, disabled, onExport }: ExportMenuProps) {
 
       {open && (
         <div className="gms-menu-list" role="menu" aria-label="Export">
-          {FORMATS.map((format) => (
-            <button
-              key={format.value}
-              type="button"
-              className="gms-menu-item"
-              role="menuitem"
-              title={format.hint}
-              onClick={() => {
-                setOpen(false);
-                onExport(format.value);
-              }}
-            >
-              {format.icon}
-              {format.label}
-            </button>
-          ))}
+          {formats.map((value) => {
+            const format = FORMATS[value];
+            return (
+              <button
+                key={value}
+                type="button"
+                className="gms-menu-item"
+                role="menuitem"
+                title={format.hint}
+                onClick={() => {
+                  setOpen(false);
+                  onExport(value);
+                }}
+              >
+                {format.icon}
+                {format.label}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

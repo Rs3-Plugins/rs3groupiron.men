@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GroupAccessService } from './group-access.service';
 import { GroupsService } from './groups.service';
 import { XpHistoryService } from './xp-history.service';
+import { RareItemsService } from '../items/rare-items.service';
 
 const TOKEN = 'group-token-value';
 const MEMBER = 'IronJackery';
@@ -54,6 +55,7 @@ function makeService(
     } as unknown as XpHistoryService,
     new GamevalsService(),
     new QuestCatalogService(),
+    rareItems(),
   );
   return { groups, tx };
 }
@@ -62,6 +64,12 @@ const STORED = [
   { skillId: 'attack', xp: 13_034_431n, level: 99, baseLevel: 99 },
   { skillId: 'mining', xp: 737_627n, level: 60, baseLevel: 60 },
 ];
+
+function rareItems() {
+  const service = new RareItemsService();
+  service.load('data/rare-items.json');
+  return service;
+}
 
 describe('skills payload merging', () => {
   it('a single changed skill rewrites only that skill', async () => {

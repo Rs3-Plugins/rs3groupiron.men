@@ -24,6 +24,16 @@ export function downloadCsv(table: Table) {
   URL.revokeObjectURL(href);
 }
 
+/** Pretty-printed so the file is readable, not just machine-parsable. */
+export function downloadJson(filename: string, data: unknown) {
+  const blob = new Blob([`${JSON.stringify(data, null, 2)}\n`], {
+    type: 'application/json;charset=utf-8',
+  });
+  const href = URL.createObjectURL(blob);
+  clickDownload(href, `${filename}.json`);
+  URL.revokeObjectURL(href);
+}
+
 function sheetName(name: string) {
   return name.replace(/[[\]:*?/\\]/g, ' ').slice(0, 31) || 'Sheet1';
 }

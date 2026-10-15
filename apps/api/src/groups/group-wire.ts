@@ -7,9 +7,11 @@
  * mapping is written out rather than derived from the models.
  */
 import type { Member, MemberSkill } from '@prisma/client';
+import { isFullScope, type ShareScope } from './group-access.service';
 import { SHARED_MEMBER } from './group.types';
 import {
   WIRE_INVENTORIES,
+  WORLD_STAT_INDEX,
   rowsToPairs,
   statsFromArray,
   statsToArray,
@@ -83,6 +85,31 @@ export function wireCoordinates(member: {
   return [member.x, member.y, member.plane];
 }
 
+/**
+ * A target only counts while it is fresh: a plugin that crashes mid-fight
+ * would otherwise leave the member shown as fighting forever.
+ */
+export const TARGET_STALE_MS = 30 * 1000;
+
+export function wireTarget(
+  member: {
+    targetName: string | null;
+    targetHp: number | null;
+    targetPercent: number | null;
+    targetAt: Date | null;
+  },
+  now: number = Date.now(),
+) {
+  if (!member.targetName || !member.targetAt) return undefined;
+  if (now - member.targetAt.getTime() >= TARGET_STALE_MS) return undefined;
+  return {
+    name: member.targetName,
+    hp: member.targetHp ?? undefined,
+    percent: member.targetPercent ?? undefined,
+    at: member.targetAt.toISOString(),
+  };
+}
+
 export function toWireMember(member: MemberWithData) {
   return {
     name: member.name,
@@ -96,6 +123,8 @@ export function toWireMember(member: MemberWithData) {
     coordinates: wireCoordinates(member),
     share_location: member.shareLocation,
     in_lobby: member.inLobby,
+    target: wireTarget(member),
+    baseline_at: member.baselineAt?.toISOString(),
     ...inventoriesToWire(member.inventories),
     skills: skillsToWire(member.skills),
   };
@@ -123,6 +152,8 @@ export function toPartialWireMember(member: Member) {
     coordinates: wireCoordinates(member),
     share_location: member.shareLocation,
     in_lobby: member.inLobby,
+    target: wireTarget(member),
+    baseline_at: member.baselineAt?.toISOString(),
   };
 }
 
@@ -139,7 +170,7 @@ export function toSharedWireMember(
     use_discord_avatar: false,
     online: false,
     last_updated: updatedAt.toISOString(),
-    stats: statsToArray({ ...statsFromArray([]), world: 0 }),
+    stats: statsToArray({ ...statsFromArray([]), world: 0, weight: 0 }),
     coordinates: [0, 0, 0],
     ...inventoriesToWire(inventories),
     skills: skillsToWire([]),
@@ -151,3 +182,31 @@ export type WireEntry =
   | { name: string }
   | ReturnType<typeof toWireMember>
   | ReturnType<typeof toPartialWireMember>;
+
+export function redactWireEntries(
+  entries: WireEntry[],
+  scope: ShareScope,
+): WireEntry[] {
+  if (isFullScope(scope)) return entries;
+  return entries.map((entry) => {
+    if (!('last_updated' in entry)) return entry;
+    const hidden: Record<string, unknown> = {};
+    if (!scope.map) {
+      hidden.coordinates = [];
+      hidden.target = undefined;
+      if (Array.isArray(entry.stats)) {
+        const stats = [...(entry.stats as number[])];
+        stats[WORLD_STAT_INDEX] = 0;
+        hidden.stats = stats;
+      }
+    }
+    if (!scope.items && 'bank' in entry) {
+      hidden.inventory = [];
+      hidden.bank = [];
+      hidden.equipment = [];
+      hidden.inventories = undefined;
+    }
+    if (!scope.skills && 'skills' in entry) hidden.skills = {};
+    return { ...entry, ...hidden };
+  });
+}

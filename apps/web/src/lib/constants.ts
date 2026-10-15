@@ -1,5 +1,33 @@
 export const SITE_NAME = 'RS3 Group Ironman';
+
+/**
+ * Canonical origin, no trailing slash. Every canonical link, og:url and
+ * absolute share image is built from this, so moving domain is a one-line
+ * change here plus the three files that cannot read it: index.html,
+ * public/robots.txt and public/sitemap.xml.
+ */
 export const SITE_URL = 'https://rs3groupiron.men';
+
+/**
+ * Per-route search copy. Titles get " · RS3 Group Ironman" appended; the
+ * landing page keeps the longer title set in index.html.
+ */
+export const PAGE_SEO = {
+  login: {
+    title: 'Login',
+    description: "Enter your group name and token to open your group's dashboard.",
+  },
+  getStarted: {
+    title: 'Create your group',
+    description:
+      'Set up a Group Ironman group in a minute and connect each member’s tracker.',
+  },
+  browse: {
+    title: 'Discover groups',
+    description:
+      'Search RS3 Group Ironman groups by name, or browse the most viewed and highest total level groups.',
+  },
+} as const;
 
 /** Max length for group names and RuneScape usernames. */
 export const MAX_NAME = 16;

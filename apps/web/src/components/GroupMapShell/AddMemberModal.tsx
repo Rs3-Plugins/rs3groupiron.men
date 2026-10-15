@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import type { AppearanceTheme } from '../../api/groupClient';
 import { discordAvatarUrl } from '../../lib/items';
 import { Modal } from '../Modal';
 import { MemberAvatarOptions } from './MemberAvatarOptions';
@@ -14,7 +13,6 @@ export type NewMember = {
 };
 
 type AddMemberModalProps = {
-  appearance: AppearanceTheme;
   busy: boolean;
   onClose: () => void;
   onSubmit: (member: NewMember) => void;
@@ -23,7 +21,7 @@ type AddMemberModalProps = {
 const DEFAULT_COLOR = '#4a8f3c';
 
 /** Mount only while open; the form state resets on unmount. */
-export function AddMemberModal({ appearance, busy, onClose, onSubmit }: AddMemberModalProps) {
+export function AddMemberModal({ busy, onClose, onSubmit }: AddMemberModalProps) {
   const [name, setName] = useState('');
   const [nick, setNick] = useState('');
   const [discord, setDiscord] = useState('');
@@ -38,7 +36,6 @@ export function AddMemberModal({ appearance, busy, onClose, onSubmit }: AddMembe
       onClose={onClose}
       titleId="gms-add-member-title"
       title="Add member"
-      appearance={appearance}
       closeDisabled={busy}
     >
       <form

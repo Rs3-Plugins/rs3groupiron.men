@@ -1,16 +1,22 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { createGroup, type GroupMode } from '../api/groupClient';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  createGroup,
+  type GroupMode,
+  type GroupShares,
+  type GroupVisibility,
+} from '../api/groupClient';
 import { AuthError, AuthHeader, CountedField } from '../components/AuthFields';
-import { MarketingLayout } from '../components/MarketingLayout';
+import { DiscoverLink } from '../components/DiscoverLink';
+import { MarketingLayout, useFormTheme } from '../components/MarketingLayout';
 import { SetupVideoFrame } from '../components/SetupVideoFrame';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { TokenReveal } from '../components/TokenReveal';
-import { MAX_NAME, MAX_SLOTS, MIN_SLOTS, TOKEN_HINT } from '../lib/constants';
+import { MAX_NAME, MAX_SLOTS, MIN_SLOTS, PAGE_SEO, TOKEN_HINT } from '../lib/constants';
+import { DEFAULT_SHARES, SHARE_FIELDS } from '../lib/groupShares';
 import { writeGroupSession } from '../lib/groupSession';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import '../styles/auth.css';
-import './GetStartedPage.css';
 
 type MemberField = { id: number; name: string };
 
@@ -26,23 +32,53 @@ const MODES: Array<{ id: GroupMode; label: string; icon: string }> = [
   { id: 'competitive', label: 'Comp', icon: '/group-modes/competitive.webp' },
 ];
 
+const VISIBILITIES: Array<{
+  id: GroupVisibility;
+  label: string;
+  sub: string;
+  next: string;
+}> = [
+  {
+    id: 'private',
+    label: 'Private',
+    sub: 'Only people with your group token can open it.',
+    next: 'Change this any time in settings.',
+  },
+  {
+    id: 'public',
+    label: 'Public',
+    sub: 'Anyone can find your group by name and watch along.',
+    next: 'Configure what’s visible next.',
+  },
+];
+
 const TOKEN_CLASSES = {
-  root: 'get-started-token',
-  label: 'get-started-token-label',
-  row: 'get-started-token-row',
-  button: 'home-btn',
-  hint: 'auth-hint',
+  root: 'hero-field',
+  label: '',
+  row: 'hero-token',
+  button: '',
+  hint: 'hero-hint',
 };
 
 export function GetStartedPage() {
-  useDocumentTitle('Get started', { canonicalPath: '/get-started' });
+  useDocumentTitle(PAGE_SEO.getStarted.title, {
+    canonicalPath: '/get-started',
+    description: PAGE_SEO.getStarted.description,
+  });
   const navigate = useNavigate();
+  const formTheme = useFormTheme();
   const [name, setName] = useState('');
   const [slots, setSlots] = useState(MIN_SLOTS);
   const [mode, setMode] = useState<GroupMode>('normal');
+  const [visibility, setVisibility] = useState<GroupVisibility>('private');
+  const [shares, setShares] = useState<GroupShares>(DEFAULT_SHARES);
   const [members, setMembers] = useState(() => emptyMembers(MIN_SLOTS));
+  const [onShares, setOnShares] = useState(false);
   const [created, setCreated] = useState<{ name: string; token: string } | null>(null);
   const { isBusy, error, setError, run } = useAsyncAction('Could not create group');
+
+  const detailsReady =
+    name.trim().length > 0 && members.every((m) => m.name.trim().length > 0);
 
   function setSlotCount(next: number) {
     setSlots(next);
@@ -57,31 +93,48 @@ export function GetStartedPage() {
     setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, name: value } : m)));
   }
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-
+  function validateDetails(): string[] | null {
     const groupName = name.trim();
     if (groupName.length < 1 || groupName.length > MAX_NAME) {
       setError(`Group name must be 1–${MAX_NAME} characters`);
-      return;
+      return null;
     }
 
     const memberNames = members.map((m) => m.name.trim());
     if (memberNames.some((m) => m.length < 1 || m.length > MAX_NAME)) {
       setError(`Each player username must be 1–${MAX_NAME} characters`);
-      return;
+      return null;
     }
     if (new Set(memberNames.map((m) => m.toLowerCase())).size !== memberNames.length) {
       setError('Player usernames must be unique');
+      return null;
+    }
+    return memberNames;
+  }
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+
+    const memberNames = validateDetails();
+    if (!memberNames) {
+      setOnShares(false);
+      return;
+    }
+
+    if (visibility === 'public' && !onShares) {
+      setError(null);
+      setOnShares(true);
       return;
     }
 
     await run('create', async () => {
       const result = await createGroup({
-        name: groupName,
+        name: name.trim(),
         mode,
         member_slots: slots,
         member_names: memberNames,
+        visibility,
+        shares,
       });
       setCreated({ name: result.name, token: result.token });
     });
@@ -93,141 +146,310 @@ export function GetStartedPage() {
     navigate('/group', { replace: true });
   }
 
-  return (
-    <MarketingLayout className="auth-page" mainClassName="get-started-content">
-      <AuthHeader />
+  if (created) {
+    return (
+      <MarketingLayout
+        topRight={
+          <>
+            <DiscoverLink />
+            <ThemeToggle />
+          </>
+        }
+      >
+        <div className="hero-col hero-col--wide hero-stagger">
+          <AuthHeader />
 
-      {!created ? (
-        <>
-          <h1 className="auth-title">Create your group</h1>
-          <p className="auth-lead">Name it, size it, add your crew.</p>
+          <div className={formTheme}>
+            <div className="hero-card">
+              <h1>You&apos;re set</h1>
+              <p className="hero-card-lead">
+                Save your token and watch the setup video, then jump into{' '}
+                <strong>{created.name}</strong>.
+              </p>
 
-          <form className="auth-form" onSubmit={(e) => void onSubmit(e)}>
-            {error && <AuthError>{error}</AuthError>}
+              {error && <AuthError>{error}</AuthError>}
 
-            <div className="get-started-name-row">
-              <CountedField
-                label="Group name"
-                className="auth-field--grow"
-                value={name}
-                max={MAX_NAME}
-                disabled={isBusy}
-                autoFocus
-                autoComplete="off"
-                placeholder={`1–${MAX_NAME} characters`}
-                onChange={setName}
+              <TokenReveal
+                token={created.token}
+                label="GROUP TOKEN"
+                classNames={TOKEN_CLASSES}
+                onCopyError={setError}
+                hint={TOKEN_HINT}
               />
 
-              <div
-                className={
-                  mode === 'competitive'
-                    ? 'get-started-mode get-started-mode--competitive'
-                    : 'get-started-mode'
-                }
-                role="group"
-                aria-label="Group type"
+              <div className="hero-field">
+                HOW TO SET UP
+                <div className="hero-video">
+                  <SetupVideoFrame />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="hero-submit hero-submit--ready"
+                onClick={goToGroup}
               >
-                <span className="get-started-mode-thumb" aria-hidden />
-                {MODES.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    className="get-started-mode-btn"
-                    disabled={isBusy}
-                    aria-pressed={mode === option.id}
-                    onClick={() => setMode(option.id)}
-                  >
-                    <img src={option.icon} alt="" width={18} height={18} />
-                    <span>{option.label}</span>
-                  </button>
-                ))}
-              </div>
+                Go to group
+              </button>
             </div>
+          </div>
+        </div>
+      </MarketingLayout>
+    );
+  }
 
-            <fieldset className="get-started-fieldset" disabled={isBusy}>
-              <legend>Group size</legend>
-              <div className="get-started-chips" role="group" aria-label="Group size">
-                {SLOT_OPTIONS.map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={
-                      slots === value
-                        ? 'get-started-chip get-started-chip--active'
-                        : 'get-started-chip'
-                    }
-                    aria-pressed={slots === value}
-                    onClick={() => setSlotCount(value)}
-                  >
-                    {value}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
-            <fieldset className="get-started-fieldset" disabled={isBusy}>
-              <legend>Members</legend>
-              <p className="auth-hint">
-                RuneScape usernames — {slots} players, 1–{MAX_NAME} chars each.
-              </p>
-              <div className="get-started-members">
-                {members.map((member, index) => (
-                  <CountedField
-                    key={member.id}
-                    label={`Player ${index + 1}`}
-                    value={member.name}
-                    max={MAX_NAME}
-                    disabled={isBusy}
-                    autoComplete="off"
-                    placeholder="Username"
-                    onChange={(value) => setMemberName(member.id, value)}
-                  />
-                ))}
-              </div>
-            </fieldset>
-
-            <button
-              type="submit"
-              className="home-btn home-btn--primary auth-submit"
-              disabled={isBusy}
-            >
-              {isBusy ? 'Creating…' : 'Create group'}
-            </button>
-          </form>
+  return (
+    <MarketingLayout
+      topRight={
+        <>
+          <DiscoverLink />
+          <ThemeToggle />
         </>
-      ) : (
-        <div className="auth-form">
-          <h1 className="auth-title">You&apos;re set</h1>
-          <p className="auth-lead">
-            Save your token and watch the setup video, then jump into{' '}
-            <strong>{created.name}</strong>.
-          </p>
+      }
+    >
+      <div className="hero-col hero-col--wide hero-stagger">
+        <AuthHeader />
 
-          {error && <AuthError>{error}</AuthError>}
+        <h1 className="hero-title">{onShares ? 'What to share' : 'Create your group'}</h1>
+        <p className="hero-lead">
+          {onShares
+            ? `“${name.trim()}” will be public. Choose what visitors can see.`
+            : 'Name it, size it, add your crew.'}
+        </p>
 
-          <TokenReveal
-            token={created.token}
-            classNames={TOKEN_CLASSES}
-            onCopyError={setError}
-            hint={TOKEN_HINT}
+        <div className={formTheme}>
+          <form className="hero-card" onSubmit={(e) => void onSubmit(e)}>
+            {onShares ? (
+              <SharesPage
+                busy={isBusy}
+                error={error}
+                shares={shares}
+                onToggle={(key, on) => setShares((prev) => ({ ...prev, [key]: on }))}
+                onBack={() => {
+                  setError(null);
+                  setOnShares(false);
+                }}
+              />
+            ) : (
+              <DetailsPage
+                busy={isBusy}
+                error={error}
+                name={name}
+                slots={slots}
+                mode={mode}
+                visibility={visibility}
+                members={members}
+                ready={detailsReady}
+                onName={setName}
+                onSlots={setSlotCount}
+                onMode={setMode}
+                onVisibility={setVisibility}
+                onMemberName={setMemberName}
+              />
+            )}
+          </form>
+        </div>
+
+        <p className="hero-foot">
+          Already have a group? <Link to="/login">Log in</Link>
+        </p>
+      </div>
+    </MarketingLayout>
+  );
+}
+
+type DetailsPageProps = {
+  busy: boolean;
+  error: string | null;
+  name: string;
+  slots: number;
+  mode: GroupMode;
+  visibility: GroupVisibility;
+  members: MemberField[];
+  ready: boolean;
+  onName: (value: string) => void;
+  onSlots: (value: number) => void;
+  onMode: (mode: GroupMode) => void;
+  onVisibility: (visibility: GroupVisibility) => void;
+  onMemberName: (id: number, value: string) => void;
+};
+
+function DetailsPage({
+  busy,
+  error,
+  name,
+  slots,
+  mode,
+  visibility,
+  members,
+  ready,
+  onName,
+  onSlots,
+  onMode,
+  onVisibility,
+  onMemberName,
+}: DetailsPageProps) {
+  return (
+    <>
+      <div className="hero-field">
+        GROUP NAME
+        <div className="hero-row">
+          <CountedField
+            label=""
+            className="hero-field--grow"
+            value={name}
+            max={MAX_NAME}
+            disabled={busy}
+            autoFocus
+            autoComplete="off"
+            aria-label="Group name"
+            placeholder={`1–${MAX_NAME} characters`}
+            onChange={onName}
           />
 
-          <section className="get-started-video" aria-label="How to setup">
-            <h2>How to setup</h2>
-            <div className="get-started-video-frame">
-              <SetupVideoFrame />
-            </div>
-          </section>
-
-          <button
-            type="button"
-            className="home-btn home-btn--primary auth-submit"
-            onClick={goToGroup}
-          >
-            Go to group
-          </button>
+          <div className="hero-seg" role="radiogroup" aria-label="Group mode">
+            {MODES.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={mode === option.id}
+                disabled={busy}
+                onClick={() => onMode(option.id)}
+              >
+                <img src={option.icon} alt="" width={18} height={18} />
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
-      )}
-    </MarketingLayout>
+      </div>
+
+      <div className="hero-field">
+        GROUP SIZE
+        <div className="hero-sizes" role="radiogroup" aria-label="Group size">
+          {SLOT_OPTIONS.map((value) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              className="hero-size"
+              aria-checked={slots === value}
+              aria-label={`${value} players`}
+              disabled={busy}
+              onClick={() => onSlots(value)}
+            >
+              {value}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="hero-field">
+        WHO CAN SEE IT
+        <div className="hero-choices" role="radiogroup" aria-label="Who can see it">
+          {VISIBILITIES.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              role="radio"
+              aria-checked={visibility === option.id}
+              className={
+                visibility === option.id ? 'hero-choice hero-choice--active' : 'hero-choice'
+              }
+              disabled={busy}
+              onClick={() => onVisibility(option.id)}
+            >
+              <span className="hero-choice-radio" aria-hidden />
+              <span className="hero-choice-text">
+                <strong>{option.label}</strong>
+                <em>{option.sub}</em>
+                <em className="hero-choice-next">{option.next}</em>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="hero-field">
+        MEMBERS
+        <span className="hero-hint">
+          RuneScape usernames — {slots} players, 1–{MAX_NAME} chars each.
+        </span>
+        <div className="hero-players">
+          {members.map((member, index) => (
+            <CountedField
+              key={member.id}
+              label={`PLAYER ${index + 1}`}
+              value={member.name}
+              max={MAX_NAME}
+              disabled={busy}
+              autoComplete="off"
+              placeholder="Username"
+              onChange={(value) => onMemberName(member.id, value)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {error && <AuthError>{error}</AuthError>}
+
+      <button
+        type="submit"
+        className={ready ? 'hero-submit hero-submit--ready' : 'hero-submit'}
+        disabled={!ready || busy}
+      >
+        {visibility === 'public' ? 'Continue' : busy ? 'Creating…' : 'Create group'}
+      </button>
+    </>
+  );
+}
+
+type SharesPageProps = {
+  busy: boolean;
+  error: string | null;
+  shares: GroupShares;
+  onToggle: (key: keyof GroupShares, on: boolean) => void;
+  onBack: () => void;
+};
+
+function SharesPage({ busy, error, shares, onToggle, onBack }: SharesPageProps) {
+  return (
+    <>
+      <div className="hero-field">
+        <span className="hero-hint">
+          Untick anything you would rather keep to the group. The live map starts off
+          because it shows where each member is standing right now, while the rest is a
+          record of what they have done. All of this can be changed later in settings.
+        </span>
+        <div className="hero-shares">
+          {SHARE_FIELDS.map((field) => (
+            <label key={field.key} className="hero-share">
+              <input
+                type="checkbox"
+                checked={shares[field.key]}
+                disabled={busy}
+                onChange={(e) => onToggle(field.key, e.target.checked)}
+              />
+              <span className="hero-share-text">
+                <strong>{field.label}</strong>
+                <em>{field.hint}</em>
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {error && <AuthError>{error}</AuthError>}
+
+      <div className="hero-steps">
+        <button type="button" className="hero-step-back" disabled={busy} onClick={onBack}>
+          ← Back
+        </button>
+        <button type="submit" className="hero-submit hero-submit--ready" disabled={busy}>
+          {busy ? 'Creating…' : 'Create group'}
+        </button>
+      </div>
+    </>
   );
 }

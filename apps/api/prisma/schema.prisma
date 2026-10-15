@@ -17,14 +17,69 @@ model Group {
   appearance  AppearanceTheme  @default(rs3)
   /// Fixed group capacity (2–5). Add only when below this.
   memberSlots Int              @default(5) @map("member_slots")
+  /// Coin value at or above which a drop is announced even when the item is
+  /// not listed. 0 leaves the lists in sole charge.
+  dropThreshold Int            @default(20000000) @map("drop_threshold")
+  visibility  GroupVisibility  @default(private)
+  publicMap          Boolean @default(false) @map("public_map")
+  publicSkills       Boolean @default(true) @map("public_skills")
+  publicItems        Boolean @default(true) @map("public_items")
+  publicQuests       Boolean @default(true) @map("public_quests")
+  publicAchievements Boolean @default(true) @map("public_achievements")
+  viewsTotal  Int              @default(0) @map("views_total")
   createdAt   DateTime         @default(now()) @map("created_at")
   members     Member[]
+  viewDays    GroupViewDay[]
   /// Group-owned inventories, i.e. the shared bank.
   inventories GroupInventory[]
   sharedBankEntries SharedBankEntry[]
   achievements Achievement[]
+  rareItems   GroupRareItem[]
 
+  @@index([visibility, nameKey])
   @@map("groups")
+}
+
+enum GroupVisibility {
+  private
+  public
+}
+
+model GroupViewDay {
+  id      String   @id @default(cuid())
+  groupId String   @map("group_id")
+  day     DateTime @db.Date
+  views   Int      @default(0)
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, day])
+  @@index([day])
+  @@map("group_view_days")
+}
+
+/**
+ * A group's own say on an item: `include` adds one the shared list misses,
+ * `include = false` silences one it has. Absent means the shared list and the
+ * group's value threshold decide.
+ */
+model GroupRareItem {
+  id        String   @id @default(cuid())
+  groupId   String   @map("group_id")
+  itemId    Int      @map("item_id")
+  include   Boolean  @default(true)
+  /// Only announce a drop of this item when the stack falls in [minQty, maxQty].
+  /// Null is open-ended, so both null means any amount. Only meaningful on an
+  /// included row: an excluded item is silent at every size.
+  minQty    Int?     @map("min_qty")
+  maxQty    Int?     @map("max_qty")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, itemId])
+  @@index([groupId])
+  @@map("group_rare_items")
 }
 
 enum AchievementKind {
@@ -49,6 +104,10 @@ model Achievement {
   skillId    String?         @map("skill_id")
   /// Item id for drops.
   itemId     Int?            @map("item_id")
+  /// Stack size for drops, so the feed can draw the item the way the game
+  /// does. Null for anything that is not a drop, or a drop from before this
+  /// was stored; the title still carries "xN" for the reader.
+  quantity   Int?
   /// RS3 gameval name for quests/diaries (e.g. quest_cooks_assistant).
   /// Stored instead of the cache id because names survive renumbering.
   gameval    String?
@@ -109,6 +168,19 @@ model Member {
   shareLocation Boolean @default(true) @map("share_location")
   /// Logged in but sitting on the lobby screen: online, with no position.
   inLobby     Boolean  @default(false) @map("in_lobby")
+  /// What this member is currently fighting, straight from the target panel.
+  /// Cleared when they stop; treated as stale by readers after a short while.
+  targetName    String?   @map("target_name")
+  targetHp      Int?      @map("target_hp")
+  targetPercent Int?      @map("target_percent")
+  targetAt      DateTime? @map("target_at")
+  /// Running total across every NPC, kept here so a member list needs no
+  /// aggregate query.
+  npcKillsTotal Int       @default(0) @map("npc_kills_total")
+  /// When the plugin last sent a full login baseline. The site compares this
+  /// between polls: a jump that lands on a new baseline is catch-up, not a
+  /// gain, so it must not surface as an XP drop.
+  baselineAt  DateTime? @map("baseline_at")
   /// Any change at all: position, vitals, online flag, profile, inventories.
   lastUpdated DateTime @default(now()) @map("last_updated")
   /// Only the expensive payload: inventories and skills. A position ping bumps
@@ -121,6 +193,9 @@ model Member {
   prayerMax     Int @default(0) @map("prayer_max")
   summonCurrent Int @default(0) @map("summon_current")
   summonMax     Int @default(0) @map("summon_max")
+  /// Carried weight in kilograms, as the game shows it. Float because it has a
+  /// decimal, and signed because weight-reducing gear takes it below zero.
+  weight        Float @default(0)
   world         Int @default(0)
   x     Int @default(0)
   y     Int @default(0)
@@ -132,6 +207,8 @@ model Member {
   xpSamples SkillXpSample[]
   quests MemberQuest[]
   completedAchievements MemberAchievement[]
+  achievementTallies MemberAchievementTally[]
+  npcKills    MemberNpcKill[]
 
   @@unique([groupId, name])
   @@index([groupId])
@@ -232,6 +309,44 @@ model MemberQuest {
 /// Achievements and diaries a member has completed, keyed by the RS3
 /// gameval name so a cache renumbering cannot reattribute one. Presence is
 /// completion: there is no row for an incomplete achievement.
+/**
+ * Progress towards an achievement that counts something ("kill 50 goblins").
+ * Separate from MemberAchievement, where a row means finished: these come and
+ * go while the count climbs, and are cleared once it is done.
+ */
+/**
+ * How many of each NPC a member has killed. One row per member per name, so
+ * the running totals stay cheap to read and to add to.
+ */
+model MemberNpcKill {
+  id        String   @id @default(cuid())
+  memberId  String   @map("member_id")
+  npcName   String   @map("npc_name")
+  kills     Int      @default(0)
+  lastAt    DateTime @default(now()) @map("last_at")
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, npcName])
+  @@index([memberId])
+  @@map("member_npc_kills")
+}
+
+model MemberAchievementTally {
+  id        String   @id @default(cuid())
+  memberId  String   @map("member_id")
+  gameval   String
+  progress  Int      @default(0)
+  target    Int      @default(0)
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, gameval])
+  @@index([memberId])
+  @@map("member_achievement_tallies")
+}
+
 model MemberAchievement {
   id        String   @id @default(cuid())
   memberId  String   @map("member_id")

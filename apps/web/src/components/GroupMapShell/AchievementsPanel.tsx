@@ -4,24 +4,35 @@ import {
   fetchAchievements,
   type Achievement,
   type AchievementKind,
-  type AppearanceTheme,
 } from '../../api/groupClient';
-import { dayBounds, toDayInput } from '../../lib/day';
+import {
+  DATE_RANGES,
+  dayLabel,
+  rangeBounds,
+  toDayInput,
+  type DateRange,
+} from '../../lib/day';
 import { downloadRemoteImage } from '../../lib/download';
+import { downloadCsv, downloadJson } from '../../lib/exportTable';
 import { colorForName } from '../../lib/items';
+import { useItemNames } from '../../lib/itemNames';
 import { SKILL_BY_ID, type SkillId } from '../../lib/skills';
-import { timestamp } from '../../lib/time';
+import { timestamp, toUnix } from '../../lib/time';
 import { usePagedHistory } from '../../hooks/usePagedHistory';
-import { useUrlState } from '../../hooks/useUrlState';
+import { useUrlState, useUrlText } from '../../hooks/useUrlState';
 import { Modal } from '../Modal';
-import { DayPicker, ShowAllTimeButton } from './DayPicker';
-import { IconSelect } from './IconSelect';
+import { DayNav, RANGE_OPTIONS } from './DayNav';
+import { Dropdown, type DropdownOption } from './Dropdown';
+import { ExportMenu, type ExportFormat } from './ExportMenu';
+import { EmptyState, SearchGlyph, TrophyGlyph } from './EmptyState';
 import { ItemIcon } from './ItemIcon';
-import { memberOptions, type MemberBadge } from './memberOptions';
-import { LoadMoreButton, PanelStatus, PanelToolbar } from './PanelChrome';
-import { SelectField, type SelectOption } from './SelectField';
+import type { MemberBadge } from './memberOptions';
+import { LoadMoreButton, PanelStatus } from './PanelChrome';
+import { Segmented } from './Segmented';
 
 const PAGE_SIZE = 50;
+
+const EXPORT_FORMATS: ExportFormat[] = ['csv', 'json'];
 
 const KINDS: AchievementKind[] = ['level', 'drop', 'quest', 'diary', 'other'];
 
@@ -33,21 +44,27 @@ const KIND_LABEL: Record<AchievementKind, string> = {
   other: 'Other',
 };
 
-const KIND_OPTIONS: SelectOption[] = [
-  { value: 'all', label: 'All kinds' },
-  ...KINDS.map((kind) => ({ value: kind, label: KIND_LABEL[kind] })),
-];
-
 type KindFilter = 'all' | AchievementKind;
 
 const KIND_FILTERS: KindFilter[] = ['all', ...KINDS];
 
+/** "Milestones" is what the design calls the catch-all `other` kind. */
+const KIND_OPTIONS: Array<DropdownOption<KindFilter>> = [
+  { id: 'all', label: 'All kinds' },
+  { id: 'level', label: 'Levels' },
+  { id: 'quest', label: 'Quests' },
+  { id: 'other', label: 'Milestones' },
+  { id: 'drop', label: 'Drops' },
+  { id: 'diary', label: 'Diaries' },
+];
+
 type AchievementsPanelProps = {
   groupName?: string;
   groupToken?: string;
-  appearance?: AppearanceTheme;
   dataRevision?: number;
   members?: ReadonlyArray<MemberBadge>;
+  /** ISO instant the group was created; the calendar stops there. */
+  createdAt?: string;
   /** Client-side entries shown above the fetched ones (the demo's activity). */
   injected?: ReadonlyArray<Achievement>;
 };
@@ -55,22 +72,26 @@ type AchievementsPanelProps = {
 export function AchievementsPanel({
   groupName = DEMO_GROUP,
   groupToken = '',
-  appearance = 'modern',
   dataRevision,
   members = [],
+  createdAt,
   injected,
 }: AchievementsPanelProps) {
+  // Drop entries name an item, so this panel needs the catalogue too.
+  useItemNames();
   const [kindFilter, setKindFilter] = useUrlState<KindFilter>('kind', 'all', {
     allowed: KIND_FILTERS,
   });
   const [memberFilter, setMemberFilter] = useUrlState('member', 'all');
+  const [query, setQuery] = useUrlText('q');
   const [zoomedId, setZoomedId] = useUrlState('achievement', '', { history: 'push' });
   const [today] = useState(() => toDayInput(new Date()));
-  const [day, setDay] = useUrlState('day', '');
+  const [day, setDay] = useUrlState('day', today);
+  const [range, setRange] = useUrlState<DateRange>('range', '24h', { allowed: DATE_RANGES });
 
   const fetchPage = useCallback(
     ({ before, limit, signal }: { before?: string; limit: number; signal: AbortSignal }) => {
-      const bounds = day ? dayBounds(day) : null;
+      const bounds = rangeBounds(range, day, today);
       return fetchAchievements(groupName, groupToken, {
         limit,
         before,
@@ -81,7 +102,7 @@ export function AchievementsPanel({
         signal,
       });
     },
-    [groupName, groupToken, kindFilter, memberFilter, day],
+    [groupName, groupToken, kindFilter, memberFilter, range, day, today],
   );
 
   const { entries: fetched, hasMore, error, loading, refreshing, oldest, loadMore } =
@@ -94,16 +115,24 @@ export function AchievementsPanel({
 
   // Injected entries skip the API, so the active filters are applied here.
   const entries = useMemo(() => {
-    if (!injected?.length) return fetched;
-    const bounds = day ? dayBounds(day) : null;
-    const extra = injected.filter(
-      (entry) =>
-        (kindFilter === 'all' || entry.kind === kindFilter) &&
-        (memberFilter === 'all' || entry.name === memberFilter) &&
-        (!bounds || (entry.at >= bounds.from && entry.at < bounds.to)),
+    const all = injected?.length
+      ? [
+          ...injected.filter(
+            (entry) =>
+              (kindFilter === 'all' || entry.kind === kindFilter) &&
+              (memberFilter === 'all' || entry.name === memberFilter),
+          ),
+          ...fetched,
+        ]
+      : fetched;
+
+    const q = query.trim().toLowerCase();
+    if (!q) return all;
+    // Matches the sentence as it reads on screen: who, what, and the detail.
+    return all.filter((entry) =>
+      `${entry.name} ${entry.title} ${entry.detail ?? ''}`.toLowerCase().includes(q),
     );
-    return extra.length ? [...extra, ...fetched] : fetched;
-  }, [injected, fetched, kindFilter, memberFilter, day]);
+  }, [injected, fetched, kindFilter, memberFilter, query]);
 
   const [knownMembers, setKnownMembers] = useState<string[]>([]);
   useEffect(() => {
@@ -115,9 +144,21 @@ export function AchievementsPanel({
     });
   }, [entries]);
 
-  const memberChoices = useMemo(
-    () => memberOptions(knownMembers, members),
-    [knownMembers, members],
+  const colorOf = useMemo(() => {
+    const byName = new Map(members.map((m) => [m.name, m.color]));
+    return (name: string) => byName.get(name) ?? colorForName(name);
+  }, [members]);
+
+  const memberChoices = useMemo<Array<DropdownOption<string>>>(
+    () => [
+      { id: 'all', label: 'All members' },
+      ...knownMembers.map((name) => ({
+        id: name,
+        label: name,
+        icon: <span className="gms-dot" style={{ background: colorOf(name) }} aria-hidden />,
+      })),
+    ],
+    [knownMembers, colorOf],
   );
 
   const zoomed = useMemo(
@@ -125,65 +166,154 @@ export function AchievementsPanel({
     [zoomedId, entries],
   );
 
-  const counts = useMemo(() => {
-    const byKind = new Map<AchievementKind, number>();
-    for (const entry of entries) byKind.set(entry.kind, (byKind.get(entry.kind) ?? 0) + 1);
-    return KINDS.filter((k) => byKind.has(k)).map((k) => ({ kind: k, count: byKind.get(k)! }));
+  // Days with something logged get a dot in the calendar.
+  const markedDays = useMemo(
+    () => new Set(entries.map((entry) => toDayInput(new Date(entry.at)))),
+    [entries],
+  );
+
+  const earliest = useMemo(() => {
+    if (!createdAt) return undefined;
+    const at = new Date(createdAt);
+    return Number.isNaN(at.getTime()) ? undefined : toDayInput(at);
+  }, [createdAt]);
+
+  /** Exports what is on screen: when, who, and what they did. */
+  const runExport = useCallback(
+    (format: ExportFormat) => {
+      const rows = entries.map((entry) => ({
+        at: toUnix(entry.at),
+        member: entry.name,
+        kind: entry.kind,
+        achievement: entry.title,
+        detail: entry.detail ?? '',
+      }));
+      const filename = `${groupName}-achievements-${range}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-');
+
+      if (format === 'json') {
+        downloadJson(filename, rows);
+        return;
+      }
+      downloadCsv({
+        filename,
+        sheet: 'Achievements',
+        headers: ['Time (unix)', 'Member', 'Kind', 'Achievement', 'Detail'],
+        rows: rows.map((r) => [r.at, r.member, r.kind, r.achievement, r.detail]),
+      });
+    },
+    [entries, groupName, range],
+  );
+
+  const groups = useMemo(() => {
+    const out: Array<{ day: string; rows: Achievement[] }> = [];
+    for (const entry of entries) {
+      const label = dayLabel(entry.at);
+      const last = out[out.length - 1];
+      if (last && last.day === label) last.rows.push(entry);
+      else out.push({ day: label, rows: [entry] });
+    }
+    return out;
   }, [entries]);
 
   return (
-    <section className="gms-panel" aria-label="Group achievements" aria-busy={loading}>
-      <PanelToolbar title="Group achievements">
-        <SelectField
-          label="Kind"
+    <section className="gms-panel gms-ach" aria-label="Group achievements" aria-busy={loading}>
+      <div className="gms-panel-head">
+        <div className="gms-panel-head-text">
+          <h1 className="gms-page-title">Group achievements</h1>
+          <span className="gms-panel-sub">Levels, quests and milestones as they happen</span>
+        </div>
+
+        <input
+          className="gms-input gms-ach-search"
+          value={query}
+          placeholder="Search achievements"
+          aria-label="Search achievements"
+          onChange={(e) => setQuery(e.target.value)}
+        />
+
+        <Dropdown
+          ariaLabel="Kind"
           value={kindFilter}
           options={KIND_OPTIONS}
           onChange={setKindFilter}
         />
-        <IconSelect
-          label="Member"
+
+        <Dropdown
+          ariaLabel="Member"
           value={memberFilter}
           options={memberChoices}
           onChange={setMemberFilter}
         />
-        <DayPicker day={day} today={today} onChange={setDay} />
-      </PanelToolbar>
 
-      {counts.length > 0 && (
-        <ul className="gms-panel-summary" aria-label="Loaded achievements per kind">
-          {counts.map((row) => (
-            <li
-              key={row.kind}
-              className="gms-panel-summary-chip gms-panel-summary-chip--baseline"
-            >
-              <span className="gms-ach-summary-kind">{KIND_LABEL[row.kind]}</span>
-              <strong>{row.count}</strong>
-            </li>
-          ))}
-        </ul>
-      )}
+        <Segmented
+          options={RANGE_OPTIONS}
+          value={range}
+          ariaLabel="Range"
+          onChange={setRange}
+        />
 
-      <div className="gms-panel-body">
+        <DayNav
+          day={day || today}
+          today={today}
+          earliest={earliest}
+          marked={markedDays}
+          picked={range === 'day'}
+          onChange={(next) => {
+            setDay(next);
+            setRange('day');
+          }}
+        />
+
+        <ExportMenu
+          busy={null}
+          disabled={entries.length === 0}
+          formats={EXPORT_FORMATS}
+          onExport={runExport}
+        />
+      </div>
+
+      <div className="gms-panel-body gms-ach-body">
         <PanelStatus
           error={error}
           loading={loading && entries.length === 0}
           refreshing={refreshing}
-          empty={!loading && entries.length === 0}
-          emptyText={
-            <>
-              {day ? 'No achievements on this day' : 'No achievements yet'}
-              {day && <ShowAllTimeButton onClick={() => setDay('')} />}
-            </>
-          }
         />
 
-        {entries.length > 0 && (
-          <ul className="gms-panel-list">
-            {entries.map((entry) => (
-              <AchievementCard key={entry.id} entry={entry} onZoom={() => setZoomedId(entry.id)} />
-            ))}
-          </ul>
+        {!loading && !error && entries.length === 0 && query.trim() && (
+          <EmptyState
+            icon={<SearchGlyph />}
+            title={`Nothing matches “${query.trim()}”`}
+            body="Check the spelling or clear the search to see everything logged."
+          >
+            <button type="button" className="gms-btn" onClick={() => setQuery('')}>
+              Clear search
+            </button>
+          </EmptyState>
         )}
+
+        {!loading && !error && entries.length === 0 && !query.trim() && (
+          <EmptyState
+            icon={<TrophyGlyph />}
+            title="No achievements yet"
+            body="Level-ups, quest completions and milestones will be logged here as your group earns them."
+          />
+        )}
+
+        {groups.map((group) => (
+          <div key={group.day} className="gms-ach-group">
+            <div className="gms-day-head">{group.day}</div>
+            {group.rows.map((entry) => (
+              <AchievementCard
+                key={entry.id}
+                entry={entry}
+                color={colorOf(entry.name)}
+                onZoom={() => setZoomedId(entry.id)}
+              />
+            ))}
+          </div>
+        ))}
 
         {hasMore && <LoadMoreButton loading={loading} disabled={!oldest} onClick={loadMore} />}
       </div>
@@ -194,7 +324,6 @@ export function AchievementsPanel({
         titleId="gms-ach-image-title"
         title={zoomed ? zoomed.title : 'Achievement'}
         className="gms-modal--achievement"
-        appearance={appearance}
       >
         {zoomed?.image_url && <ZoomedImage entry={zoomed} />}
       </Modal>
@@ -268,36 +397,47 @@ function AchievementIcon({ entry }: { entry: Achievement }) {
     );
   }
   if (entry.kind === 'drop' && entry.item_id != null) {
-    return <ItemIcon itemId={entry.item_id} size={24} className="gms-ach-icon" />;
+    return (
+      <ItemIcon
+        itemId={entry.item_id}
+        quantity={entry.quantity ?? undefined}
+        className="gms-ach-icon"
+      />
+    );
   }
   return <KindGlyph kind={entry.kind} />;
 }
 
-function AchievementCard({ entry, onZoom }: { entry: Achievement; onZoom: () => void }) {
+function AchievementCard({
+  entry,
+  color,
+  onZoom,
+}: {
+  entry: Achievement;
+  color: string;
+  onZoom: () => void;
+}) {
   const [imageBroken, setImageBroken] = useState(false);
-  const { absolute, stamp, ago } = timestamp(entry.at);
+  const { absolute, stamp } = timestamp(entry.at, false);
   const showImage = Boolean(entry.image_url) && !imageBroken;
 
   return (
-    <li className={`gms-ach-card gms-ach-card--${entry.kind}`}>
+    <div className={`gms-ach-row gms-ach-row--${entry.kind}`}>
       <span className="gms-ach-icon-slot">
         <AchievementIcon entry={entry} />
       </span>
+
       <div className="gms-ach-main">
-        <div className="gms-ach-who">
-          <span
-            className="gms-ach-dot"
-            style={{ background: colorForName(entry.name) }}
-            aria-hidden
-          />
-          <span className="gms-ach-name">{entry.name}</span>
-          <span className={`gms-ach-badge gms-ach-badge--${entry.kind}`}>
-            {KIND_LABEL[entry.kind]}
-          </span>
-        </div>
-        <p className="gms-ach-headline">{entry.title}</p>
-        {entry.detail && <p className="gms-ach-detail">{entry.detail}</p>}
+        {/* "Member did the thing" as one sentence, the way the design reads. */}
+        <span className="gms-ach-headline">
+          <strong style={{ color }}>{entry.name}</strong> {entry.title}
+        </span>
+        <span className="gms-ach-meta" title={absolute}>
+          {stamp} · {KIND_LABEL[entry.kind]}
+          {entry.detail ? ` · ${entry.detail}` : ''}
+        </span>
       </div>
+
       {showImage && entry.image_url && (
         <button type="button" className="gms-ach-thumb-btn" onClick={onZoom} title="View full image">
           <img
@@ -312,11 +452,11 @@ function AchievementCard({ entry, onZoom }: { entry: Achievement; onZoom: () => 
           />
         </button>
       )}
-      <time className="gms-panel-time" dateTime={entry.at} title={absolute}>
-        <span className="gms-panel-clock">{stamp}</span>
-        <span className="gms-panel-ago">{ago}</span>
-      </time>
-    </li>
+
+      <span className={`gms-ach-badge gms-ach-badge--${entry.kind}`}>
+        {KIND_LABEL[entry.kind]}
+      </span>
+    </div>
   );
 }
 

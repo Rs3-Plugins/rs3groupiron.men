@@ -23,6 +23,7 @@ export function useGroupQuests(
   groupName: string,
   token: string,
   dataRevision?: number,
+  enabled = true,
 ): GroupQuests {
   const [byMember, setByMember] = useState<Record<string, MemberQuestStates>>({});
   const [loading, setLoading] = useState(true);
@@ -30,6 +31,11 @@ export function useGroupQuests(
   const request = useLatestRequest();
 
   const load = useCallback(async () => {
+    if (!enabled) {
+      setError(null);
+      setLoading(false);
+      return;
+    }
     const settled = await request((signal) => fetchQuests(groupName, token, signal));
     if (!settled) return;
     if (settled.ok) {
@@ -39,7 +45,7 @@ export function useGroupQuests(
       setError(errorMessage(settled.error, 'Failed to load quests'));
     }
     setLoading(false);
-  }, [request, groupName, token]);
+  }, [request, groupName, token, enabled]);
 
   useEffect(() => {
     setByMember({});

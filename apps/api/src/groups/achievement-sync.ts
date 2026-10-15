@@ -89,6 +89,48 @@ export type AchievementUpdatePlan = {
  * `full` marks the input as the member's complete list, so anything stored but
  * absent is treated as no longer complete. A partial update only adds.
  */
+export type AchievementTally = {
+  achievement_id?: number;
+  gameval?: string;
+  progress: number;
+  target: number;
+};
+
+export type ResolvedTally = { gameval: string; progress: number; target: number };
+
+/**
+ * Tallies named the same way as completions, dropping any this server's dump
+ * does not know and any that are finished or untouched — a finished one is a
+ * completion, and a zero is just noise.
+ */
+export function resolveAchievementTallies(
+  tallies: AchievementTally[],
+  resolver: AchievementNameResolver,
+): ResolvedTally[] {
+  const out = new Map<string, ResolvedTally>();
+
+  for (const tally of tallies) {
+    let gameval: string | undefined;
+    const rawName = tally.gameval?.trim().toLowerCase();
+    if (rawName) {
+      if (isGamevalName(rawName) && resolver.hasName('achievement', rawName)) {
+        gameval = rawName;
+      }
+    } else if (tally.achievement_id != null) {
+      gameval = resolver.nameOf('achievement', tally.achievement_id);
+    }
+    if (!gameval) continue;
+
+    const target = Math.max(0, Math.round(tally.target));
+    const progress = Math.max(0, Math.round(tally.progress));
+    if (target <= 0 || progress <= 0 || progress >= target) continue;
+
+    out.set(gameval, { gameval, progress, target });
+  }
+
+  return [...out.values()];
+}
+
 export function planAchievementUpdate(
   previous: ReadonlySet<string>,
   next: ReadonlySet<string>,

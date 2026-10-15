@@ -34,10 +34,10 @@ pnpm --filter @rs3/api lint
 A group's token is its only credential. It is created with the group and never
 rotates, and travels verbatim in the `Authorization` header.
 
-| Routes | Demo group | Any other group |
-|---|---|---|
-| `am-i-logged-in`, `get-group-data`, `xp-history` | no token needed | token required |
-| everything else | rejected | token required |
+| Routes | Demo group | Public group | Any other group |
+|---|---|---|---|
+| `am-i-logged-in`, `get-group-data`, `xp-history` | no token needed | no token needed, filtered | token required |
+| everything else | rejected | token required | token required |
 
 Plugin pushes (`update-group-member`, `player-moved`, `set-member-online`,
 `update-member-quests`) carry the character's display name and only update
@@ -67,6 +67,26 @@ the last 12 minutes (it heartbeats every 5 while idle), so a crashed client
 does not stay online forever.
 
 The seeded demo group is public sample data and read-only.
+
+## Visibility
+
+A group is `private` by default: an unknown name and a wrong token give the
+same 401, so the endpoints cannot be used to find out whether a group exists.
+
+A group that sets `visibility: public` is readable with no token at all and is
+listed by `GET /public-groups?q=<name>`, which only ever sees public rows. What
+a tokenless viewer gets is decided by five flags — `map`, `skills`, `items`,
+`quests`, `achievements` — set through `create-group` or `update-group-settings`
+as `shares`. All default on except `map`: every other flag covers a record of
+what a member has done, while the map is where they are standing right now, so
+that one is opted into. Writes always need the token.
+
+Every read carries the caller's `scope`, so the two things stay separate:
+`GET am-i-logged-in` reports `shares` (what the group publishes) alongside
+`visible` (what this request may read — everything, for the token holder).
+Withheld member fields come back empty rather than absent, because a delta
+client reads an absent field as unchanged; an endpoint whose entire payload is
+withheld answers 403.
 
 ## Reading group data
 
