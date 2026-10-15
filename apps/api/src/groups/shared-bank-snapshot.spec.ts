@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GroupAccessService } from './group-access.service';
 import { GroupsService } from './groups.service';
 import { XpHistoryService } from './xp-history.service';
+import { RareItemsService } from '../items/rare-items.service';
 
 const TOKEN = 'group-token-value';
 const MEMBER = 'IronJackery';
@@ -61,9 +62,16 @@ function makeService(
     } as unknown as XpHistoryService,
     new GamevalsService(),
     new QuestCatalogService(),
+    rareItems(),
   );
 
   return { groups, tx };
+}
+
+function rareItems() {
+  const service = new RareItemsService();
+  service.load('data/rare-items.json');
+  return service;
 }
 
 describe('shared_bank snapshots', () => {

@@ -1,16 +1,12 @@
 import { useMemo } from 'react';
-import { useUrlNumber, useUrlState, useUrlText } from '../../hooks/useUrlState';
+import { useUrlState, useUrlText } from '../../hooks/useUrlState';
 import { formatGp, getItemPrices } from '../../lib/itemPrices';
 import { formatQty, type GroupItem } from '../../lib/items';
 import { IconSelect } from './IconSelect';
 import { ItemIcon } from './ItemIcon';
 import { memberOptions, type MemberBadge } from './memberOptions';
-import { Pagination } from './Pagination';
 import { SearchField } from './SearchField';
 
-const PAGE_SIZE_ALL = 8;
-const PAGE_SIZE_BANK = 36;
-const MAX_PAGE_BUTTONS = 15;
 const BAR_COLORS = ['#c47a2c', '#c44b4b', '#4a9e58', '#5a8fd4', '#9b6bc9', '#b8a03a'];
 
 type PriceMode = 'each' | 'stack';
@@ -43,7 +39,6 @@ export function ItemsPanel({
   members?: ReadonlyArray<MemberBadge>;
 }) {
   const [query, setQuery] = useUrlText('q');
-  const [page, setPage] = useUrlNumber('page', 1, { min: 1 });
   const [playerFilter, setPlayerFilter] = useUrlState('member', 'all');
   const [sort, setSort] = useUrlState<Sort>('sort', 'qty', { allowed: SORT_VALUES });
   const [priceMode, setPriceMode] = useUrlState<PriceMode>('price', 'stack', {
@@ -114,10 +109,6 @@ export function ItemsPanel({
   );
 
   const isSingleBank = playerFilter !== 'all';
-  const pageSize = isSingleBank ? PAGE_SIZE_BANK : PAGE_SIZE_ALL;
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const safePage = Math.min(page, pageCount);
-  const pageItems = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   return (
     <section className="gms-items" aria-label="Group items">
@@ -150,17 +141,7 @@ export function ItemsPanel({
           className="gms-items-search"
           label="Search items"
           value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setPage(1);
-          }}
-        />
-
-        <Pagination
-          page={safePage}
-          pageCount={pageCount}
-          maxButtons={MAX_PAGE_BUTTONS}
-          onSelect={setPage}
+          onChange={(e) => setQuery(e.target.value)}
         />
 
         <div className="gms-items-price-mode" role="group" aria-label="Price display">
@@ -198,22 +179,20 @@ export function ItemsPanel({
           hideLabel
           value={playerFilter}
           options={playerChoices}
-          onChange={(value) => {
-            setPlayerFilter(value);
-            setPage(1);
-          }}
+          onChange={(value) => setPlayerFilter(value)}
         />
       </div>
 
+      {/* Every match is rendered; the list scrolls rather than paging. */}
       <div className={isSingleBank ? 'gms-items-tiles' : 'gms-items-grid'}>
-        {pageItems.map((item) =>
+        {filtered.map((item) =>
           isSingleBank ? (
             <ItemTile key={item.id} item={item} priceMode={priceMode} />
           ) : (
             <ItemCard key={item.id} item={item} priceMode={priceMode} />
           ),
         )}
-        {pageItems.length === 0 && <p className="gms-items-empty">No items match.</p>}
+        {filtered.length === 0 && <p className="gms-items-empty">No items match.</p>}
       </div>
     </section>
   );

@@ -10,6 +10,7 @@ import {
   pairsToRows,
 } from './item-codec';
 import { XpHistoryService } from './xp-history.service';
+import { RareItemsService } from '../items/rare-items.service';
 
 const TOKEN = 'group-token-value';
 const MEMBER = 'IronJackery';
@@ -98,11 +99,18 @@ function makeService(opts: {
     } as unknown as XpHistoryService,
     new GamevalsService(),
     new QuestCatalogService(),
+    rareItems(),
   );
 
   /** Every `dataUpdatedAt` the write path set, if any. */
   const bumps = () => memberUpdates.filter((d) => 'dataUpdatedAt' in d);
   return { groups, bumps, tx };
+}
+
+function rareItems() {
+  const service = new RareItemsService();
+  service.load('data/rare-items.json');
+  return service;
 }
 
 describe('dataUpdatedAt', () => {

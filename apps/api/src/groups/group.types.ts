@@ -90,6 +90,13 @@ export const MAX_MEMBER_NAMES = 10;
 /** Distinct inventories one update may carry (inv, worn, bank, pouches...). */
 export const MAX_INVENTORIES = 32;
 
+/** Item ids one drop-rules request may carry per field. */
+export const MAX_DROP_RULES = 500;
+
+/** Distinct NPC names one kill report may carry, and kills per name. */
+export const MAX_KILL_NAMES = 200;
+export const MAX_KILLS_PER_REPORT = 10_000;
+
 export const MAX_ACHIEVEMENT_TITLE = 120;
 export const MAX_ACHIEVEMENT_DETAIL = 300;
 export const MAX_ACHIEVEMENT_IMAGE_URL = 500;
@@ -332,6 +339,136 @@ export class SetLocationSharingBody {
   shared!: boolean;
 }
 
+/** Per-group drop rules: a value threshold plus item opinions. */
+export class DropRulesBody {
+  /** Coin value at or above which any drop counts. 0 turns the rule off. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(MAX_INT32)
+  threshold?: number;
+
+  /** Item ids to announce even when the shared list lacks them. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_DROP_RULES)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @Max(MAX_INT32, { each: true })
+  include?: number[];
+
+  /** Item ids to stay quiet about, even when the shared list has them. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_DROP_RULES)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @Max(MAX_INT32, { each: true })
+  exclude?: number[];
+
+  /** Item ids to forget, handing the decision back to the shared list. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_DROP_RULES)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @Max(MAX_INT32, { each: true })
+  clear?: number[];
+}
+
+/** NPC names a member has killed since the last report, with counts. */
+export class NpcKillInput {
+  @IsString()
+  @MaxLength(MAX_INPUT_NAME)
+  npc!: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(MAX_KILLS_PER_REPORT)
+  kills!: number;
+}
+
+export class ReportKillsBody {
+  @IsString()
+  @MaxLength(MAX_INPUT_NAME)
+  name!: string;
+
+  @IsArray()
+  @ArrayMaxSize(MAX_KILL_NAMES)
+  @ValidateNested({ each: true })
+  @Type(() => NpcKillInput)
+  kills!: NpcKillInput[];
+}
+
+/** What a member is fighting. An absent name clears it. */
+export class SetTargetBody {
+  @IsString()
+  @MaxLength(MAX_INPUT_NAME)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(MAX_INPUT_NAME)
+  target?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(MAX_INT32)
+  hp?: number;
+
+  /** Share of the target's health bar still filled, 0-100. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  percent?: number;
+}
+
+/** A drop the plugin noticed; the server decides whether it is worth posting. */
+export class ReportDropBody {
+  @IsString()
+  @MaxLength(MAX_INPUT_NAME)
+  name!: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(MAX_INT32)
+  item_id!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(MAX_INT32)
+  quantity?: number;
+
+  /** Item name as the client knows it; the server has no obj name table. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(MAX_ACHIEVEMENT_TITLE)
+  item_name?: string;
+
+  /** NPC the drop came from, when the plugin could tell. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(MAX_INPUT_NAME)
+  source?: string;
+
+  /** The client's own value for one of them, used by the group threshold. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(MAX_INT32)
+  value?: number;
+}
+
 export class UpdateGroupSettingsBody {
   @IsOptional()
   @IsIn(['rs3', 'modern'])
@@ -441,6 +578,33 @@ export class AchievementRefInput {
  * whole completed list (e.g. on login) so anything missing is cleared;
  * otherwise the listed ones are simply added.
  */
+/** Progress towards a counted achievement, e.g. 37 of 50 kills. */
+export class AchievementTallyInput {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(MAX_INT32)
+  achievement_id?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(MAX_GAMEVAL_NAME)
+  gameval?: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(MAX_INT32)
+  progress!: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(MAX_INT32)
+  target!: number;
+}
+
 export class UpdateMemberAchievementsBody {
   @IsString()
   @MaxLength(MAX_INPUT_NAME)
@@ -460,6 +624,17 @@ export class UpdateMemberAchievementsBody {
   @IsOptional()
   @IsBoolean()
   achievements?: boolean;
+
+  /**
+   * Counted achievements in progress. Sent alongside `completed`, and a
+   * `full` update replaces the stored set rather than merging into it.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_ACHIEVEMENT_UPDATES)
+  @ValidateNested({ each: true })
+  @Type(() => AchievementTallyInput)
+  tallies?: AchievementTallyInput[];
 }
 
 /** One quest reference: `gameval` wins over `quest_id` when both are sent. */

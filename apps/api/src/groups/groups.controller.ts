@@ -27,8 +27,11 @@ import {
   AddMemberBody,
   CreateAchievementBody,
   CreateGroupBody,
+  DropRulesBody,
   MemberNameBody,
   RenameMemberBody,
+  ReportKillsBody,
+  ReportDropBody,
   UpdateGroupSettingsBody,
   UpdateMemberAchievementsBody,
   UpdateMemberBody,
@@ -36,6 +39,7 @@ import {
   UpdateMemberQuestsBody,
   PlayerMovedBody,
   SetLocationSharingBody,
+  SetTargetBody,
   SetMemberOnlineBody,
 } from './group.types';
 import { GroupsService } from './groups.service';
@@ -280,6 +284,67 @@ export class GroupsAuthedController {
     @Body() body: PlayerMovedBody,
   ) {
     return this.groups.playerMoved(groupName, authorization, body);
+  }
+
+  /** The group's drop rules: value threshold plus its own item opinions. */
+  @Get('drop-rules')
+  getDropRules(
+    @Param('groupName') groupName: string,
+    @Headers('authorization') authorization: string | undefined,
+  ) {
+    return this.groups.getDropRules(groupName, authorization);
+  }
+
+  @Post('drop-rules')
+  @HttpCode(200)
+  updateDropRules(
+    @Param('groupName') groupName: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: DropRulesBody,
+  ) {
+    return this.groups.updateDropRules(groupName, authorization, body);
+  }
+
+  /** A drop the plugin saw; recorded only when the group's rules keep it. */
+  @Post('report-drop')
+  @HttpCode(200)
+  reportDrop(
+    @Param('groupName') groupName: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: ReportDropBody,
+  ) {
+    return this.groups.reportDrop(groupName, authorization, body);
+  }
+
+  /** NPC kills since the member's last report; counts are added, not set. */
+  @Post('report-kills')
+  @HttpCode(200)
+  reportKills(
+    @Param('groupName') groupName: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: ReportKillsBody,
+  ) {
+    return this.groups.reportKills(groupName, authorization, body);
+  }
+
+  /** Kill counts per member, biggest first. */
+  @Get('npc-kills')
+  getNpcKills(
+    @Param('groupName') groupName: string,
+    @Headers('authorization') authorization: string | undefined,
+  ) {
+    return this.groups.getNpcKills(groupName, authorization);
+  }
+
+  /** What a member is fighting; an absent target clears it. */
+  @Post('set-target')
+  @HttpCode(200)
+  setTarget(
+    @Param('groupName') groupName: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: SetTargetBody,
+  ) {
+    return this.groups.setTarget(groupName, authorization, body);
   }
 
   /** Opt a member in or out of the live map. */

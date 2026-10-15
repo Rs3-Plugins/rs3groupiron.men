@@ -83,6 +83,31 @@ export function wireCoordinates(member: {
   return [member.x, member.y, member.plane];
 }
 
+/**
+ * A target only counts while it is fresh: a plugin that crashes mid-fight
+ * would otherwise leave the member shown as fighting forever.
+ */
+export const TARGET_STALE_MS = 30 * 1000;
+
+export function wireTarget(
+  member: {
+    targetName: string | null;
+    targetHp: number | null;
+    targetPercent: number | null;
+    targetAt: Date | null;
+  },
+  now: number = Date.now(),
+) {
+  if (!member.targetName || !member.targetAt) return undefined;
+  if (now - member.targetAt.getTime() >= TARGET_STALE_MS) return undefined;
+  return {
+    name: member.targetName,
+    hp: member.targetHp ?? undefined,
+    percent: member.targetPercent ?? undefined,
+    at: member.targetAt.toISOString(),
+  };
+}
+
 export function toWireMember(member: MemberWithData) {
   return {
     name: member.name,
@@ -96,6 +121,7 @@ export function toWireMember(member: MemberWithData) {
     coordinates: wireCoordinates(member),
     share_location: member.shareLocation,
     in_lobby: member.inLobby,
+    target: wireTarget(member),
     baseline_at: member.baselineAt?.toISOString(),
     ...inventoriesToWire(member.inventories),
     skills: skillsToWire(member.skills),
@@ -124,6 +150,7 @@ export function toPartialWireMember(member: Member) {
     coordinates: wireCoordinates(member),
     share_location: member.shareLocation,
     in_lobby: member.inLobby,
+    target: wireTarget(member),
     baseline_at: member.baselineAt?.toISOString(),
   };
 }

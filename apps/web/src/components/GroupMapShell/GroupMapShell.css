@@ -1075,11 +1075,50 @@
 
 .gms-inv-grid {
   display: grid;
-  grid-template-columns: repeat(4, 38px);
+  /* Four equal columns that share the panel, so the grid fills its width
+     instead of leaving a gutter down one side. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 2px;
-  justify-content: start;
-  width: max-content;
-  max-width: 100%;
+  width: 100%;
+}
+
+.gms-target {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.gms-target-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #d9c89c;
+}
+
+.gms-target-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.gms-target-hp {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  color: #e7d7b0;
+}
+
+.gms-target-track {
+  height: 4px;
+  border: 1px solid var(--border);
+  background: #15191d;
+}
+
+.gms-target-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #c44b4b, #e07a5f);
 }
 
 .gms-money-pouch {
@@ -1087,14 +1126,18 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  margin-top: 6px;
-  color: #e7d7b0;
-  font-size: 0.85rem;
-  font-weight: 700;
+  margin-top: 8px;
+  color: #f0d24b;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 1px #000;
 }
 
 .gms-money-pouch img {
   display: block;
+  flex: 0 0 auto;
   image-rendering: pixelated;
 }
 
@@ -1109,12 +1152,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
-  min-width: 38px;
-  min-height: 38px;
-  max-width: 38px;
-  max-height: 38px;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 1 / 1;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 0;
@@ -1128,6 +1168,13 @@
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   object-fit: contain;
+}
+
+/* The slot is now elastic, so its icon has to shrink with it rather than
+   overflow the cell on a narrow card. */
+.gms-inv-slot .gms-item-icon {
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .gms-inv-qty {
@@ -1351,25 +1398,29 @@
   padding: 0 0.1rem;
 }
 
+/* The whole result set is rendered, so these two own the scrolling. min-height
+   lets them shrink inside the flex column instead of pushing the panel open. */
 .gms-items-grid {
   flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 0.65rem;
-  overflow: auto;
+  overflow-y: auto;
   align-content: start;
   align-items: stretch;
-  padding-right: 0.15rem;
+  padding-right: 0.3rem;
 }
 
 .gms-items-tiles {
   flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
   gap: 0.5rem;
-  overflow: auto;
+  overflow-y: auto;
   align-content: start;
-  padding-right: 0.15rem;
+  padding-right: 0.3rem;
 }
 
 .gms-item-tile {

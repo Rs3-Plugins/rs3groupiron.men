@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { LiveStatsController } from './common/live-stats.controller';
 import { ServerTimingInterceptor } from './common/server-timing.interceptor';
 import { GamevalsModule } from './gamevals/gamevals.module';
+import { ItemsModule } from './items/items.module';
 import { GroupsModule } from './groups/groups.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UploadsModule } from './uploads/uploads.module';
@@ -22,6 +23,7 @@ import { UploadsModule } from './uploads/uploads.module';
     }),
     PrismaModule,
     GamevalsModule,
+    ItemsModule,
     GroupsModule,
     UploadsModule,
   ],

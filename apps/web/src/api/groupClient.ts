@@ -325,6 +325,95 @@ export type GroupSettingsResult = {
   member_slots: number;
 };
 
+/** How many of each NPC each member has killed, biggest first. */
+export type NpcKills = {
+  members: Array<{
+    name: string;
+    total: number;
+    kills: Array<{ npc: string; kills: number; last_at: string }>;
+  }>;
+};
+
+export async function fetchNpcKills(
+  groupName: string,
+  token: string,
+  signal?: AbortSignal,
+): Promise<NpcKills> {
+  return api(groupPath(groupName, 'npc-kills'), { token, signal });
+}
+
+/** RS3 achievements per member: finished ones, plus any counted progress. */
+export type AchievementProgress = {
+  members: Array<{
+    name: string;
+    completed: string[];
+    in_progress: Array<{ gameval: string; progress: number; target: number }>;
+  }>;
+};
+
+export async function fetchAchievementProgress(
+  groupName: string,
+  token: string,
+  signal?: AbortSignal,
+): Promise<AchievementProgress> {
+  return api(groupPath(groupName, 'achievement-progress'), { token, signal });
+}
+
+/**
+ * What a group announces when it drops: the shared list the API ships, plus
+ * the group's own additions and silences, plus a value threshold for anything
+ * nobody listed. `items` is the resolved set the plugin filters on.
+ */
+export type DropRules = {
+  threshold: number;
+  include: number[];
+  exclude: number[];
+  items: number[];
+  shared_list_size: number;
+};
+
+export async function fetchDropRules(
+  groupName: string,
+  token: string,
+  signal?: AbortSignal,
+): Promise<DropRules> {
+  return api(groupPath(groupName, 'drop-rules'), { token, signal });
+}
+
+/**
+ * Partial update: omitted fields are left alone. `clear` runs first, so one
+ * call can move an item from include to exclude.
+ */
+export async function updateDropRules(
+  groupName: string,
+  token: string,
+  body: {
+    threshold?: number;
+    include?: number[];
+    exclude?: number[];
+    clear?: number[];
+  },
+): Promise<DropRules> {
+  return api(groupPath(groupName, 'drop-rules'), {
+    token,
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** The shared list itself, for showing what a group inherits by default. */
+export type RareItemCatalogue = {
+  updated: string;
+  count: number;
+  ids: number[];
+};
+
+export async function fetchRareItemCatalogue(
+  signal?: AbortSignal,
+): Promise<RareItemCatalogue> {
+  return api('/api/items/rare', { signal });
+}
+
 export async function updateGroupSettings(
   groupName: string,
   token: string,

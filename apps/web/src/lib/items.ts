@@ -63,6 +63,8 @@ export type WireMember = {
   in_lobby?: boolean;
   /** Set when the plugin last sent its login baseline, so catch-up XP is known. */
   baseline_at?: string;
+  /** What this member is fighting right now, absent when they are not. */
+  target?: { name: string; hp?: number; percent?: number; at: string };
   last_updated?: string;
   stats?: number[];
   coordinates?: number[];
@@ -93,6 +95,7 @@ export type WirePartialMember = {
   share_location?: boolean;
   in_lobby?: boolean;
   baseline_at?: string;
+  target?: { name: string; hp?: number; percent?: number; at: string };
   last_updated?: string;
   stats?: number[];
   coordinates?: number[];
@@ -142,6 +145,8 @@ export type PlayerView = {
   inLobby: boolean;
   /** Timestamp of the plugin's last login baseline, or null. */
   baselineAt: string | null;
+  /** The NPC this member is fighting, or null when they are not. */
+  target: { name: string; hp: number | null; percent: number | null } | null;
   /** Game world the member is on, or 0 when the plugin hasn't reported one. */
   world: number;
   lastSeen: string | null;
@@ -336,6 +341,13 @@ export function toPlayerView(member: WireMember): PlayerView | null {
     online: member.online === true,
     inLobby: member.in_lobby === true,
     baselineAt: member.baseline_at ?? null,
+    target: member.target
+      ? {
+          name: member.target.name,
+          hp: member.target.hp ?? null,
+          percent: member.target.percent ?? null,
+        }
+      : null,
     world: stats[6] ?? 0,
     lastSeen: member.last_updated ?? null,
     avatarColor: resolveAvatarColor(member.name, member.color),
@@ -366,6 +378,7 @@ function memberViewKey(member: WireMember) {
     member.color ?? '',
     member.use_discord_avatar === false ? '0' : '1',
     member.online === true ? '1' : '0',
+    member.target ? `${member.target.name}:${member.target.hp ?? ''}` : '',
   ].join('|');
 }
 
@@ -400,16 +413,16 @@ export function membersToPlayers(
   return out;
 }
 
-/** Aggregate inventory + bank + shared bank across members for the Items tab. */
+/**
+ * Aggregate the banks across members for the Items tab, plus the group's
+ * shared bank. Backpack and worn items are deliberately left out: the tab is
+ * presented as a bank view, and carried items would quietly pad every total.
+ */
 export function aggregateGroupItems(members: WireMember[]): GroupItem[] {
   const map = new Map<number, Map<string, number>>();
 
   for (const member of members) {
-    const stacks = [
-      ...unpackPairs(member.inventory),
-      ...unpackPairs(member.bank),
-      ...unpackPairs(member.equipment),
-    ];
+    const stacks = unpackPairs(member.bank);
     const label = member.name === SHARED ? 'Shared bank' : member.name;
     for (const stack of stacks) {
       let byPlayer = map.get(stack.id);

@@ -20,6 +20,9 @@ const ACTIONS: Array<{ panel: OpenPanel; label: string; icon: string }> = [
 
 const STACK_PANEL_LABEL = { inventory: 'Inventory', equipment: 'Equipment' } as const;
 
+/** The pouch holds coins, so its hover names the item like any slot does. */
+const COINS_ITEM_ID = 995;
+
 export type PlayerCardProps = {
   player: PlayerView;
   xpDrop?: CombinedXpDrop | null;
@@ -124,6 +127,8 @@ export const PlayerCard = memo(function PlayerCard({
         <StatBar kind="summon" icon="/sprites/summon_icon.png" value={player.summoning} />
       </div>
 
+      {player.target && <TargetBar target={player.target} />}
+
       <div className="gms-player-actions">
         {ACTIONS.map((action) => {
           const active = panel === action.panel;
@@ -170,6 +175,29 @@ export const PlayerCard = memo(function PlayerCard({
     </article>
   );
 });
+
+/** Who the member is fighting, with whatever the target panel knows of it. */
+function TargetBar({
+  target,
+}: {
+  target: { name: string; hp: number | null; percent: number | null };
+}) {
+  const width = target.percent === null ? 100 : Math.max(0, Math.min(100, target.percent));
+  return (
+    <div
+      className="gms-target"
+      title={target.hp === null ? target.name : `${target.name}: ${target.hp.toLocaleString()} life points`}
+    >
+      <div className="gms-target-row">
+        <span className="gms-target-name">{target.name}</span>
+        {target.hp !== null && <span className="gms-target-hp">{formatQty(target.hp)}</span>}
+      </div>
+      <div className="gms-target-track">
+        <div className="gms-target-fill" style={{ width: `${width}%` }} />
+      </div>
+    </div>
+  );
+}
 
 function formatLastSeen(iso: string) {
   const d = new Date(iso);
@@ -252,8 +280,8 @@ function StackPanel({
         </div>
       )}
       {moneyPouch !== undefined && (
-        <div className="gms-money-pouch" title={`Money pouch: ${moneyPouch.toLocaleString()} coins`}>
-          <img src="/sprites/money_pouch.png" alt="" width={20} height={20} />
+        <div className="gms-money-pouch" title={`${itemName(COINS_ITEM_ID)}: ${moneyPouch.toLocaleString()}`}>
+          <img src="/sprites/money_pouch.png" alt="Money pouch" width={20} height={20} />
           <span>{formatQty(moneyPouch)}</span>
         </div>
       )}

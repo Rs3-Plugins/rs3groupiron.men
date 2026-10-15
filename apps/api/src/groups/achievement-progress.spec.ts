@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GroupAccessService } from './group-access.service';
 import { GroupsService } from './groups.service';
 import { XpHistoryService } from './xp-history.service';
+import { RareItemsService } from '../items/rare-items.service';
 
 const TOKEN = 'group-token-value';
 const MEMBER = 'IronJackery';
@@ -26,6 +27,10 @@ function makeService(stored: string[]) {
         Promise.resolve({ count: 0 }),
       ),
       deleteMany: jest.fn(() => Promise.resolve({ count: 0 })),
+    },
+    memberAchievementTally: {
+      deleteMany: jest.fn(() => Promise.resolve({ count: 0 })),
+      upsert: jest.fn(() => Promise.resolve({})),
     },
     achievement: {
       createMany: jest.fn<Promise<unknown>, [{ data: FeedRow[] }]>(() =>
@@ -60,6 +65,7 @@ function makeService(stored: string[]) {
     } as unknown as XpHistoryService,
     gamevals,
     new QuestCatalogService(),
+    rareItems(),
   );
   return { groups, tx };
 }
@@ -68,6 +74,12 @@ const feedTitles = (tx: ReturnType<typeof makeService>['tx']) =>
   tx.achievement.createMany.mock.calls.flatMap((call) =>
     call[0].data.map((row) => row.title),
   );
+
+function rareItems() {
+  const service = new RareItemsService();
+  service.load('data/rare-items.json');
+  return service;
+}
 
 describe('achievement sync', () => {
   it('a first sync stores everything and posts nothing to the feed', async () => {
