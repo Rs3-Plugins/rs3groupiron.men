@@ -143,12 +143,26 @@ function shuffleStacks(stacks: ItemStack[], slots: number): ItemStack[] {
   return next;
 }
 
+/** Mirrors a shuffle onto the slot view so the fixed grids move with it. */
+function shuffleSlots(
+  slots: Array<ItemStack | null>,
+  changes: number,
+): Array<ItemStack | null> {
+  const filled = slots.filter((slot): slot is ItemStack => slot !== null);
+  if (!filled.length) return slots;
+  const shuffled = shuffleStacks(filled, changes);
+  let next = 0;
+  return slots.map((slot) => (slot === null ? null : (shuffled[next++] ?? slot)));
+}
+
 function items(player: PlayerView): PlayerView {
   const touchEquipment = Math.random() < 0.35 && player.equipment.length > 0;
   return {
     ...player,
     inventory: touchEquipment ? player.inventory : shuffleStacks(player.inventory, 2),
     equipment: touchEquipment ? shuffleStacks(player.equipment, 1) : player.equipment,
+    inventorySlots: touchEquipment ? player.inventorySlots : shuffleSlots(player.inventorySlots, 2),
+    equipmentSlots: touchEquipment ? shuffleSlots(player.equipmentSlots, 1) : player.equipmentSlots,
     lastSeen: new Date().toISOString(),
   };
 }

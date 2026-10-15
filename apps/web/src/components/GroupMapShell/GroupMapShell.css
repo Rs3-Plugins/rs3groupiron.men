@@ -1082,6 +1082,27 @@
   max-width: 100%;
 }
 
+.gms-money-pouch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 6px;
+  color: #e7d7b0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.gms-money-pouch img {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.gms-inv-slot--empty {
+  background: #10141800;
+  border-color: color-mix(in srgb, var(--border) 55%, transparent);
+}
+
 .gms-inv-slot {
   position: relative;
   box-sizing: border-box;

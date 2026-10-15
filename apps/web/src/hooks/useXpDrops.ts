@@ -5,15 +5,18 @@ import {
   mergeXpDrop,
   skillXpSnapshot,
   type CombinedXpDrop,
+  type XpSnapshot,
 } from '../lib/xpDrops';
 
 /**
  * Tracks XP gains between successive `players` snapshots and exposes one
- * combined floating drop per player. The first snapshot never produces drops.
+ * combined floating drop per player. The first snapshot never produces drops,
+ * nor does the one where a member comes back online: their plugin sends every
+ * skill on login, and that catch-up is not something they just earned.
  */
 export function useXpDrops(players: PlayerView[]) {
   const [xpDropsByPlayer, setXpDropsByPlayer] = useState<Record<string, CombinedXpDrop>>({});
-  const prevXpRef = useRef<Map<string, Map<string, number>> | null>(null);
+  const prevXpRef = useRef<XpSnapshot | null>(null);
 
   useEffect(() => {
     const gains = diffXpDrops(prevXpRef.current, players);

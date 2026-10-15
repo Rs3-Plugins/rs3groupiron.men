@@ -61,6 +61,8 @@ export type WireMember = {
   share_location?: boolean;
   /** Online but on the lobby screen, so there is no position to plot. */
   in_lobby?: boolean;
+  /** Set when the plugin last sent its login baseline, so catch-up XP is known. */
+  baseline_at?: string;
   last_updated?: string;
   stats?: number[];
   coordinates?: number[];
@@ -90,6 +92,7 @@ export type WirePartialMember = {
   online?: boolean;
   share_location?: boolean;
   in_lobby?: boolean;
+  baseline_at?: string;
   last_updated?: string;
   stats?: number[];
   coordinates?: number[];
@@ -137,6 +140,8 @@ export type PlayerView = {
   online: boolean;
   /** Online but on the lobby screen: shown as "lobby" instead of a position. */
   inLobby: boolean;
+  /** Timestamp of the plugin's last login baseline, or null. */
+  baselineAt: string | null;
   /** Game world the member is on, or 0 when the plugin hasn't reported one. */
   world: number;
   lastSeen: string | null;
@@ -148,6 +153,11 @@ export type PlayerView = {
   inventory: ItemStack[];
   bank: ItemStack[];
   equipment: ItemStack[];
+  /** Same items with empty slots kept, for the fixed-grid panels. */
+  inventorySlots: Array<ItemStack | null>;
+  equipmentSlots: Array<ItemStack | null>;
+  /** Coins in the money pouch, shown under the inventory grid. */
+  moneyPouch: number;
   skills: PlayerSkill[];
   totalLevel: number;
   /** Change key used by membersToPlayers() to reuse unchanged views. */
@@ -195,6 +205,56 @@ export function itemIconUrl(itemId: number) {
 
 export function itemName(itemId: number) {
   return ITEM_NAMES[itemId] ?? `Item ${itemId}`;
+}
+
+/** Backpack capacity: the panel always draws this many slots. */
+export const BACKPACK_SLOTS = 28;
+
+/** RS3 inv gameval for the coin pouch, carried in the generic map. */
+const MONEY_POUCH_KEY = 'money_pouch';
+
+/**
+ * The pouch holds more than a 32-bit stack can count, so the game splits it:
+ * one slot of plain coins and one of `coins_b`, where each counts a billion.
+ * Both arrive as sent — collapsing them before storage would overflow the
+ * server's integer column — so the total is worked out here.
+ */
+const COINS = 995;
+const COINS_BILLION = 54830;
+const BILLION = 1_000_000_000;
+
+export function moneyPouchTotal(member: WireMember): number {
+  const pairs = member.inventories?.[MONEY_POUCH_KEY];
+  if (!pairs?.length) return 0;
+  let total = 0;
+  for (let i = 0; i + 1 < pairs.length; i += 2) {
+    const id = pairs[i] ?? 0;
+    const quantity = pairs[i + 1] ?? 0;
+    if (id === COINS_BILLION) total += quantity * BILLION;
+    else if (id === COINS) total += quantity;
+  }
+  return total;
+}
+
+/**
+ * Pairs with their empty slots kept, so a panel can draw a fixed grid and the
+ * items stay where they are instead of shifting left as things are used.
+ */
+export function unpackSlots(
+  pairs: number[] | undefined,
+  slots?: number,
+): Array<ItemStack | null> {
+  const out: Array<ItemStack | null> = [];
+  if (pairs?.length) {
+    for (let i = 0; i + 1 < pairs.length; i += 2) {
+      const id = pairs[i] ?? 0;
+      const quantity = pairs[i + 1] ?? 0;
+      out.push(id > 0 && quantity > 0 ? { id, quantity } : null);
+    }
+  }
+  if (slots === undefined) return out;
+  while (out.length < slots) out.push(null);
+  return out.slice(0, slots);
 }
 
 export function unpackPairs(pairs: number[] | undefined): ItemStack[] {
@@ -275,6 +335,7 @@ export function toPlayerView(member: WireMember): PlayerView | null {
     avatarUrl: useDiscordAvatar ? discordUrl : null,
     online: member.online === true,
     inLobby: member.in_lobby === true,
+    baselineAt: member.baseline_at ?? null,
     world: stats[6] ?? 0,
     lastSeen: member.last_updated ?? null,
     avatarColor: resolveAvatarColor(member.name, member.color),
@@ -285,6 +346,9 @@ export function toPlayerView(member: WireMember): PlayerView | null {
     inventory: unpackPairs(member.inventory),
     bank: unpackPairs(member.bank),
     equipment: unpackPairs(member.equipment),
+    inventorySlots: unpackSlots(member.inventory, BACKPACK_SLOTS),
+    equipmentSlots: unpackSlots(member.equipment),
+    moneyPouch: moneyPouchTotal(member),
     skills,
     totalLevel: skills.reduce((sum, s) => sum + s.baseLevel, 0),
   };

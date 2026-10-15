@@ -16,6 +16,7 @@ export type WireInventoryField = keyof typeof WIRE_INVENTORIES;
 /** Inventories whose slot positions matter, so empty slots are kept. */
 const POSITIONAL_INVENTORIES: ReadonlySet<string> = new Set([
   WIRE_INVENTORIES.inventory,
+  WIRE_INVENTORIES.equipment,
 ]);
 
 export type InventoryRow = { slot: number; itemId: number; quantity: number };

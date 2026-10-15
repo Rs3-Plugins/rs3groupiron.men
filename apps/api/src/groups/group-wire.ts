@@ -96,6 +96,7 @@ export function toWireMember(member: MemberWithData) {
     coordinates: wireCoordinates(member),
     share_location: member.shareLocation,
     in_lobby: member.inLobby,
+    baseline_at: member.baselineAt?.toISOString(),
     ...inventoriesToWire(member.inventories),
     skills: skillsToWire(member.skills),
   };
@@ -123,6 +124,7 @@ export function toPartialWireMember(member: Member) {
     coordinates: wireCoordinates(member),
     share_location: member.shareLocation,
     in_lobby: member.inLobby,
+    baseline_at: member.baselineAt?.toISOString(),
   };
 }
 

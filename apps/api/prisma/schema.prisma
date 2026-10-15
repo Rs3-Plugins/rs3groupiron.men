@@ -109,6 +109,10 @@ model Member {
   shareLocation Boolean @default(true) @map("share_location")
   /// Logged in but sitting on the lobby screen: online, with no position.
   inLobby     Boolean  @default(false) @map("in_lobby")
+  /// When the plugin last sent a full login baseline. The site compares this
+  /// between polls: a jump that lands on a new baseline is catch-up, not a
+  /// gain, so it must not surface as an XP drop.
+  baselineAt  DateTime? @map("baseline_at")
   /// Any change at all: position, vitals, online flag, profile, inventories.
   lastUpdated DateTime @default(now()) @map("last_updated")
   /// Only the expensive payload: inventories and skills. A position ping bumps

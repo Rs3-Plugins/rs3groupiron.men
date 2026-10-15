@@ -163,7 +163,8 @@ export const PlayerCard = memo(function PlayerCard({
       {stackPanel && (
         <StackPanel
           title={STACK_PANEL_LABEL[stackPanel]}
-          stacks={stackPanel === 'inventory' ? player.inventory : player.equipment}
+          slots={stackPanel === 'inventory' ? player.inventorySlots : player.equipmentSlots}
+          moneyPouch={stackPanel === 'inventory' ? player.moneyPouch : undefined}
         />
       )}
     </article>
@@ -219,17 +220,41 @@ function StatBar({
   );
 }
 
-function StackPanel({ title, stacks }: { title: string; stacks: ItemStack[] }) {
+/**
+ * Draws every slot, filled or not. The grid is fixed so an item keeps its place
+ * as things around it are used, instead of the whole panel shuffling up.
+ */
+function StackPanel({
+  title,
+  slots,
+  moneyPouch,
+}: {
+  title: string;
+  slots: Array<ItemStack | null>;
+  /** Coin pouch total; only the inventory carries one. */
+  moneyPouch?: number;
+}) {
+  const filled = slots.some((slot) => slot !== null);
   return (
     <div className="gms-player-panel">
       <div className="gms-player-panel-title">{title}</div>
-      {stacks.length === 0 ? (
+      {slots.length === 0 ? (
         <p className="gms-player-panel-empty">Empty</p>
       ) : (
-        <div className="gms-inv-grid">
-          {stacks.map((stack, index) => (
-            <ItemSlot key={`${stack.id}-${index}`} stack={stack} />
-          ))}
+        <div className="gms-inv-grid" aria-label={filled ? undefined : 'Empty'}>
+          {slots.map((stack, index) =>
+            stack ? (
+              <ItemSlot key={`${index}-${stack.id}`} stack={stack} />
+            ) : (
+              <div key={`${index}-empty`} className="gms-inv-slot gms-inv-slot--empty" />
+            ),
+          )}
+        </div>
+      )}
+      {moneyPouch !== undefined && (
+        <div className="gms-money-pouch" title={`Money pouch: ${moneyPouch.toLocaleString()} coins`}>
+          <img src="/sprites/money_pouch.png" alt="" width={20} height={20} />
+          <span>{formatQty(moneyPouch)}</span>
         </div>
       )}
     </div>

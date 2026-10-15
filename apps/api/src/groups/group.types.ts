@@ -226,6 +226,14 @@ export class UpdateMemberBody {
   @IsOptional()
   @IsBoolean()
   achievements?: boolean;
+
+  /**
+   * Marks the full set a plugin sends on login. The values are what the member
+   * already had, so the site must not read the jump as freshly earned XP.
+   */
+  @IsOptional()
+  @IsBoolean()
+  baseline?: boolean;
 }
 
 export class MemberNameBody {

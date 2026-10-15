@@ -1005,6 +1005,7 @@ export class GroupsService {
             ...(body.world === undefined
               ? {}
               : { world: Math.round(body.world) }),
+            ...(body.baseline === true ? { baselineAt: now } : {}),
           },
           select: { id: true },
         });
