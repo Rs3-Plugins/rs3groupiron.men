@@ -999,6 +999,7 @@ export class GroupsService {
           data: {
             lastUpdated: now,
             online: true,
+            inLobby: false,
             ...(vitals ?? {}),
             ...(coords ?? {}),
             ...(body.world === undefined

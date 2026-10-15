@@ -302,15 +302,30 @@ export function GroupMapShell({
     [players],
   );
 
+  // Follows the focused player: every poll that moves them re-centres the map.
+  // The previous object is kept when nothing moved so the map is not told to
+  // re-centre on coordinates it is already showing.
   useEffect(() => {
     if (!focusName) {
       setMapFocus(null);
       return;
     }
-    if (mapFocus?.name === focusName) return;
     const player = players.find((p) => p.name === focusName);
-    if (player) setMapFocus(focusFor(player));
-  }, [focusName, players, mapFocus?.name]);
+    if (!player) return;
+    const next = focusFor(player);
+    // No position (hidden, in the lobby, never reported): hold the last one
+    // rather than snapping back to the default centre.
+    if (!next) return;
+    setMapFocus((prev) =>
+      prev &&
+      prev.name === next.name &&
+      prev.x === next.x &&
+      prev.y === next.y &&
+      prev.plane === next.plane
+        ? prev
+        : next,
+    );
+  }, [focusName, players]);
 
   function goToPlayer(player: PlayerView) {
     const focus = focusFor(player);

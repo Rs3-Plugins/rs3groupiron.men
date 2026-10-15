@@ -309,6 +309,10 @@ function memberViewKey(member: WireMember) {
  * Convert wire members to PlayerViews (shared bank skipped). When `prev` is
  * given, members whose data hasn't changed keep their previous PlayerView
  * object so memoised children don't re-render.
+ *
+ * Sorted by username so the roster never reshuffles: the payload arrives in
+ * whatever order the members last updated, which would otherwise reorder every
+ * list on screen each poll.
  */
 export function membersToPlayers(
   members: WireMember[],
@@ -326,6 +330,9 @@ export function membersToPlayers(
     const view = toPlayerView(member);
     if (view) out.push({ ...view, viewKey: key });
   }
+  out.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+  );
   return out;
 }
 
