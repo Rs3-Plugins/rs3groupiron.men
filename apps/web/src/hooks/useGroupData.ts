@@ -10,7 +10,7 @@ import {
   type PlayerView,
   type WireMember,
 } from '../lib/items';
-import { openGroupStream } from '../lib/groupStream';
+import { openGroupStream, type GroupChangeKind } from '../lib/groupStream';
 import { maxLastUpdated, mergeDelta, type GroupCache } from '../lib/mergeDelta';
 import { FULL_REFRESH_EVERY_N_POLLS } from '../lib/polling';
 
@@ -20,6 +20,10 @@ export type GroupData = {
   info: GroupInfo | null;
   loading: boolean;
   error: string | null;
+  dataRevision: number;
+  achievementsRevision: number;
+  questsRevision: number;
+  settingsRevision: number;
   /** Full refetch of members + info. Sets `error` on failure. */
   refresh: () => Promise<void>;
   /** Locally patch the player list (demo tooling only; overwritten by next poll). */
@@ -35,6 +39,10 @@ function samePlayers(a: PlayerView[], b: PlayerView[]) {
 export function useGroupData(groupName: string, token: string, pollMs: number): GroupData {
   const [players, setPlayers] = useState<PlayerView[]>([]);
   const [rawMembers, setRawMembers] = useState<WireMember[]>([]);
+  const [dataRevision, setDataRevision] = useState(0);
+  const [achievementsRevision, setAchievementsRevision] = useState(0);
+  const [questsRevision, setQuestsRevision] = useState(0);
+  const [settingsRevision, setSettingsRevision] = useState(0);
   const [info, setInfo] = useState<GroupInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,15 +63,24 @@ export function useGroupData(groupName: string, token: string, pollMs: number): 
   const committedSeqRef = useRef(0);
   const failCountRef = useRef(0);
 
-  const commit = useCallback((seq: number, members: WireMember[]) => {
+  const commit = useCallback((seq: number, members: WireMember[], heavy = true) => {
     if (seq < committedSeqRef.current) return;
     committedSeqRef.current = seq;
     cacheRef.current = { members, since: maxLastUpdated(members) };
     setRawMembers(members);
+    if (heavy) setDataRevision((n) => n + 1);
     const next = membersToPlayers(members, playersRef.current);
     if (!samePlayers(next, playersRef.current)) {
       playersRef.current = next;
       setPlayers(next);
+    }
+  }, []);
+
+  const applyKinds = useCallback((kinds: GroupChangeKind[]) => {
+    for (const kind of kinds) {
+      if (kind === 'achievements') setAchievementsRevision((n) => n + 1);
+      else if (kind === 'quests') setQuestsRevision((n) => n + 1);
+      else if (kind === 'settings') setSettingsRevision((n) => n + 1);
     }
   }, []);
 
@@ -96,7 +113,7 @@ export function useGroupData(groupName: string, token: string, pollMs: number): 
         commit(seq, full.filter(isFullMember));
         return;
       }
-      if (result.changed) commit(seq, result.merged);
+      if (result.changed) commit(seq, result.merged, result.heavy);
       else committedSeqRef.current = Math.max(committedSeqRef.current, seq);
     },
     [groupName, token, commit],
@@ -131,6 +148,10 @@ export function useGroupData(groupName: string, token: string, pollMs: number): 
     needFullRef.current = true;
     setPlayers([]);
     setRawMembers([]);
+    setDataRevision(0);
+    setAchievementsRevision(0);
+    setQuestsRevision(0);
+    setSettingsRevision(0);
     setLoading(true);
     setError(null);
   }, [groupName, token]);
@@ -155,6 +176,7 @@ export function useGroupData(groupName: string, token: string, pollMs: number): 
       onEvent: (event) => {
         if (generation !== generationRef.current) return;
         const seq = ++seqRef.current;
+        applyKinds(event.kinds);
 
         if (event.type === 'snapshot') {
           commit(seq, event.data.filter(isFullMember));
@@ -173,7 +195,7 @@ export function useGroupData(groupName: string, token: string, pollMs: number): 
           void refresh();
           return;
         }
-        if (result.changed) commit(seq, result.merged);
+        if (result.changed) commit(seq, result.merged, result.heavy);
         setError(null);
       },
       onError: () => {
@@ -190,7 +212,23 @@ export function useGroupData(groupName: string, token: string, pollMs: number): 
       setStreaming(false);
     };
     // streamAttempt is the reconnect trigger.
-  }, [groupName, token, streamAttempt, commit, refresh]);
+  }, [groupName, token, streamAttempt, commit, refresh, applyKinds]);
+
+  // Group settings live outside the delta, and the poll loop that used to
+  // re-read them stands down while the stream is connected.
+  useEffect(() => {
+    if (settingsRevision === 0) return;
+    const generation = generationRef.current;
+    void (async () => {
+      try {
+        const next = await fetchGroupInfo(groupName, token);
+        if (generation !== generationRef.current) return;
+        if (next) setInfo(next);
+      } catch {
+        // A failed re-read leaves the previous settings in place.
+      }
+    })();
+  }, [settingsRevision, groupName, token]);
 
   // Poll loop. Re-created on cadence change without dropping cached data.
   // Skipped entirely while the live stream is connected.
@@ -238,5 +276,17 @@ export function useGroupData(groupName: string, token: string, pollMs: number): 
     };
   }, [load, pollMs, streaming]);
 
-  return { players, rawMembers, info, loading, error, refresh, patchPlayers };
+  return {
+    players,
+    rawMembers,
+    info,
+    loading,
+    error,
+    dataRevision,
+    achievementsRevision,
+    questsRevision,
+    settingsRevision,
+    refresh,
+    patchPlayers,
+  };
 }

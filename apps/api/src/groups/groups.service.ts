@@ -162,6 +162,15 @@ const SNAPSHOT_CACHE_MAX = 256;
 const DEFAULT_STATS = [10, 10, 1, 1, 1, 1, 1];
 const DEFAULT_COORDS = [3200, 3200, 0];
 
+/**
+ * Which separately-fetched endpoint a change invalidates. `members` is the
+ * delta payload itself and needs no refetch; the rest are endpoints a client
+ * would otherwise have to poll blindly.
+ */
+export type GroupChangeKind = 'members' | 'achievements' | 'quests' | 'settings';
+
+export type GroupChange = { groupId: string; kind: GroupChangeKind };
+
 /** `inventory_changes` key for the group storage, matching the snapshot field. */
 const SHARED_BANK_FIELD = 'shared_bank';
 
@@ -199,7 +208,7 @@ export class GroupsService {
    * that SSE exists. Writes stay synchronous — emitting is just a function
    * call, and nobody may be listening.
    */
-  private readonly changed = new Subject<string>();
+  private readonly changed = new Subject<GroupChange>();
   readonly changed$ = this.changed.asObservable();
 
   /** Recent full payloads, shared between concurrent readers of a group. */
@@ -208,9 +217,18 @@ export class GroupsService {
     { at: number; payload: Promise<WireEntry[]> }
   >();
 
-  /** Wakes any SSE subscribers for the group; a no-op when nobody is watching. */
-  private notifyChanged(groupId: string) {
-    this.changed.next(groupId);
+  /**
+   * Wakes any SSE subscribers for the group; a no-op when nobody is watching.
+   *
+   * The kinds say which of the separately-fetched endpoints a client should
+   * re-read. Member state travels in the delta itself, so that is the default
+   * and costs a client nothing extra.
+   */
+  private notifyChanged(groupId: string, ...kinds: GroupChangeKind[]) {
+    const list = kinds.length > 0 ? kinds : (['members'] as GroupChangeKind[]);
+    for (const kind of list) {
+      this.changed.next({ groupId, kind });
+    }
   }
 
   async createGroup(body: CreateGroupBody) {
@@ -704,7 +722,7 @@ export class GroupsService {
       select,
     });
 
-    this.notifyChanged(group.id);
+    this.notifyChanged(group.id, 'achievements');
     return toAchievementEntry(row);
   }
 
@@ -762,7 +780,7 @@ export class GroupsService {
       },
     });
 
-    this.notifyChanged(group.id);
+    this.notifyChanged(group.id, 'achievements');
     return { ok: true, recorded: true, achievement: toAchievementEntry(row) };
   }
 
@@ -897,7 +915,7 @@ export class GroupsService {
       }
     });
 
-    this.notifyChanged(group.id);
+    this.notifyChanged(group.id, 'settings');
     return this.getDropRules(groupName, token);
   }
 
@@ -1045,7 +1063,7 @@ export class GroupsService {
       return { ...plan, isBaseline };
     });
 
-    this.notifyChanged(group.id);
+    this.notifyChanged(group.id, 'quests', 'achievements');
     return {
       ok: true,
       name: member.name,
@@ -1232,7 +1250,7 @@ export class GroupsService {
       { maxWait: 5_000, timeout: 20_000 },
     );
 
-    this.notifyChanged(group.id);
+    this.notifyChanged(group.id, 'achievements');
     return {
       ok: true,
       name: member.name,
@@ -1305,6 +1323,7 @@ export class GroupsService {
       hasDeposit;
 
     let dataChanged = false;
+    let postedAchievements = false;
     await this.prisma.$transaction(
       async (tx) => {
         const memberId = existing.id;
@@ -1387,7 +1406,7 @@ export class GroupsService {
         }
 
         if (skills) {
-          heavyChanged ||= await this.replaceSkills(
+          const result = await this.replaceSkills(
             tx,
             group.id,
             memberId,
@@ -1396,6 +1415,8 @@ export class GroupsService {
             now,
             body.achievements !== false,
           );
+          heavyChanged ||= result.changed;
+          postedAchievements ||= result.posted;
         }
 
         // An empty list is a real snapshot (the group emptied its storage), so
@@ -1481,7 +1502,8 @@ export class GroupsService {
       { maxWait: 5_000, timeout: 20_000 },
     );
 
-    this.notifyChanged(group.id);
+    if (postedAchievements) this.notifyChanged(group.id, 'members', 'achievements');
+    else this.notifyChanged(group.id);
     return {
       ok: true,
       name: existing.name,
@@ -1919,7 +1941,7 @@ export class GroupsService {
       select: { id: true },
     });
 
-    this.notifyChanged(group.id);
+    this.notifyChanged(group.id, 'settings');
     return {
       ok: true,
       name,
@@ -1976,7 +1998,7 @@ export class GroupsService {
       },
     });
 
-    this.notifyChanged(group.id);
+    this.notifyChanged(group.id, 'settings');
     return {
       ok: true,
       name,
@@ -2063,6 +2085,7 @@ export class GroupsService {
       throw err;
     }
 
+    this.notifyChanged(group.id, 'settings');
     return {
       ok: true,
       name: updated.name,
@@ -2182,7 +2205,7 @@ export class GroupsService {
       where: { id: member.id, groupId: group.id },
     });
     if (result.count === 0) throw new NotFoundException('Member not found');
-    this.notifyChanged(group.id);
+    this.notifyChanged(group.id, 'settings');
     return { ok: true };
   }
 
@@ -2208,7 +2231,7 @@ export class GroupsService {
       data: { name: next, lastUpdated: new Date() },
       select: { id: true },
     });
-    this.notifyChanged(group.id);
+    this.notifyChanged(group.id, 'settings');
     return { ok: true, name: next };
   }
 
@@ -2328,7 +2351,7 @@ export class GroupsService {
     skills: Record<string, SkillPayloadValue>,
     sampledAt: Date,
     recordAchievements = true,
-  ): Promise<boolean> {
+  ): Promise<{ changed: boolean; posted: boolean }> {
     // Read BEFORE writing so milestone crossings can be diffed.
     const previous = await db.memberSkill.findMany({
       where: { memberId },
@@ -2342,6 +2365,7 @@ export class GroupsService {
       memberId,
     }));
     const changed = skillsDiffer(previous, rows);
+    let posted = false;
     if (rows.length) {
       if (changed) {
         await db.memberSkill.deleteMany({
@@ -2359,6 +2383,7 @@ export class GroupsService {
       const milestones = recordAchievements
         ? detectSkillMilestones(memberName, previous, rows)
         : [];
+      posted = milestones.length > 0;
       if (milestones.length) {
         await db.achievement.createMany({
           data: milestones.map((m) => ({
@@ -2376,6 +2401,6 @@ export class GroupsService {
         });
       }
     }
-    return changed;
+    return { changed, posted };
   }
 }

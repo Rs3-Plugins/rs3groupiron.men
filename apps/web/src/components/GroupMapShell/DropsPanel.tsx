@@ -218,7 +218,7 @@ function DropsFeed({
     [groupName, groupToken, memberFilter, range, day, today],
   );
 
-  const { entries: fetched, hasMore, error, loading, refreshing, oldest, loadMore } =
+  const { entries: fetched, hasMore, error, loading, oldest, loadMore } =
     usePagedHistory<Achievement>({
       fetchPage,
       pageSize: PAGE_SIZE,
@@ -389,7 +389,6 @@ function DropsFeed({
         <PanelStatus
           error={error}
           loading={loading && entries.length === 0}
-          refreshing={refreshing}
         />
 
         {!loading && !error && visible.length === 0 && query.trim() && (

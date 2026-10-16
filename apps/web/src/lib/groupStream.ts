@@ -1,8 +1,30 @@
 import type { WireEntry } from './items';
 
+/** Separately-fetched endpoints an event says to re-read. */
+export type GroupChangeKind = 'members' | 'achievements' | 'quests' | 'settings';
+
 export type GroupStreamEvent =
-  | { type: 'snapshot'; at: string; data: WireEntry[] }
-  | { type: 'delta'; at: string; data: WireEntry[] };
+  | { type: 'snapshot'; at: string; data: WireEntry[]; kinds: GroupChangeKind[] }
+  | { type: 'delta'; at: string; data: WireEntry[]; kinds: GroupChangeKind[] };
+
+const CHANGE_KINDS: readonly string[] = [
+  'members',
+  'achievements',
+  'quests',
+  'settings',
+];
+
+/**
+ * Absent on an older server, which is why callers treat an empty list as "no
+ * hint" and keep their interval backstop rather than assuming nothing changed.
+ */
+function parseKinds(raw: unknown): GroupChangeKind[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (k): k is GroupChangeKind =>
+      typeof k === 'string' && CHANGE_KINDS.includes(k),
+  );
+}
 
 export type GroupStreamHandlers = {
   onEvent: (event: GroupStreamEvent) => void;
@@ -31,7 +53,7 @@ export function parseFrame(raw: string): GroupStreamEvent | null {
   }
   if (!dataLines.length) return null;
 
-  let parsed: { type?: string; at?: string; data?: unknown };
+  let parsed: { type?: string; at?: string; data?: unknown; kinds?: unknown };
   try {
     parsed = JSON.parse(dataLines.join('\n')) as typeof parsed;
   } catch {
@@ -46,6 +68,7 @@ export function parseFrame(raw: string): GroupStreamEvent | null {
     type,
     at: parsed.at ?? new Date().toISOString(),
     data: parsed.data as WireEntry[],
+    kinds: parseKinds(parsed.kinds),
   };
 }
 

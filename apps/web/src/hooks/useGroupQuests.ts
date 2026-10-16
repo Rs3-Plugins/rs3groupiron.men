@@ -12,7 +12,7 @@ export type GroupQuests = {
   error: string | null;
 };
 
-const REFRESH_MS = 30_000;
+const REFRESH_MS = 300_000;
 
 /**
  * Quest progress for the whole group. Loaded once, then refreshed when the

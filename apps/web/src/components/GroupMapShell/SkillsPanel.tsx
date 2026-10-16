@@ -4,10 +4,7 @@ import { formatQty, type PlayerSkill } from '../../lib/items';
 import { MAX_SKILL_XP, combatLevelFromSkills, xpForLevel } from '../../lib/skills';
 
 type SkillTip = {
-  skill: PlayerSkill;
-  nextXp: number;
-  remainder: number;
-  atCap: boolean;
+  skillId: string;
   anchor: DOMRect;
 };
 
@@ -47,11 +44,6 @@ export function SkillsPanel({
   const [tip, setTip] = useState<SkillTip | null>(null);
   const [tipStyle, setTipStyle] = useState<CSSProperties>(HIDDEN_TIP);
 
-  useLayoutEffect(() => {
-    if (!tip || !tipRef.current) return;
-    setTipStyle(clampSkillTipStyle(tipRef.current, tip.anchor));
-  }, [tip]);
-
   /**
    * Cell tiers, in ascending order of achievement:
    *   99   — the classic max, highlighted border
@@ -83,19 +75,23 @@ export function SkillsPanel({
     Object.fromEntries(skills.map((s) => [s.id, s.baseLevel])),
   );
   function showTip(skill: PlayerSkill, el: HTMLElement) {
-    const atCap = skill.baseLevel >= skill.maxLevel;
-    const nextXp = atCap
-      ? MAX_SKILL_XP
-      : xpForLevel(skill.baseLevel + 1, skill.curve);
     setTipStyle(HIDDEN_TIP);
-    setTip({
-      skill,
-      nextXp,
-      remainder: Math.max(0, nextXp - skill.xp),
-      atCap,
-      anchor: el.getBoundingClientRect(),
-    });
+    setTip({ skillId: skill.id, anchor: el.getBoundingClientRect() });
   }
+
+  const tipSkill = tip ? (skills.find((s) => s.id === tip.skillId) ?? null) : null;
+  const tipAtCap = tipSkill ? tipSkill.baseLevel >= tipSkill.maxLevel : false;
+  const tipNextXp = tipSkill
+    ? tipAtCap
+      ? MAX_SKILL_XP
+      : xpForLevel(tipSkill.baseLevel + 1, tipSkill.curve)
+    : 0;
+  const tipRemainder = tipSkill ? Math.max(0, tipNextXp - tipSkill.xp) : 0;
+
+  useLayoutEffect(() => {
+    if (!tip || !tipRef.current) return;
+    setTipStyle(clampSkillTipStyle(tipRef.current, tip.anchor));
+  }, [tip, tipSkill?.xp, tipSkill?.level, tipSkill?.baseLevel]);
 
   return (
     <div className="gms-player-panel gms-skills-panel">
@@ -108,7 +104,7 @@ export function SkillsPanel({
             className={cellClass(skill)}
             style={CELL_BUTTON_STYLE}
             aria-label={cellLabel(skill)}
-            aria-describedby={tip?.skill.id === skill.id ? tipId : undefined}
+            aria-describedby={tip?.skillId === skill.id ? tipId : undefined}
             onMouseEnter={(e) => showTip(skill, e.currentTarget)}
             onFocus={(e) => showTip(skill, e.currentTarget)}
             onMouseLeave={() => setTip(null)}
@@ -165,7 +161,7 @@ export function SkillsPanel({
           <strong>{questPoints}</strong>
         </div>
       </div>
-      {tip
+      {tipSkill
         ? createPortal(
             <div
               ref={tipRef}
@@ -175,19 +171,19 @@ export function SkillsPanel({
               style={tipStyle}
             >
               <div className="gms-skill-tip-head">
-                {tip.skill.name}: {tip.skill.level}/{tip.skill.baseLevel}
+                {tipSkill.name}: {tipSkill.level}/{tipSkill.baseLevel}
               </div>
               <div className="gms-skill-tip-row">
                 <span>Current XP:</span>
-                <span>{formatQty(tip.skill.xp)}</span>
+                <span>{formatQty(tipSkill.xp)}</span>
               </div>
               <div className="gms-skill-tip-row">
                 <span>Next level:</span>
-                <span>{tip.atCap ? '—' : formatQty(tip.nextXp)}</span>
+                <span>{tipAtCap ? '—' : formatQty(tipNextXp)}</span>
               </div>
               <div className="gms-skill-tip-row">
                 <span>Remainder:</span>
-                <span>{tip.atCap ? '0' : formatQty(tip.remainder)}</span>
+                <span>{tipAtCap ? '0' : formatQty(tipRemainder)}</span>
               </div>
             </div>,
             document.body,

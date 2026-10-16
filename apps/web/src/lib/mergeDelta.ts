@@ -34,6 +34,7 @@ export function mergeDelta(cache: GroupCache, response: WireEntry[]) {
   const byName = new Map(cache.members.map((m) => [m.name, m]));
   const merged: WireMember[] = [];
   let changed = response.length !== cache.members.length;
+  let heavy = changed;
 
   for (let i = 0; i < response.length; i++) {
     const entry = response[i]!;
@@ -63,6 +64,7 @@ export function mergeDelta(cache: GroupCache, response: WireEntry[]) {
       } else {
         merged.push(entry);
         changed = true;
+        heavy = true;
       }
       continue;
     }
@@ -72,5 +74,5 @@ export function mergeDelta(cache: GroupCache, response: WireEntry[]) {
     merged.push(cached);
   }
 
-  return { merged, changed };
+  return { merged, changed, heavy };
 }

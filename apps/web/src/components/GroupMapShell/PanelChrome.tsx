@@ -25,7 +25,6 @@ export function PanelRowsSkeleton({ rows = SKELETON_ROWS.length }: { rows?: numb
 type PanelStatusProps = {
   error?: string | null;
   loading?: boolean;
-  refreshing?: boolean;
   empty?: boolean;
   emptyText?: ReactNode;
 };
@@ -33,7 +32,6 @@ type PanelStatusProps = {
 export function PanelStatus({
   error,
   loading = false,
-  refreshing = false,
   empty = false,
   emptyText,
 }: PanelStatusProps) {
@@ -41,16 +39,7 @@ export function PanelStatus({
     return <p className="gms-panel-status gms-panel-status--error">{error}</p>;
   }
   if (loading) return <PanelRowsSkeleton />;
-  return (
-    <>
-      {refreshing && (
-        <p className="gms-panel-status" aria-live="polite">
-          Refreshing…
-        </p>
-      )}
-      {empty && <p className="gms-panel-status">{emptyText}</p>}
-    </>
-  );
+  return <>{empty && <p className="gms-panel-status">{emptyText}</p>}</>;
 }
 
 export function Banner({

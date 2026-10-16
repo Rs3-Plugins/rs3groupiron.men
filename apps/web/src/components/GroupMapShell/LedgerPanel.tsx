@@ -102,7 +102,6 @@ export function LedgerPanel({
     hasMore,
     error,
     loading,
-    refreshing,
     oldest,
     loadMore,
   } = usePagedHistory<BankLedgerEntry>({
@@ -110,6 +109,7 @@ export function LedgerPanel({
     pageSize: PAGE_SIZE,
     errorFallback: 'Failed to load bank ledger',
     dataRevision,
+    refreshMs: 300_000,
   });
 
   const entries = useMemo(() => {
@@ -305,7 +305,6 @@ export function LedgerPanel({
         <PanelStatus
           error={error}
           loading={loading && entries.length === 0}
-          refreshing={refreshing}
         />
 
         {!loading && !error && visible.length === 0 && searching && (

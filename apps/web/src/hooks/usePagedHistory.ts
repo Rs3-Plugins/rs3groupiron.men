@@ -22,7 +22,7 @@ export function usePagedHistory<T extends { at: string }>({
   pageSize,
   errorFallback,
   dataRevision,
-  refreshMs = 15_000,
+  refreshMs = 300_000,
 }: Options<T>) {
   const [entries, setEntries] = useState<T[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -70,7 +70,6 @@ export function usePagedHistory<T extends { at: string }>({
     hasMore,
     error,
     loading,
-    refreshing: loading && entries.length > 0,
     oldest,
     loadMore: () => oldest && void load(oldest.at),
   };

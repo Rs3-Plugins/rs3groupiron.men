@@ -4,7 +4,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -171,11 +170,18 @@ export function GroupMapShell({
   }, []);
 
   const pollMs = tab === 'map' ? POLL_MS_MAP : POLL_MS_DEFAULT;
-  const { players, rawMembers, info, loading, error, refresh, patchPlayers } = useGroupData(
-    groupName,
-    groupToken,
-    pollMs,
-  );
+  const {
+    players,
+    rawMembers,
+    info,
+    loading,
+    error,
+    dataRevision,
+    achievementsRevision,
+    questsRevision,
+    refresh,
+    patchPlayers,
+  } = useGroupData(groupName, groupToken, pollMs);
 
   const { xpDropsByPlayer, dismissXpDrop } = useXpDrops(players);
   const memberSlots = info?.member_slots ?? DEFAULT_MEMBER_SLOTS;
@@ -224,19 +230,12 @@ export function GroupMapShell({
 
   const demo = useDemoActivity(demoTools, patchPlayers);
 
-  const dataRevision = useRef(0);
-  const lastMembers = useRef(rawMembers);
-  if (lastMembers.current !== rawMembers) {
-    lastMembers.current = rawMembers;
-    dataRevision.current += 1;
-  }
-
   // Quest progress feeds both the Quests tab and the quest points on each
   // player's skills panel, so it lives at shell level.
   const quests = useGroupQuests(
     groupName,
     groupToken,
-    dataRevision.current,
+    questsRevision,
     visible?.quests !== false,
   );
   const questsByMember = useMemo(
@@ -312,7 +311,7 @@ export function GroupMapShell({
   const panelProps = {
     groupName,
     groupToken,
-    dataRevision: dataRevision.current,
+    dataRevision,
     members: memberBadges,
   };
 
@@ -495,6 +494,7 @@ export function GroupMapShell({
           {tab === 'achievements' && (
             <AchievementsPanel
               {...panelProps}
+              dataRevision={achievementsRevision}
               createdAt={info?.created_at}
               injected={demo.achievements}
             />
@@ -502,6 +502,7 @@ export function GroupMapShell({
           {tab === 'drops' && (
             <DropsPanel
               {...panelProps}
+              dataRevision={achievementsRevision}
               createdAt={info?.created_at}
               injected={demo.achievements}
             />

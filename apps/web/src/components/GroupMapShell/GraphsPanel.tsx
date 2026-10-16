@@ -181,7 +181,7 @@ export function GraphsPanel({
   // `force` skips the cache, which is the whole point of refreshing.
   useLiveRefresh(
     useCallback(() => void load(true, true), [load]),
-    { signal: dataRevision, intervalMs: 30_000 },
+    { signal: dataRevision, intervalMs: 300_000 },
   );
 
   // Demo gains are appended on a synthetic clock that carries on past the end

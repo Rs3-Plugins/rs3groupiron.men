@@ -20,7 +20,7 @@ import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { allowDevReset } from '../config/env';
-import { GroupAccessService } from './group-access.service';
+import { GroupAccessService, visibleChangeKind } from './group-access.service';
 import { GroupEventsService } from './group-events.service';
 import { GroupsSeedService } from './groups-seed.service';
 import { redactWireEntries, type WireEntry } from './group-wire';
@@ -154,7 +154,10 @@ export class GroupsAuthedController {
         const data = Array.isArray(event.data)
           ? redactWireEntries(event.data as WireEntry[], group.scope)
           : event.data;
-        return { type: event.type, data: { ...event, data } };
+        const kinds = event.kinds?.filter((kind) =>
+          visibleChangeKind(kind, group.scope),
+        );
+        return { type: event.type, data: { ...event, data, kinds } };
       }),
     );
   }

@@ -9,6 +9,17 @@ import { applyTheme, readUiPrefs } from './lib/uiPrefs'
 // the other theme while React boots.
 applyTheme(readUiPrefs().themePref)
 
+const RELOAD_KEY = 'chunk-reload-at'
+const RELOAD_WINDOW_MS = 10_000
+
+window.addEventListener('vite:preloadError', (event) => {
+  const last = Number(sessionStorage.getItem(RELOAD_KEY) ?? 0)
+  if (Date.now() - last < RELOAD_WINDOW_MS) return
+  sessionStorage.setItem(RELOAD_KEY, String(Date.now()))
+  event.preventDefault()
+  window.location.reload()
+})
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

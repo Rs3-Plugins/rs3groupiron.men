@@ -112,6 +112,23 @@ export function isFullScope(scope: ShareScope) {
   return SHARE_KEYS.every((key) => scope[key]);
 }
 
+/**
+ * Whether a change kind may be announced to this caller.
+ *
+ * The endpoint behind a withheld kind already answers 403, so sending the kind
+ * anyway would tell a tokenless viewer that something happened without letting
+ * them read what. `members` rides the delta, which is redacted separately, and
+ * `settings` mirrors am-i-logged-in, which every reader may see.
+ */
+export function visibleChangeKind(
+  kind: 'members' | 'achievements' | 'quests' | 'settings',
+  scope: ShareScope,
+): boolean {
+  if (kind === 'achievements') return scope.achievements;
+  if (kind === 'quests') return scope.quests;
+  return true;
+}
+
 const SHARE_LABELS: Record<keyof ShareScope, string> = {
   map: 'location',
   skills: 'skills',

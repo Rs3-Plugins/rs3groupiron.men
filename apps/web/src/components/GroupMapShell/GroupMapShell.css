@@ -197,32 +197,34 @@
 
 .gms-xp-drops {
   position: absolute;
-  left: 50%;
+  left: 0;
+  right: 0;
+  top: 0;
   bottom: 0.35rem;
   z-index: 5;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   pointer-events: none;
-  transform: translateX(-50%);
 }
 
 .gms-xp-drop {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.12rem 0.45rem 0.12rem 0.28rem;
-  border: 1px solid rgba(232, 160, 74, 0.45);
+  padding: 0.14rem 0.5rem 0.14rem 0.3rem;
+  border: 1px solid rgba(232, 160, 74, 0.55);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--surface2) 88%, transparent);
+  background: color-mix(in srgb, var(--surface2) 94%, transparent);
   color: var(--gold-bright);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
-  animation: gms-xp-drift 1.85s ease-out forwards;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  transform: translateX(-50%);
+  animation: gms-xp-drift 3.2s ease-out forwards;
 }
 
 .gms-xp-drop-icons {
@@ -247,15 +249,21 @@
 @keyframes gms-xp-drift {
   0% {
     opacity: 0;
-    transform: translateY(0.25rem) scale(0.92);
+    bottom: 0;
+    transform: translateX(-50%) translateY(0.25rem) scale(0.92);
   }
-  12% {
+  8% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  62% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translateY(calc(-100% - 4.5rem)) scale(1);
+    bottom: 100%;
+    transform: translateX(-50%) scale(1);
   }
 }
 
@@ -4525,7 +4533,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .gms-xp-drop {
-    animation: gms-xp-fade 1.85s linear forwards;
+    animation: gms-xp-fade 3.2s linear forwards;
   }
 
   .gms-spinner-ring {

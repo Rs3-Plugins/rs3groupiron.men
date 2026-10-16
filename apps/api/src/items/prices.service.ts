@@ -163,18 +163,18 @@ export class PricesService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * `high` is what buyers pay and `low` what sellers get, so the midpoint is
-   * the closest thing to a market price. Thinly traded items often report only
-   * one side, in which case that side is the only signal available.
+   * `low` is the instant-sell price — what a member actually gets for the item
+   * — so that is what the site values a bank at. `high` is the instant-buy
+   * side and is only used when the feed reports no sell price at all, which
+   * happens on thinly traded items.
    */
   private priceOf(entry: LatestEntry | undefined): number {
     const high = Number(entry?.high);
     const low = Number(entry?.low);
     const hasHigh = Number.isFinite(high) && high > 0;
     const hasLow = Number.isFinite(low) && low > 0;
-    if (hasHigh && hasLow) return Math.round((high + low) / 2);
-    if (hasHigh) return Math.round(high);
     if (hasLow) return Math.round(low);
+    if (hasHigh) return Math.round(high);
     return 0;
   }
 

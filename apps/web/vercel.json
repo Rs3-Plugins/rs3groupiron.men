@@ -12,7 +12,7 @@
       "source": "/api/:path*",
       "destination": "https://api.rs3groupiron.men/api/:path*"
     },
-    { "source": "/((?!api/|_vercel/).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|_vercel/|assets/).*)", "destination": "/index.html" }
   ],
   "headers": [
     {

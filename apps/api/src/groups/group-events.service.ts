@@ -6,14 +6,27 @@ import {
   map,
   share,
   switchMap,
+  tap,
   throttleTime,
 } from 'rxjs/operators';
-import { GroupsService } from './groups.service';
+import { GroupsService, type GroupChangeKind } from './groups.service';
+
+export const ALL_CHANGE_KINDS: GroupChangeKind[] = [
+  'members',
+  'achievements',
+  'quests',
+  'settings',
+];
 
 export type GroupEvent = {
   type: 'snapshot' | 'delta' | 'ping';
   at: string;
   data: unknown;
+  /**
+   * Which separately-fetched endpoints this event invalidates. Lets a client
+   * refetch only the panel that changed instead of polling all of them.
+   */
+  kinds?: GroupChangeKind[];
 };
 
 /** Cloudflare drops connections idle for ~100s. */
@@ -58,6 +71,11 @@ export class GroupEventsService {
   private readonly lastBroadcast = new Map<string, number>();
   /** Open connections per group — one per browser tab. */
   private readonly viewers = new Map<string, number>();
+  /**
+   * Kinds seen since the last broadcast. Recorded before the throttle so a
+   * burst that collapses into one delta still reports every kind it covered.
+   */
+  private readonly pendingKinds = new Map<string, Set<GroupChangeKind>>();
 
   constructor(private readonly groups: GroupsService) {}
 
@@ -93,7 +111,12 @@ export class GroupEventsService {
     if (existing) return existing;
 
     const stream = this.groups.changed$.pipe(
-      filter((id) => id === groupId),
+      filter((change) => change.groupId === groupId),
+      tap((change) => {
+        const seen = this.pendingKinds.get(groupId) ?? new Set<GroupChangeKind>();
+        seen.add(change.kind);
+        this.pendingKinds.set(groupId, seen);
+      }),
       // Leading so the first move is immediate, trailing so the last of a
       // burst is never dropped.
       throttleTime(BROADCAST_INTERVAL_MS, undefined, {
@@ -103,13 +126,21 @@ export class GroupEventsService {
       switchMap(async () => {
         const since = this.lastBroadcast.get(groupId) ?? 0;
         const at = Date.now();
+        const kinds = [...(this.pendingKinds.get(groupId) ?? [])];
+        this.pendingKinds.delete(groupId);
         const data = await this.groups.buildGroupData(groupId, since, true);
         this.lastBroadcast.set(groupId, at);
-        return { type: 'delta' as const, at: new Date(at).toISOString(), data };
+        return {
+          type: 'delta' as const,
+          at: new Date(at).toISOString(),
+          data,
+          kinds,
+        };
       }),
       finalize(() => {
         this.streams.delete(groupId);
         this.lastBroadcast.delete(groupId);
+        this.pendingKinds.delete(groupId);
       }),
       share({ resetOnRefCountZero: true }),
     );
@@ -138,6 +169,9 @@ export class GroupEventsService {
         type: 'snapshot' as const,
         at: new Date(at).toISOString(),
         data,
+        // A fresh or reconnected client holds nothing it can trust, so every
+        // panel is invalidated rather than just the ones that moved.
+        kinds: ALL_CHANGE_KINDS,
       };
     });
 

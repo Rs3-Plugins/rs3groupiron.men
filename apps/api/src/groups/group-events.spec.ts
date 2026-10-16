@@ -1,7 +1,7 @@
 import { Subject, firstValueFrom } from 'rxjs';
 import { take } from 'rxjs/operators';
 import { GroupEventsService } from './group-events.service';
-import { GroupsService } from './groups.service';
+import { GroupsService, type GroupChange } from './groups.service';
 
 const GROUP = 'group-1';
 
@@ -11,7 +11,7 @@ const flush = () => new Promise((resolve) => setImmediate(resolve));
 type BuildCall = { groupId: string; since: number };
 
 function makeService() {
-  const changed = new Subject<string>();
+  const changed = new Subject<GroupChange>();
   const calls: BuildCall[] = [];
   const groups = {
     changed$: changed.asObservable(),
@@ -89,7 +89,7 @@ describe('GroupEventsService', () => {
       await flush();
 
       clock = 9_000;
-      changed.next(GROUP);
+      changed.next({ groupId: GROUP, kind: 'members' });
       await flush();
 
       const deltas = calls.filter((c) => c.since > 0);
