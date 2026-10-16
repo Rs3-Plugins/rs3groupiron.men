@@ -23,7 +23,7 @@ const CHARTS: ChartKind[] = ['line', 'area', 'bar', 'pie'];
 export const PERIODS: XpHistoryPeriod[] = ['24h', '7d', '30d', '365d'];
 
 export const DEFAULT_GRAPH_PREFS: GraphPrefs = {
-  period: '24h',
+  period: '7d',
   skill: 'overall',
   player: 'all',
   mode: 'cumulative',

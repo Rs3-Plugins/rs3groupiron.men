@@ -203,6 +203,9 @@
   bottom: 0.35rem;
   z-index: 5;
   pointer-events: none;
+  /* Capped so the rise does not stretch with the card: an open card is several
+     times taller, and covering that in the same 3.2s reads as a speed-up. */
+  --gms-xp-rise: 8rem;
 }
 
 .gms-xp-drop {
@@ -262,7 +265,7 @@
   }
   100% {
     opacity: 0;
-    bottom: 100%;
+    bottom: min(100%, var(--gms-xp-rise));
     transform: translateX(-50%) scale(1);
   }
 }

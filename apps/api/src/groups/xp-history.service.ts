@@ -288,8 +288,33 @@ export class XpHistoryService {
       baselines.set(pairKey(row.memberId, row.skillId), BigInt(row.xp));
     }
 
-    const missing = memberIds.length * skillIds.length - baselines.size;
-    if (missing > 0) {
+    // Nothing before the window means tracking started inside it, so the
+    // earliest sample we do have is the baseline. Falling straight through to
+    // the member's current XP would make every gain clamp to zero, because
+    // every sample in the window is lower than where they are now.
+    if (memberIds.length * skillIds.length - baselines.size > 0) {
+      const inWindow = await this.prisma.$queryRaw<
+        Array<{ memberId: string; skillId: string; xp: bigint }>
+      >`
+        SELECT DISTINCT ON ("member_id", "skill_id")
+          "member_id" AS "memberId",
+          "skill_id" AS "skillId",
+          "xp"
+        FROM "skill_xp_samples"
+        WHERE "member_id" = ANY(${memberIds}::text[])
+          AND "skill_id" = ANY(${skillIds}::text[])
+          AND "sampled_at" > (${from}::timestamptz AT TIME ZONE 'UTC')
+        ORDER BY "member_id", "skill_id", "sampled_at" ASC
+      `;
+      for (const row of inWindow) {
+        const key = pairKey(row.memberId, row.skillId);
+        if (!baselines.has(key)) baselines.set(key, BigInt(row.xp));
+      }
+    }
+
+    // Still nothing means no history at all for that pair, so the member has
+    // not gained anything we can see and their current XP is the baseline.
+    if (memberIds.length * skillIds.length - baselines.size > 0) {
       const current = await this.prisma.memberSkill.findMany({
         where: {
           memberId: { in: memberIds },
