@@ -6,6 +6,7 @@ export {
   RUNEAPPS_TILES_URL,
   DEFAULT_CENTER,
   DEFAULT_ZOOM,
+  DEFAULT_MIN_ZOOM,
   DEFAULT_MAP_ID,
 } from './constants';
 export {

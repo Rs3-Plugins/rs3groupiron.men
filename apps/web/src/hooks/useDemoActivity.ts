@@ -23,11 +23,22 @@ export type DemoActivity = {
 
 const TICK_MS = 1200;
 const ACHIEVEMENT_MS = 14_000;
-const MAX_DEMO_ACHIEVEMENTS = 20;
+// Feeds both the achievements and the rare-drops panels, and the seed alone
+// puts nine drops in the window, so this holds more than a single page needs.
+const MAX_DEMO_ACHIEVEMENTS = 40;
 const LEDGER_MS = 4500;
 const MAX_DEMO_LEDGER = 60;
 const QUEST_MS = 9000;
 const MAX_XP_SAMPLES = 16;
+
+/** The demo has no real captures, so every entry shows the same placeholder. */
+const DEMO_SHOT = '/demo-shots/images-not-supported.png';
+
+const DAY_MS = 86_400_000;
+/** Backfill for the 24-hour window the feed panels open on. */
+const SEED_LEDGER_BATCHES = 14;
+const SEED_XP_SAMPLES = 12;
+const SEED_DROPS = 9;
 
 export const DEMO_XP_SAMPLE_MS = 12_000;
 
@@ -43,11 +54,33 @@ const BANK_QUANTITIES = [1, 1, 2, 3, 5, 10, 24, 50, 100, 280, 1000, 5000, 24_000
 const DEMO_QUESTS = QUESTS.filter((q) => q.category === 'quest' && q.questPoints > 0);
 const QUEST_BY_GAMEVAL = new Map(DEMO_QUESTS.map((q) => [q.gameval, q]));
 
+/**
+ * Rare drops carry a real item id, because the panel labels and prices them
+ * from the catalogue rather than from the title. `detail` is the source line
+ * the feed shows under the item.
+ */
+const DROP_TEMPLATES: Array<{
+  itemId: number;
+  title: string;
+  detail: string;
+  /** Stackables carry one so the feed draws the game's stacked art. */
+  quantity?: number;
+}> = [
+  { itemId: 15259, title: 'Received a Dragon hatchet', detail: 'Dagannoth Kings' },
+  { itemId: 11694, title: 'Received an Armadyl godsword', detail: 'Kree’arra' },
+  { itemId: 4151, title: 'Received an Abyssal whip', detail: 'Abyssal demon' },
+  { itemId: 1249, title: 'Received a Dragon spear', detail: 'Kalphite Queen' },
+  { itemId: 23351, title: 'Received an Elder overload', detail: 'Raids chest' },
+  { itemId: 11832, title: 'Received a Bandos chestplate', detail: 'General Graardor' },
+  { itemId: 11834, title: 'Received Bandos tassets', detail: 'General Graardor' },
+  { itemId: 15271, title: 'Received a Rune pouch', detail: 'Crazy archaeologist' },
+  { itemId: 565, title: 'Received Blood runes', detail: 'Zamorak chest', quantity: 1200 },
+  { itemId: 995, title: 'Received Coins', detail: 'Clue scroll', quantity: 2_400_000 },
+];
+
 const ACHIEVEMENT_TEMPLATES: Array<{ kind: AchievementKind; title: string; detail: string | null }> = [
   { kind: 'level', title: 'Reached level 99 Mining', detail: 'A new skill cape is earned' },
   { kind: 'level', title: 'Reached level 120 Slayer', detail: 'Mastery beyond 99' },
-  { kind: 'drop', title: 'Received a Dragon pickaxe', detail: 'Rare drop from Kalphite Queen' },
-  { kind: 'drop', title: 'Received an Armadyl hilt', detail: null },
   { kind: 'diary', title: 'Finished the Varrock achievements', detail: 'Hard tier complete' },
   { kind: 'other', title: 'Unlocked a new music track', detail: null },
 ];
@@ -167,6 +200,23 @@ function items(player: PlayerView): PlayerView {
   };
 }
 
+/**
+ * Moves the money pouch so the coin counter has something to animate. Weighted
+ * towards gains, with the occasional spend, and never below zero.
+ */
+function coins(player: PlayerView): PlayerView {
+  // A spend is capped at what is actually in the pouch, so the total drifts
+  // around instead of pinning to zero and swallowing every other change.
+  const spendable = Math.min(player.moneyPouch, 2500);
+  const gain = spendable < 100 || Math.random() < 0.6;
+  const amount = gain
+    ? Math.round(50 + Math.random() * 4000)
+    : -Math.round(50 + Math.random() * spendable);
+  const moneyPouch = Math.max(0, player.moneyPouch + amount);
+  if (moneyPouch === player.moneyPouch) return player;
+  return { ...player, moneyPouch, lastSeen: new Date().toISOString() };
+}
+
 function presence(player: PlayerView): PlayerView {
   const online = !player.online;
   return {
@@ -199,6 +249,7 @@ function stepPlayer(
   if (Math.random() < 0.35) next = gainXp(next, log);
   if (Math.random() < 0.3) next = vitals(next);
   if (Math.random() < 0.12) next = items(next);
+  if (Math.random() < 0.22) next = coins(next);
   // Never log out the last member, or the demo would go quiet for good.
   if (onlineCount > 1 && Math.random() < 0.012) next = presence(next);
   return next;
@@ -252,29 +303,67 @@ export function useDemoActivity(enabled: boolean, patchPlayers: PatchPlayers): D
   const committedRef = useRef(-1);
   const tickRef = useRef(0);
   const seqRef = useRef(0);
+  const seededRef = useRef(false);
 
   useEffect(() => {
     if (!enabled) return;
 
-    const push = (
+    const make = (
       name: string,
-      template: { kind: AchievementKind; title: string; detail: string | null },
+      template: {
+        kind: AchievementKind;
+        title: string;
+        detail: string | null;
+        itemId?: number;
+        quantity?: number;
+      },
+      at: string,
       gameval: string | null = null,
-    ) => {
+    ): Achievement => {
       seqRef.current += 1;
-      const entry: Achievement = {
+      return {
         id: `demo-${seqRef.current}`,
         name,
         kind: template.kind,
         title: template.title,
         detail: template.detail,
         skill_id: template.kind === 'level' ? 'mining' : null,
-        item_id: template.kind === 'drop' ? 1249 : null,
+        item_id: template.itemId ?? null,
+        quantity: template.quantity ?? null,
         gameval,
-        image_url: null,
-        at: new Date().toISOString(),
+        image_url: DEMO_SHOT,
+        at,
       };
+    };
+
+    const push = (
+      name: string,
+      template: {
+        kind: AchievementKind;
+        title: string;
+        detail: string | null;
+        itemId?: number;
+        quantity?: number;
+      },
+      gameval: string | null = null,
+    ) => {
+      const entry = make(name, template, new Date().toISOString(), gameval);
       setAchievements((prev) => [entry, ...prev].slice(0, MAX_DEMO_ACHIEVEMENTS));
+    };
+
+    const dropEntry = (names: string[], at: string) => {
+      const template = pick(DROP_TEMPLATES);
+      return make(
+        pick(names),
+        {
+          kind: 'drop',
+          title: template.title,
+          detail: template.detail,
+          itemId: template.itemId,
+          quantity: template.quantity,
+        },
+        at,
+      );
     };
 
     // The tick updater rolls dice, so React can run it twice and keep only the
@@ -320,10 +409,7 @@ export function useDemoActivity(enabled: boolean, patchPlayers: PatchPlayers): D
       }));
     };
 
-    const moveBank = () => {
-      const names = namesRef.current;
-      if (!names.length) return;
-      const at = new Date().toISOString();
+    const bankBatch = (at: string, names: string[]) => {
       const batch: BankLedgerEntry[] = [];
       for (let n = 0, count = 1 + Math.floor(Math.random() * 2); n < count; n += 1) {
         seqRef.current += 1;
@@ -336,7 +422,67 @@ export function useDemoActivity(enabled: boolean, patchPlayers: PatchPlayers): D
           at,
         });
       }
-      setLedger((prev) => [...batch, ...prev].slice(0, MAX_DEMO_LEDGER));
+      return batch;
+    };
+
+    const moveBank = () => {
+      const names = namesRef.current;
+      if (!names.length) return;
+      setLedger((prev) =>
+        [...bankBatch(new Date().toISOString(), names), ...prev].slice(0, MAX_DEMO_LEDGER),
+      );
+    };
+
+    /**
+     * The ledger, graphs and rare drops all open on the last 24 hours, so the
+     * demo backfills that window rather than starting empty and filling in only
+     * as the timers fire.
+     */
+    const seed = () => {
+      const names = namesRef.current;
+      if (!names.length || seededRef.current) return;
+      seededRef.current = true;
+      const now = Date.now();
+
+      // Spread across the day with a little jitter, so the feed has believable
+      // gaps and day headers rather than one drop every two hours on the dot.
+      const dropSeed: Achievement[] = [];
+      for (let i = SEED_DROPS; i > 0; i -= 1) {
+        const slot = (i - Math.random()) / SEED_DROPS;
+        dropSeed.push(dropEntry(names, new Date(now - slot * DAY_MS).toISOString()));
+      }
+      // Reversed so the whole list stays newest-first, like the live pushes:
+      // the cap then trims the oldest entries rather than the newest seeded one.
+      setAchievements((prev) =>
+        [...prev, ...dropSeed.reverse()].slice(0, MAX_DEMO_ACHIEVEMENTS),
+      );
+
+      const ledgerSeed: BankLedgerEntry[] = [];
+      for (let i = SEED_LEDGER_BATCHES; i > 0; i -= 1) {
+        const at = new Date(now - (i / SEED_LEDGER_BATCHES) * DAY_MS).toISOString();
+        ledgerSeed.push(...bankBatch(at, names));
+      }
+      setLedger((prev) =>
+        [...prev, ...ledgerSeed.reverse()].slice(0, MAX_DEMO_LEDGER),
+      );
+
+      // XP samples climb towards the totals already accumulated, so the chart
+      // opens on a curve instead of a single point at "now".
+      const totals = cloneTotals(totalsRef.current);
+      if (!Object.keys(totals).length) return;
+      const samples = Array.from({ length: SEED_XP_SAMPLES }, (_, i) => {
+        const k = (i + 1) / SEED_XP_SAMPLES;
+        const at = new Date(now - (1 - k) * DAY_MS).toISOString();
+        const scaled: DemoXpTotals = {};
+        for (const name of Object.keys(totals)) {
+          scaled[name] = {};
+          for (const id of Object.keys(totals[name]!)) {
+            scaled[name]![id] = Math.round(totals[name]![id]! * k);
+          }
+        }
+        return { t: at, totals: scaled };
+      });
+      setXp((prev) => ({ totals: prev.totals, samples }));
     };
 
     const progressQuest = () => {
@@ -379,8 +525,18 @@ export function useDemoActivity(enabled: boolean, patchPlayers: PatchPlayers): D
     const award = () => {
       const names = namesRef.current;
       if (!names.length) return;
+      // Drops are the headline feed, so they land more often than the rest.
+      if (Math.random() < 0.5) {
+        const entry = dropEntry(names, new Date().toISOString());
+        setAchievements((prev) => [entry, ...prev].slice(0, MAX_DEMO_ACHIEVEMENTS));
+        return;
+      }
       push(pick(names), pick(ACHIEVEMENT_TEMPLATES));
     };
+
+    // One tick first, so the member names the seed needs are known.
+    tick();
+    seed();
 
     const timers = [
       window.setInterval(tick, TICK_MS),

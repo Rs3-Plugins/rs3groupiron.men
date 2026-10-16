@@ -7,281 +7,83 @@
   font-family: var(--font-ui);
   --gms-sidebar-w: 268px;
   --gms-sidebar-fit: min(var(--gms-sidebar-w), calc(100vw - 1.5rem));
-  --gms-panel-rgb: 28, 32, 36;
-  --gms-panel-alpha: 0.96;
-  --gms-panel-fill: rgba(var(--gms-panel-rgb), var(--gms-panel-alpha));
+  /* Panel surfaces come from the theme; the alpha is the opacity setting. */
+  --gms-panel-alpha: 0.94;
+  --gms-panel-fill: color-mix(
+    in srgb,
+    var(--surface) calc(var(--gms-panel-alpha) * 100%),
+    transparent
+  );
 }
 
-.gms-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-overlay);
-  pointer-events: none;
-}
 
-.gms-toolbar,
-.gms-players,
-.gms-items,
-.gms-panel,
-.gms-settings,
-.gms-player-nav,
-.gms-toolbar button,
-.gms-player-nav button,
-.gms-player button,
-.gms-player select,
-.gms-player a,
-.gms-items input,
-.gms-items select,
-.gms-items button,
-.gms-panel button,
-.gms-panel select,
-.gms-panel input,
-.gms-panel a,
-.gms-settings button,
-.gms-settings input,
-.gms-modal button,
-.gms-modal input,
-.gms-modal iframe {
-  pointer-events: auto;
-}
-
-.gms button,
-.gms-modal button,
-.gms-panel-field-label,
-.gms-graphs-chart {
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-/* Toolbar + player nav sit centred in the space right of the sidebar, so
-   the sidebar can run the full height of the screen without overlap. */
-.gms-chrome {
-  position: absolute;
-  top: 0.75rem;
-  left: calc(var(--gms-sidebar-fit) + 1.4rem);
-  right: 0.75rem;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.gms-toolbar,
-.gms-player-nav {
-  box-sizing: border-box;
-  width: min(920px, 100%);
-}
-
-.gms-toolbar {
-  position: relative;
-  top: auto;
-  left: auto;
-  transform: none;
+/* ——— Brand lockup ———
+   Values lifted verbatim from the handoff's inline styles. */
+.gms-brand {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.5rem 1rem;
-  width: 100%;
-  padding: 0.45rem 0.65rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--gms-panel-fill, rgba(28, 32, 36, 0.82));
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
-}
-
-.gms-chrome--with-nav .gms-toolbar {
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  border-bottom-color: var(--border);
-  box-shadow: none;
-}
-
-.gms-player-nav {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0.55rem 0.45rem;
-  border: 1px solid var(--border);
-  border-top: none;
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-  background: rgba(22, 26, 30, 0.96);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
-}
-
-.gms-player-nav-btn {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.28rem 0.65rem;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  background: rgba(40, 45, 50, 0.9);
-  color: #c8ced4;
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 600;
+  gap: 10px;
+  flex: none;
+  margin: -4px 0;
+  min-width: 0;
   cursor: pointer;
 }
 
-.gms-player-nav-btn:hover:not(:disabled) {
-  border-color: #6a7682;
-  color: var(--ink);
-  background: rgba(52, 58, 64, 0.95);
+.gms-brand-logo {
+  width: 46px;
+  height: 46px;
+  display: block;
+  flex: none;
 }
 
-.gms-player-nav-btn--active {
-  border-color: var(--gold-dim);
-  color: var(--ink);
-  background: rgba(72, 52, 28, 0.85);
-}
-
-.gms-player-nav-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.gms-player-nav-btn--offline:not(:disabled) {
-  opacity: 0.72;
-  color: #9aa3ad;
-}
-
-.gms-player-nav-btn--offline .gms-player-nav-avatar {
-  filter: grayscale(1);
-  opacity: 0.85;
-}
-
-.gms-player-nav-offline,
-.gms-player-nav-lobby {
-  margin-left: 0.1rem;
-  color: #9aa3ad;
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-.gms-player-nav-lobby {
-  color: #d8b24a;
-}
-
-.gms-player-nav-dot {
-  width: 10px;
-  height: 10px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  border: 1.5px solid var(--ink);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.65);
-}
-
-.gms-toolbar-left,
-.gms-toolbar-right,
-.gms-tabs {
+.gms-wordmark {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  flex-direction: column;
+  gap: 4px;
   min-width: 0;
-  row-gap: 0.35rem;
 }
 
-.gms-toolbar-left,
-.gms-toolbar-right {
-  flex-wrap: wrap;
+.gms-wordmark-eyebrow {
+  font: 400 9px/1 var(--font-display);
+  letter-spacing: 0.45em;
+  color: var(--hdrGold);
 }
 
-.gms-toolbar-left {
-  flex: 1;
-}
-
-.gms-tabs {
-  position: relative;
-  flex: 1 1 0;
-  flex-wrap: nowrap;
-}
-
-.gms-tab {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-}
-
-.gms-tab--icon {
-  padding-left: 0.5rem;
-  padding-right: 0.5rem;
-}
-
-.gms-nav-icon {
-  flex: 0 0 auto;
-}
-
-.gms-tabs-measure {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: max-content;
-  max-width: none;
-  visibility: hidden;
-  pointer-events: none;
+.gms-wordmark-title {
+  font: 400 19px/1 var(--font-display);
+  color: var(--hdrText);
   white-space: nowrap;
 }
 
-.gms-tabs-measure-row {
-  display: flex;
+.gms-wordmark-title span {
+  color: var(--hdrGoldHi);
+}
+
+/* Outline pill: no fill, no icon. */
+.gms-group-pill {
+  height: 24px;
+  padding: 0 10px;
+  display: inline-flex;
   align-items: center;
-  width: max-content;
-  gap: 0.4rem;
-}
-
-.gms-tabs-measure-row > * {
-  flex: 0 0 auto;
-}
-
-.gms-tabs-spacer {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.gms-group-identity {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.4rem;
-  flex-shrink: 0;
-  margin-right: 0.45rem;
-  min-width: 0;
-}
-
-.gms-group-name {
-  color: var(--ink);
-  font-size: 1.05rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  gap: 6px;
+  border: 1px solid var(--hdrLine2);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hdrMuted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 11rem;
 }
 
-.gms-group-mode-icon {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  image-rendering: pixelated;
-  object-fit: contain;
-}
-
-.gms-tab,
 .gms-action,
 .gms-page {
   appearance: none;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  background: rgba(40, 45, 50, 0.9);
-  color: #c8ced4;
+  border: 1px solid var(--line2);
+  border-radius: var(--radius);
+  background: var(--raise);
+  color: var(--text);
   font: inherit;
   font-size: 0.82rem;
   font-weight: 600;
@@ -290,20 +92,51 @@
   white-space: nowrap;
 }
 
-.gms-tab:hover,
 .gms-action:hover,
 .gms-page:hover {
-  border-color: #6a7380;
-  color: #f2f4f6;
-  background: rgba(52, 58, 64, 0.95);
+  border-color: var(--gold);
+  color: var(--goldHi);
+  background: var(--hover);
 }
 
-.gms-tab--active,
+/*
+ * Nav buttons, verbatim from the handoff: transparent until active, then a
+ * faint gold wash with an inset rule along the bottom edge.
+ */
+.gms-tab {
+  appearance: none;
+  height: 34px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--hdrMuted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.gms-tab:hover {
+  color: var(--hdrText);
+}
+
+.gms-tab--active {
+  background: rgba(202, 164, 77, 0.12);
+  color: var(--hdrGoldHi);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--hdrGold);
+}
+
 .gms-page--active,
 .gms-page[aria-current='page'] {
-  border-color: var(--gold-dim);
+  border-color: var(--gold);
   color: var(--gold);
-  background: rgba(55, 42, 28, 0.95);
+  background: color-mix(in srgb, var(--gold) 14%, var(--raise));
 }
 
 .gms-action--with-icon {
@@ -321,9 +154,9 @@
 }
 
 .gms-action--icon[aria-pressed='true'] {
-  border-color: var(--gold-dim);
-  color: var(--gold);
-  background: rgba(55, 42, 28, 0.95);
+  border-color: var(--gold);
+  color: var(--goldHi);
+  background: color-mix(in srgb, var(--gold) 22%, var(--surface2));
 }
 
 .gms-players {
@@ -346,31 +179,14 @@
   scrollbar-gutter: stable;
 }
 
-.gms-players::-webkit-scrollbar {
-  width: 7px;
-}
-
-.gms-players::-webkit-scrollbar-track {
-  margin: 0.25rem 0;
-  background: transparent;
-}
-
-.gms-players::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background-clip: padding-box;
-  background-color: var(--scroll-thumb);
-}
-
-.gms-players::-webkit-scrollbar-thumb:hover {
-  background-color: var(--scroll-thumb-hover);
-}
+/* The members column used its own 7px bar; it now shares the global one so
+   every scroller in the app matches. */
 
 .gms-player {
   position: relative;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--gms-panel-fill, rgba(28, 32, 36, 0.82));
+  background: var(--gms-panel-fill, var(--surface));
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
   padding: 0.55rem 0.6rem 0.5rem;
   width: 100%;
@@ -398,7 +214,7 @@
   padding: 0.12rem 0.45rem 0.12rem 0.28rem;
   border: 1px solid rgba(232, 160, 74, 0.45);
   border-radius: 999px;
-  background: rgba(12, 14, 16, 0.88);
+  background: color-mix(in srgb, var(--surface2) 88%, transparent);
   color: var(--gold-bright);
   font-size: 0.72rem;
   font-weight: 700;
@@ -422,8 +238,10 @@
   object-fit: contain;
   flex-shrink: 0;
   border-radius: 3px;
-  background: rgba(8, 10, 12, 0.55);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
+  /* Seats the skill sprite against the drop's own backdrop, whatever the
+     theme: a fixed near-black puck went flat grey on parchment. */
+  background: color-mix(in srgb, var(--surface2) 80%, transparent);
+  box-shadow: 0 0 0 1px var(--line2);
 }
 
 @keyframes gms-xp-drift {
@@ -459,7 +277,7 @@
   padding: 0.35rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--gms-panel-fill, rgba(28, 32, 36, 0.82));
+  background: var(--gms-panel-fill, var(--surface));
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
 
@@ -468,14 +286,14 @@
   padding: 0.75rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: rgba(28, 32, 36, 0.94);
-  color: #a8b0b8;
+  background: color-mix(in srgb, var(--surface2) 94%, transparent);
+  color: var(--muted);
   font-size: 0.85rem;
 }
 
 .gms-side-status--error {
-  color: #e88a8a;
-  border-color: #6a3a3a;
+  color: var(--emberText);
+  border-color: color-mix(in srgb, var(--emberText) 45%, #000);
 }
 
 .gms-player--open {
@@ -556,7 +374,7 @@
   padding: 0.1rem 0.38rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(40, 45, 50, 0.9);
+  background: var(--raise);
   font-size: 0.66rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -572,7 +390,7 @@
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: #9aa3ad;
+  background: var(--muted);
 }
 
 .gms-player-presence--online .gms-player-presence-dot {
@@ -607,7 +425,7 @@
   padding: 0.25rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
-  background: rgba(22, 26, 30, 0.98);
+  background: var(--surface2);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
 }
 
@@ -637,8 +455,8 @@
 
 .gms-menu-item:hover,
 .gms-menu-item:focus-visible {
-  background: rgba(52, 58, 64, 0.95);
-  color: var(--gold-bright);
+  background: var(--hover);
+  color: var(--text);
 }
 
 .gms-menu-list:has(.gms-menu-item-text) {
@@ -663,9 +481,11 @@
   line-height: 1.25;
 }
 
+/* The same gold tint the chips and segmented buttons use for "on", rather than
+   a fixed brown that stayed dark on parchment. */
 .gms-menu-item--active {
-  background: rgba(55, 42, 28, 0.95);
-  color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 22%, var(--surface2));
+  color: var(--goldHi);
 }
 
 .gms-menu-item--active::after {
@@ -676,19 +496,19 @@
 }
 
 .gms-menu-item--active .gms-menu-item-hint {
-  color: var(--gold-dim);
+  color: var(--gold);
 }
 
 .gms-player-presence--online {
   color: #8fe09a;
   border-color: rgba(110, 207, 122, 0.45);
-  background: rgba(28, 56, 34, 0.6);
+  background: color-mix(in srgb, var(--ok) 30%, var(--surface2));
 }
 
 .gms-player-presence--offline {
-  color: #9aa3ad;
+  color: var(--muted);
   border-color: var(--border-strong);
-  background: rgba(40, 45, 50, 0.85);
+  background: color-mix(in srgb, var(--surface2) 85%, transparent);
 }
 
 .gms-player-time {
@@ -722,7 +542,7 @@
   margin-right: -0.55rem;
   object-fit: contain;
   image-rendering: auto;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.75));
+  filter: var(--spriteShadeStrong);
 }
 
 .gms-stat {
@@ -821,17 +641,17 @@
   flex: 0 0 2.35rem;
   border: 1px solid var(--border-strong);
   border-radius: 4px;
-  background: rgba(40, 45, 50, 0.95);
-  color: #c8ced4;
+  background: var(--raise);
+  color: var(--text);
   cursor: pointer;
   padding: 0;
 }
 
 .gms-icon-btn:hover:not(:disabled),
 .gms-icon-btn--active {
-  border-color: var(--gold-dim);
-  color: var(--gold);
-  background: rgba(55, 42, 28, 0.95);
+  border-color: var(--gold);
+  color: var(--goldHi);
+  background: color-mix(in srgb, var(--gold) 22%, var(--surface2));
 }
 
 .gms-icon-btn:disabled {
@@ -978,11 +798,13 @@
   width: max-content;
   min-width: 10.5rem;
   padding: 0.45rem 0.55rem;
-  border: 1px solid #8a7340;
-  border-radius: 4px;
-  background: rgba(18, 16, 12, 0.97);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
-  color: var(--ink);
+  /* Same surface as the item tooltip: a fixed near-black panel stayed dark on
+     parchment while the text followed the theme, which left it unreadable. */
+  border: 1px solid var(--gold);
+  border-radius: var(--radius);
+  background: var(--raise);
+  box-shadow: var(--shadow);
+  color: var(--text);
   font-size: 0.72rem;
   line-height: 1.35;
   pointer-events: none;
@@ -1021,7 +843,7 @@
   align-items: center;
   gap: 0.3rem;
   min-width: 0;
-  color: #c8ced4;
+  color: var(--text);
   font-size: 0.72rem;
 }
 
@@ -1069,7 +891,7 @@
 
 .gms-player-panel-empty {
   margin: 0;
-  color: #7a848e;
+  color: var(--dim);
   font-size: 0.8rem;
 }
 
@@ -1113,7 +935,7 @@
 .gms-target-track {
   height: 4px;
   border: 1px solid var(--border);
-  background: #15191d;
+  background: var(--bg);
 }
 
 .gms-target-fill {
@@ -1158,7 +980,7 @@
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 0;
-  background: #15191d;
+  background: var(--bg);
   overflow: visible;
 }
 
@@ -1194,18 +1016,39 @@
 .gms-items,
 .gms-panel,
 .gms-settings {
-  position: absolute;
-  top: 5.85rem;
-  left: calc(var(--gms-sidebar-fit) + 1.4rem);
-  right: 0.75rem;
-  bottom: 0.75rem;
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background: var(--gms-panel-fill, rgba(18, 22, 26, 0.82));
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45);
+  background: var(--gms-panel-fill, var(--surface));
+  box-shadow: inset 0 1px 0 var(--sheen), var(--card);
+  /* Desaturated as well as blurred: what shows through a translucent panel
+     is the raw world map, and its greens turned every panel grey-olive.
+     This only affects what sits behind a panel, so the map itself is
+     left exactly as it renders. */
+  backdrop-filter: blur(6px) saturate(0.45);
   overflow: hidden;
+}
+
+/*
+ * The gold strip along the top of every panel. It is the single most
+ * recognisable part of the design, so it lives on the shared panel rule
+ * rather than being repeated per screen.
+ */
+.gms-items::before,
+.gms-panel::before,
+.gms-settings::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, var(--line2), var(--gold) 50%, var(--line2));
+  opacity: 0.75;
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* Items tab */
@@ -1250,8 +1093,8 @@
   padding: 0.22rem 0.55rem;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(28, 32, 36, 0.92);
-  color: #c8ced4;
+  background: color-mix(in srgb, var(--surface2) 92%, transparent);
+  color: var(--text);
   font-size: 0.74rem;
   line-height: 1.2;
 }
@@ -1273,7 +1116,7 @@
 
 .gms-items-stat--qty {
   border-color: rgba(90, 120, 160, 0.45);
-  background: rgba(32, 42, 56, 0.7);
+  background: color-mix(in srgb, var(--pr) 22%, var(--surface2));
 }
 
 .gms-items-stat--qty strong {
@@ -1282,7 +1125,7 @@
 
 .gms-items-stat--ge {
   border-color: rgba(196, 137, 58, 0.45);
-  background: rgba(72, 52, 28, 0.45);
+  background: color-mix(in srgb, var(--geAccent) 22%, var(--surface2));
 }
 
 .gms-items-stat--ge em {
@@ -1295,7 +1138,7 @@
 
 .gms-items-stat--alch {
   border-color: rgba(80, 140, 110, 0.5);
-  background: rgba(28, 52, 40, 0.55);
+  background: color-mix(in srgb, var(--ok) 22%, var(--surface2));
 }
 
 .gms-items-stat--alch em {
@@ -1303,7 +1146,7 @@
 }
 
 .gms-items-stat--alch strong {
-  color: #9fdcbc;
+  color: var(--ok);
 }
 
 .gms-items-toolbar {
@@ -1318,7 +1161,7 @@
   border: 1px solid var(--border-strong);
   border-radius: 6px;
   overflow: hidden;
-  background: rgba(28, 32, 36, 0.95);
+  background: var(--surface);
 }
 
 .gms-items-mode-btn {
@@ -1326,7 +1169,7 @@
   border: none;
   border-right: 1px solid var(--border-strong);
   background: transparent;
-  color: #a8b0b8;
+  color: var(--muted);
   font: inherit;
   font-size: 0.75rem;
   font-weight: 700;
@@ -1339,7 +1182,7 @@
 }
 
 .gms-items-mode-btn--active {
-  background: rgba(72, 52, 28, 0.85);
+  background: color-mix(in srgb, var(--gold) 26%, var(--surface2));
   color: var(--gold-bright);
 }
 
@@ -1348,7 +1191,7 @@
   appearance: none;
   border: 1px solid var(--border-strong);
   border-radius: 6px;
-  background: rgba(28, 32, 36, 0.95);
+  background: var(--surface);
   color: #e8e4d9;
   font: inherit;
   font-size: 0.82rem;
@@ -1393,7 +1236,7 @@
 }
 
 .gms-page-gap {
-  color: #7a848e;
+  color: var(--dim);
   font-size: 0.8rem;
   padding: 0 0.1rem;
 }
@@ -1431,7 +1274,7 @@
   padding: 0.55rem 0.4rem 0.5rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: rgba(28, 32, 36, 0.96);
+  background: color-mix(in srgb, var(--surface2) 96%, transparent);
   text-align: center;
 }
 
@@ -1485,7 +1328,7 @@
   padding: 0.12rem 0.4rem;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(22, 26, 30, 0.95);
+  background: var(--surface2);
   color: var(--ink);
   font-size: 0.66rem;
   font-weight: 700;
@@ -1508,7 +1351,7 @@
 
 .gms-item-price-badge--qty {
   border-color: rgba(90, 120, 160, 0.45);
-  background: rgba(32, 42, 56, 0.7);
+  background: color-mix(in srgb, var(--pr) 22%, var(--surface2));
 }
 
 .gms-item-price-badge--qty strong {
@@ -1517,7 +1360,7 @@
 
 .gms-item-price-badge--ge {
   border-color: rgba(196, 137, 58, 0.45);
-  background: rgba(72, 52, 28, 0.4);
+  background: color-mix(in srgb, var(--geAccent) 18%, var(--surface2));
 }
 
 .gms-item-price-badge--ge strong {
@@ -1526,16 +1369,16 @@
 
 .gms-item-price-badge--alch {
   border-color: rgba(80, 140, 110, 0.45);
-  background: rgba(28, 52, 40, 0.5);
+  background: color-mix(in srgb, var(--ok) 18%, var(--surface2));
 }
 
 .gms-item-price-badge--alch strong {
-  color: #9fdcbc;
+  color: var(--ok);
 }
 
 .gms-items-empty {
   margin: 1rem 0;
-  color: #7a848e;
+  color: var(--dim);
 }
 
 .gms-item-card {
@@ -1543,7 +1386,7 @@
   flex-direction: column;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: rgba(28, 32, 36, 0.96);
+  background: color-mix(in srgb, var(--surface2) 96%, transparent);
   padding: 0.55rem 0.75rem 0.6rem;
 }
 
@@ -1572,7 +1415,7 @@
   margin: 0;
   flex-shrink: 0;
   margin-left: auto;
-  color: #c8ced4;
+  color: var(--text);
   font-size: 0.78rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -1615,18 +1458,13 @@
 .gms-share-track {
   height: 0.35rem;
   border-radius: 999px;
-  background: #1a1e22;
+  background: var(--bg);
   overflow: hidden;
 }
 
 .gms-share-fill {
   height: 100%;
   border-radius: inherit;
-}
-
-.gms-panel {
-  gap: 0.6rem;
-  padding: 0.85rem;
 }
 
 /* Graphs tab */
@@ -1658,7 +1496,7 @@
   padding: 0.65rem 0.7rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: rgba(12, 14, 16, 0.45);
+  background: color-mix(in srgb, var(--surface2) 45%, transparent);
 }
 
 .gms-settings-section-head {
@@ -1702,7 +1540,7 @@
 
 .gms-settings-subheading {
   margin: 0.35rem 0 0;
-  color: #c8ced4;
+  color: var(--text);
   font-size: 0.8rem;
 }
 
@@ -1718,14 +1556,14 @@
   padding: 0.4rem 0.55rem;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: rgba(40, 45, 50, 0.8);
-  color: #c8ced4;
+  background: var(--surface2);
+  color: var(--text);
   font-size: 0.78rem;
 }
 
 .gms-settings-banner--error {
-  border-color: #6a3a3a;
-  color: #e88a8a;
+  border-color: color-mix(in srgb, var(--emberText) 45%, #000);
+  color: var(--emberText);
 }
 
 .gms-settings-members {
@@ -1749,7 +1587,7 @@
   padding: 0.6rem 0.65rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: rgba(22, 26, 30, 0.9);
+  background: var(--surface2);
 }
 
 .gms-settings-member--add {
@@ -1771,8 +1609,8 @@
   padding: 0.85rem;
   border: 1.5px dashed var(--border-strong);
   border-radius: var(--radius-md);
-  background: rgba(18, 22, 26, 0.45);
-  color: #c8ced4;
+  background: color-mix(in srgb, var(--surface2) 55%, transparent);
+  color: var(--text);
   font: inherit;
   cursor: pointer;
   transition:
@@ -1783,9 +1621,9 @@
 
 .gms-settings-add-card:hover:not(:disabled),
 .gms-settings-add-card:focus-visible {
-  border-color: var(--gold-dim);
-  background: rgba(72, 52, 28, 0.22);
-  color: var(--gold-bright);
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 14%, var(--surface2));
+  color: var(--goldHi);
 }
 
 .gms-settings-add-card:disabled {
@@ -1864,7 +1702,7 @@
   width: 100%;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(40, 45, 50, 0.95);
+  background: var(--raise);
   color: #e8ecef;
   font: inherit;
   font-size: 0.75rem;
@@ -1903,35 +1741,172 @@
   height: 0.95rem;
 }
 
+/* One line, always: four swatches, the custom button and the hex. nowrap over
+   wrap so a tight card shrinks the label rather than dropping the hex below. */
 .gms-settings-color {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  flex-shrink: 0;
-  color: #a8b0b8;
-  font-size: 0.72rem;
+  flex-wrap: nowrap;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* The label is the only part allowed to give way: it does not grow (that was
+   what pushed the swatches to the right edge) and it truncates first if the
+   card gets narrow, so the swatches and hex keep their size. */
+.gms-settings-color-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-right: 2px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.gms-settings-color input[type='color'] {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 1.55rem;
-  height: 1.55rem;
+.gms-swatch {
+  width: 20px;
+  height: 20px;
+  flex: none;
   padding: 0;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: transparent;
+  border: 0;
+  border-radius: 50%;
   cursor: pointer;
 }
 
-.gms-settings-color input[type='color']::-webkit-color-swatch-wrapper {
-  padding: 2px;
+/* Ring drawn with two shadows so it sits outside the dot without changing the
+   layout, the way a border would. */
+.gms-swatch--on {
+  box-shadow:
+    0 0 0 2px var(--surface2),
+    0 0 0 4px var(--gold);
 }
 
-.gms-settings-color input[type='color']::-webkit-color-swatch {
-  border: none;
-  border-radius: 3px;
+.gms-swatch--custom {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: conic-gradient(#e35d6f, #e8c874, #6fb36a, #5b9bd0, #9a7fd0, #e35d6f);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+}
+
+.gms-swatch:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* Pushed to the far end of the row, and never shrunk or wrapped. */
+.gms-settings-hex {
+  flex: none;
+  margin-left: auto;
+  color: var(--dim);
+  font: 11px/1 ui-monospace, Menlo, Consolas, monospace;
+  white-space: nowrap;
+}
+
+/* Portalled to the body and placed from the anchor's rect, so no card, panel
+   or scroll container can paint over it or clip it. */
+.gms-picker {
+  position: fixed;
+  z-index: var(--z-modal);
+  width: 232px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  background: var(--raise);
+  box-shadow: var(--shadow);
+}
+
+/* White to the hue across, black up from the bottom: the standard SV square. */
+.gms-picker-sv {
+  position: relative;
+  height: 140px;
+  border-radius: 6px;
+  cursor: crosshair;
+  touch-action: none;
+  background:
+    linear-gradient(0deg, #000, transparent),
+    linear-gradient(90deg, #fff, transparent),
+    var(--hue);
+}
+
+.gms-picker-hue {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: none;
+  background: linear-gradient(90deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}
+
+.gms-picker-knob {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 1px 3px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+.gms-picker-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gms-picker-preview {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+.gms-picker-hex {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text);
+  font: 12px/1 ui-monospace, Menlo, Consolas, monospace;
+  text-transform: uppercase;
+  outline: none;
+}
+
+.gms-picker-hex:focus {
+  border-color: var(--gold);
+}
+
+.gms-picker-done {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--pillEdge);
+  border-radius: 5px;
+  background: var(--pillA);
+  color: var(--goldInk);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .gms-settings-toggle {
@@ -1957,7 +1932,7 @@
   flex-shrink: 0;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
-  background: rgba(28, 32, 36, 0.95);
+  background: var(--surface);
   cursor: pointer;
   transition:
     background 0.15s ease,
@@ -1980,8 +1955,8 @@
 }
 
 .gms-settings-toggle input[type='checkbox']:checked {
-  border-color: var(--gold-dim);
-  background: rgba(72, 52, 28, 0.9);
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 30%, var(--surface2));
 }
 
 .gms-settings-toggle input[type='checkbox']:checked::after {
@@ -2023,16 +1998,27 @@
   cursor: pointer;
 }
 
+/* Tinted from the accent into the panel surface, so the fill tracks the theme.
+   The fixed browns these replaced stayed dark on parchment, which left a
+   near-black slab with dim gold text on it. */
 .gms-settings-save {
-  border: 1px solid var(--gold-dim);
-  background: rgba(72, 52, 28, 0.85);
-  color: var(--gold-bright);
+  border: 1px solid var(--gold);
+  background: color-mix(in srgb, var(--gold) 22%, var(--surface2));
+  color: var(--goldHi);
+}
+
+.gms-settings-save:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--gold) 32%, var(--surface2));
 }
 
 .gms-settings-danger {
-  border: 1px solid #6a3a3a;
-  background: rgba(60, 28, 28, 0.85);
-  color: #e88a8a;
+  border: 1px solid color-mix(in srgb, var(--emberText) 55%, transparent);
+  background: color-mix(in srgb, var(--emberText) 15%, var(--surface2));
+  color: var(--emberText);
+}
+
+.gms-settings-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--emberText) 25%, var(--surface2));
 }
 
 .gms-settings-save:disabled,
@@ -2060,7 +2046,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 0.75rem;
-  color: #c8ced4;
+  color: var(--text);
   font-size: 0.8rem;
   font-weight: 600;
 }
@@ -2092,7 +2078,7 @@
   padding: 0.45rem 0.55rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: rgba(28, 32, 36, 0.9);
+  background: color-mix(in srgb, var(--surface2) 90%, transparent);
   cursor: pointer;
 }
 
@@ -2104,7 +2090,7 @@
 
 .gms-settings-choice:has(input:checked) {
   border-color: var(--gold-dim);
-  background: rgba(72, 52, 28, 0.35);
+  background: color-mix(in srgb, var(--gold) 24%, var(--surface2));
 }
 
 .gms-settings-choice span {
@@ -2157,14 +2143,14 @@
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--scrim);
 }
 
 .gms-modal {
   width: min(22rem, 100%);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: rgba(22, 26, 30, 0.98);
+  background: var(--surface2);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
 }
 
@@ -2195,7 +2181,7 @@
   padding: 0.4rem 0.5rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(12, 14, 16, 0.85);
+  background: var(--bg);
   color: var(--gold-bright);
   font-size: 0.72rem;
   line-height: 1.35;
@@ -2204,7 +2190,7 @@
 
 .gms-setup-hint {
   margin: 0.35rem 0 0;
-  color: #7a848e;
+  color: var(--dim);
   font-size: 0.7rem;
   line-height: 1.4;
 }
@@ -2221,7 +2207,7 @@
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: #0c0e10;
+  background: var(--bg);
   aspect-ratio: 16 / 9;
 }
 
@@ -2279,7 +2265,7 @@
 
 .gms-modal-copy {
   margin: 0;
-  color: #c8ced4;
+  color: var(--text);
   font-size: 0.85rem;
   line-height: 1.45;
 }
@@ -2308,8 +2294,8 @@
   appearance: none;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(40, 45, 50, 0.95);
-  color: #c8ced4;
+  background: var(--raise);
+  color: var(--text);
   font: inherit;
   font-size: 0.75rem;
   font-weight: 650;
@@ -2337,14 +2323,14 @@
   padding: 0;
   border: 1px solid var(--border-strong);
   border-radius: 6px;
-  background: rgba(40, 45, 50, 0.9);
-  color: #c8ced4;
+  background: var(--raise);
+  color: var(--text);
   cursor: pointer;
 }
 
 .gms-graphs-refresh:hover {
-  border-color: #6a7682;
-  background: rgba(55, 62, 70, 0.95);
+  border-color: var(--dim);
+  background: var(--hover);
   color: var(--ink);
 }
 
@@ -2377,7 +2363,7 @@
   gap: 0.35rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(40, 45, 50, 0.9);
+  background: var(--raise);
   color: var(--ink);
   font: inherit;
   font-size: 0.78rem;
@@ -2466,10 +2452,10 @@
 .gms-chart-tip {
   min-width: 9rem;
   padding: 0.4rem 0.55rem;
-  border: 1px solid #8a7340;
+  border: 1px solid var(--gold);
   border-radius: var(--radius-sm);
-  background: rgba(18, 16, 12, 0.96);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  background: var(--raise);
+  box-shadow: var(--shadow);
   font-size: 0.76rem;
   line-height: 1.35;
 }
@@ -2509,7 +2495,7 @@
 }
 
 .gms-chart-tip-name {
-  color: #c8ced4;
+  color: var(--text);
 }
 
 .gms-chart-tip-value {
@@ -2556,7 +2542,7 @@
   padding: 0.35rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
-  background: rgba(22, 26, 30, 0.98);
+  background: var(--surface2);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
 }
 
@@ -2591,7 +2577,7 @@
   padding: 0.35rem 0.2rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(40, 45, 50, 0.9);
+  background: var(--raise);
   color: var(--ink);
   font: inherit;
   font-size: 0.78rem;
@@ -2629,7 +2615,7 @@
 
 .gms-chart-menu-row:hover,
 .gms-chart-menu-row:focus-visible {
-  background: rgba(52, 58, 64, 0.95);
+  background: var(--line2);
 }
 
 .gms-chart-menu-row-top {
@@ -2745,7 +2731,7 @@
   padding: 0.45rem 0.35rem 0.2rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: rgba(12, 14, 16, 0.55);
+  background: color-mix(in srgb, var(--surface2) 55%, transparent);
 }
 
 .gms-graphs-title {
@@ -2794,7 +2780,7 @@
   padding: 0.28rem 0.55rem;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: rgba(22, 26, 30, 0.9);
+  background: var(--surface2);
   white-space: nowrap;
 }
 
@@ -2808,7 +2794,7 @@
   padding: 0.45rem 0.5rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: rgba(22, 26, 30, 0.9);
+  background: var(--surface2);
 }
 
 .gms-graphs-player-head {
@@ -2865,7 +2851,7 @@
 }
 
 .gms-graphs-skill-name {
-  color: #c8ced4;
+  color: var(--text);
   font-size: 0.72rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2875,7 +2861,7 @@
 .gms-graphs-skill-bar-track {
   height: 8px;
   border-radius: 999px;
-  background: #1a1e22;
+  background: var(--bg);
   overflow: hidden;
 }
 
@@ -2925,7 +2911,7 @@
   appearance: none;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(40, 45, 50, 0.95);
+  background: var(--raise);
   color: var(--ink);
   font: inherit;
   font-size: 0.82rem;
@@ -2937,7 +2923,7 @@
 .gms-panel-field input[type='date'] {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(40, 45, 50, 0.95);
+  background: var(--raise);
   color: var(--ink);
   font: inherit;
   font-size: 0.82rem;
@@ -2959,7 +2945,7 @@
   padding: 0.35rem 0.65rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(40, 45, 50, 0.95);
+  background: var(--raise);
   color: var(--ink);
   font: inherit;
   font-size: 0.82rem;
@@ -3002,7 +2988,7 @@
   list-style: none;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
-  background: rgba(22, 26, 30, 0.98);
+  background: var(--surface2);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
   scrollbar-width: thin;
   scrollbar-color: var(--scroll-thumb) var(--scroll-track);
@@ -3026,7 +3012,7 @@
 }
 
 .gms-iconselect-option--active {
-  background: rgba(52, 58, 64, 0.95);
+  background: var(--line2);
 }
 
 .gms-iconselect-option--selected {
@@ -3081,7 +3067,7 @@
   padding: 0.22rem 0.5rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: rgba(12, 14, 16, 0.55);
+  background: color-mix(in srgb, var(--surface2) 55%, transparent);
   font-size: 0.74rem;
   font-variant-numeric: tabular-nums;
 }
@@ -3107,7 +3093,7 @@
   padding-right: 0.2rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: rgba(12, 14, 16, 0.55);
+  background: color-mix(in srgb, var(--surface2) 55%, transparent);
   scrollbar-width: thin;
   scrollbar-color: var(--scroll-thumb) var(--scroll-track);
 }
@@ -3119,7 +3105,7 @@
 }
 
 .gms-panel-status--error {
-  color: #e88a8a;
+  color: var(--emberText);
 }
 
 .gms-panel-list {
@@ -3152,7 +3138,7 @@
 }
 
 .gms-ledger-summary-in {
-  color: #6fc27a;
+  color: var(--ok);
 }
 
 .gms-ledger-summary-out {
@@ -3192,7 +3178,7 @@
   top: 0;
   z-index: 1;
   border-bottom: 1px solid var(--border-strong);
-  background: #14171a;
+  background: var(--surface2);
   color: var(--muted);
   font-size: 0.7rem;
   font-weight: 700;
@@ -3225,7 +3211,7 @@
 }
 
 .gms-ledger-item {
-  color: #c8ced4;
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3242,7 +3228,7 @@
 }
 
 .gms-ledger-row--in .gms-ledger-delta {
-  color: #6fc27a;
+  color: var(--ok);
 }
 
 .gms-ledger-row--out .gms-ledger-delta {
@@ -3269,7 +3255,7 @@
 .gms-panel-day-all {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(40, 45, 50, 0.9);
+  background: var(--raise);
   color: var(--ink);
   font: inherit;
   font-size: 0.78rem;
@@ -3316,7 +3302,7 @@
   padding: 0.32rem 0.9rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(40, 45, 50, 0.9);
+  background: var(--raise);
   color: var(--ink);
   font: inherit;
   font-size: 0.8rem;
@@ -3325,8 +3311,8 @@
 }
 
 .gms-panel-more:hover:not(:disabled) {
-  border-color: #6a7682;
-  background: rgba(55, 62, 70, 0.95);
+  border-color: var(--dim);
+  background: var(--hover);
 }
 
 .gms-panel-more:disabled {
@@ -3362,7 +3348,7 @@
 }
 
 .gms-ach-card--drop {
-  border-left-color: #6fc27a;
+  border-left-color: var(--ok);
 }
 
 .gms-ach-card--quest {
@@ -3447,7 +3433,7 @@
   padding: 0;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(12, 14, 16, 0.75);
+  background: color-mix(in srgb, var(--surface2) 75%, transparent);
   cursor: pointer;
   line-height: 0;
 }
@@ -3508,7 +3494,7 @@
 .gms-ach-download {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(40, 45, 50, 0.9);
+  background: var(--raise);
   color: var(--ink);
   font: inherit;
   font-size: 0.8rem;
@@ -3573,7 +3559,7 @@
   height: 2rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(40, 45, 50, 0.95);
+  background: var(--raise);
   color: var(--ink);
   font: inherit;
   font-size: 0.8rem;
@@ -3589,8 +3575,8 @@
 
 .gms-quests-select {
   padding-right: 1.6rem;
-  background-image: linear-gradient(45deg, transparent 50%, #8a939c 50%),
-    linear-gradient(135deg, #8a939c 50%, transparent 50%);
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
   background-position:
     calc(100% - 0.9rem) 55%,
     calc(100% - 0.6rem) 55%;
@@ -3619,7 +3605,7 @@
   display: inline-flex;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(24, 28, 32, 0.9);
+  background: color-mix(in srgb, var(--surface2) 90%, transparent);
   overflow: hidden;
 }
 
@@ -3632,7 +3618,7 @@
   border: none;
   border-right: 1px solid var(--border-strong);
   background: transparent;
-  color: #a8b0b8;
+  color: var(--muted);
   font: inherit;
   font-size: 0.76rem;
   font-weight: 600;
@@ -3649,24 +3635,24 @@
 }
 
 .gms-quests-seg[aria-pressed='true'] {
-  background: rgba(72, 52, 28, 0.85);
+  background: color-mix(in srgb, var(--gold) 26%, var(--surface2));
   color: var(--gold-bright);
 }
 
 .gms-quests-seg--finished[aria-pressed='true'] {
-  background: rgba(28, 52, 40, 0.8);
-  color: #9fdcbc;
+  background: color-mix(in srgb, var(--ok) 26%, var(--surface2));
+  color: var(--ok);
 }
 
 .gms-quests-seg--started[aria-pressed='true'] {
-  background: rgba(64, 50, 20, 0.85);
+  background: color-mix(in srgb, var(--sm) 26%, var(--surface2));
   color: #e0b352;
 }
 
 .gms-quests-seg-count {
   padding: 0 0.38rem;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.4);
+  background: color-mix(in srgb, var(--surface2) 70%, transparent);
   font-size: 0.68rem;
   font-variant-numeric: tabular-nums;
 }
@@ -3706,7 +3692,7 @@
   z-index: 1;
   padding: 0.45rem 0.6rem;
   border-bottom: 1px solid var(--border-strong);
-  background: rgba(22, 26, 30, 0.98);
+  background: var(--surface2);
   color: var(--muted);
   font-size: 0.7rem;
   font-weight: 700;
@@ -3801,7 +3787,7 @@
 }
 
 .gms-quests-row--finished .gms-quests-name-text {
-  color: #9fdcbc;
+  color: var(--ok);
 }
 
 .gms-quests-tag {
@@ -3854,7 +3840,7 @@
 }
 
 .gms-quests-mark--not_started {
-  color: #3f464d;
+  color: var(--dim);
 }
 
 .gms-quests-cell--finished {
@@ -3886,8 +3872,8 @@
   height: 1.7rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(40, 45, 50, 0.95);
-  color: #a8b0b8;
+  background: var(--raise);
+  color: var(--muted);
   cursor: pointer;
 }
 
@@ -3914,7 +3900,7 @@
   padding: 0.45rem 0.55rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(24, 28, 32, 0.98);
+  background: color-mix(in srgb, var(--raise) 98%, transparent);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
@@ -3946,7 +3932,7 @@
   height: 13px;
   border: 1px solid var(--border-strong);
   border-radius: 2px;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--bg);
   color: var(--gold-bright);
   font-size: 10px;
   line-height: 1;
@@ -3963,14 +3949,14 @@
   height: 1.7rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: rgba(40, 45, 50, 0.95);
+  background: var(--raise);
   color: var(--ink);
   font: inherit;
   font-size: 0.74rem;
   font-weight: 600;
   padding: 0 1.4rem 0 0.5rem;
-  background-image: linear-gradient(45deg, transparent 50%, #8a939c 50%),
-    linear-gradient(135deg, #8a939c 50%, transparent 50%);
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
   background-position:
     calc(100% - 0.8rem) 55%,
     calc(100% - 0.55rem) 55%;
@@ -3992,7 +3978,7 @@
   padding: 0.2rem 0.35rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.3);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
   list-style: none;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -4074,93 +4060,55 @@
 }
 
 /* —— Responsive —— */
-/* Stacked mode: the member cards can't sit beside a panel, so they move to
-   their own Profile tab and everything else spans the viewport. Driven by a
-   class rather than a breakpoint because whether they fit depends on how many
-   members the group has and how tall the window is. */
-.gms-overlay--stacked .gms-chrome {
-  left: 50%;
-  right: auto;
-  width: min(920px, calc(100vw - 1.5rem));
-  transform: translateX(-50%);
+/* Below 720px the shell gives up its fixed-height, no-scroll model: the page
+   scrolls normally, the members column sits above the content and panels grow
+   to fit their body instead of clipping it. */
+.gms--stacked {
+  height: auto;
+  min-height: 100vh;
+  overflow: visible;
 }
 
-.gms-overlay--stacked .gms-players {
-  display: none;
+.gms--stacked .gms-row {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  padding: 10px;
 }
 
-.gms-overlay--stacked.gms-overlay--players .gms-players {
-  display: flex;
-  position: absolute;
-  top: calc(var(--gms-chrome-h, 4.5rem) + 1rem);
-  right: 0.75rem;
-  bottom: 0.75rem;
-  left: 0.75rem;
+/* Content first, members underneath: on a phone the page opens on whatever
+   page you picked rather than on a column of cards you have to scroll past. */
+.gms--stacked .gms-main {
+  order: 1;
+  flex: 1 1 100%;
+  min-width: 0;
+  overflow: visible;
+}
+
+.gms--stacked .gms-players {
+  order: 2;
+  flex: 1 1 100%;
   width: auto;
   max-height: none;
-  flex-direction: column;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: visible;
 }
 
-.gms-overlay--stacked .gms-player {
+.gms--stacked .gms-player {
   flex: 0 0 auto;
 }
 
-.gms-overlay--stacked .gms-panel,
-.gms-overlay--stacked .gms-items,
-.gms-overlay--stacked .gms-settings {
-  top: calc(var(--gms-chrome-h, 4.5rem) + 1rem);
-  right: 0.75rem;
-  bottom: 0.75rem;
-  left: 0.75rem;
-  height: auto;
+.gms--stacked .gms-items,
+.gms--stacked .gms-panel,
+.gms--stacked .gms-settings {
+  flex: 0 0 auto;
+  min-height: 60vh;
+}
+
+.gms--stacked .gms-panel-body,
+.gms--stacked .gms-settings {
+  overflow: visible;
 }
 
 @media (max-width: 720px) {
-  .gms-chrome {
-    top: 0.5rem;
-  }
-
-  .gms-toolbar {
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 0.4rem;
-  }
-
-  .gms-group-identity {
-    flex: 0 1 auto;
-    width: auto;
-    justify-content: flex-start;
-    margin-right: 0;
-    min-width: 0;
-  }
-
-  .gms-group-name {
-    max-width: 7rem;
-    text-align: left;
-  }
-
-  .gms-tabs {
-    flex: 1 1 0;
-    justify-content: flex-start;
-  }
-
-  .gms-player-nav {
-    justify-content: flex-start;
-    overflow-x: auto;
-    flex-wrap: nowrap;
-  }
-
-  .gms-overlay--players .gms-player {
-    scroll-snap-align: start;
-  }
-
-  .gms-player {
-    flex: 0 0 240px;
-  }
-
   /* Narrow panel: let the timestamp drop under the text instead of squeezing it. */
   .gms-ach-card {
     grid-template-columns: 26px minmax(0, 1fr) auto;
@@ -4190,24 +4138,23 @@
     flex: 0 0 auto;
   }
 
-  .gms-player-nav-btn {
+  .gms-map-chips-bar {
+    justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+
+  .gms-map-chip {
     flex: 0 0 auto;
     max-width: 11rem;
     min-width: 0;
   }
 
-  .gms-player-nav-name {
+  .gms-map-chip-name {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .gms-player-nav-dot,
-  .gms-player-nav-avatar,
-  .gms-player-nav-offline,
-  .gms-player-nav-lobby {
-    flex: 0 0 auto;
   }
 
   /* Every panel header becomes the same two-column grid so the filters line
@@ -4370,12 +4317,8 @@
     min-width: 0;
   }
 
-  .gms-overlay--stacked.gms-overlay--players .gms-players,
-  .gms-overlay--stacked .gms-panel,
-  .gms-overlay--stacked .gms-items,
-  .gms-overlay--stacked .gms-settings {
-    right: 0.5rem;
-    left: 0.5rem;
+  .gms--stacked .gms-row {
+    padding: 8px;
   }
 }
 
@@ -4482,7 +4425,7 @@
     padding: 0.1rem 0.4rem 0.1rem 0.25rem;
     border: 0;
     border-radius: 999px;
-    background: rgba(0, 0, 0, 0.28);
+    background: color-mix(in srgb, var(--bg) 45%, transparent);
     line-height: 1.3;
   }
 
@@ -4612,4 +4555,117 @@
   100% {
     opacity: 0;
   }
+}
+
+/* ——— Design-system typography ———
+   Headings use the display face; micro labels are the uppercase tracked
+   style the design uses for section labels. Applied here as a sweep so every
+   screen picks it up ahead of its individual restyle. */
+.gms-items-title,
+.gms-panel-title,
+.gms-player-panel-title,
+.gms-graphs-title,
+.gms-quests-heading,
+.gms-settings-title,
+.gms-settings-heading,
+.gms-pq-heading,
+.gms-items-heading h2,
+.gms-modal-head h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+
+.gms-items-title,
+.gms-settings-title,
+.gms-graphs-title {
+  font-size: var(--fs-h1);
+}
+
+.gms-panel-title,
+.gms-player-panel-title,
+.gms-quests-heading,
+.gms-modal-head h3 {
+  font-size: var(--fs-h2);
+}
+
+.gms-settings-heading,
+.gms-pq-heading {
+  font-size: var(--fs-h3);
+}
+
+/* ——— Members column header ——— */
+.gms-members-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.1rem;
+}
+
+.gms-members-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.gms-members-toggle {
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.gms-members-toggle:hover {
+  color: var(--goldHi);
+  border-color: var(--gold);
+}
+
+/* Collapsed: cards shrink to a column of circular avatars. */
+.gms-players--collapsed {
+  width: 64px;
+  --gms-sidebar-w: 64px;
+}
+
+.gms-players--collapsed .gms-members-label {
+  display: none;
+}
+
+.gms-players--collapsed .gms-player {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.gms-players--collapsed .gms-player > *:not(.gms-player-head),
+.gms-players--collapsed .gms-player-head > *:not(.gms-player-avatar) {
+  display: none;
+}
+
+.gms-players--collapsed .gms-player-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-pill);
 }

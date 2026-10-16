@@ -10,3 +10,12 @@ coverage
 *.tsbuildinfo
 apps/api/data/store.json
 /.idea
+
+# Refreshed from the wiki feed at runtime; not source.
+apps/api/data/ge-prices.json
+
+# Asset name tables cached from OpenRS2 while generating catalogues.
+apps/api/tools/.cache-names/
+
+# Item icons fetched on demand from the renderer and held locally.
+apps/api/data/.icon-cache/

@@ -1,7 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import type { AppearanceTheme } from '../api/groupClient';
-import { Rs3Frame } from './GroupMapShell/Rs3Frame';
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), ' +
@@ -16,7 +14,6 @@ type ModalProps = {
   children: ReactNode;
   /** Extra class on the dialog frame (e.g. `gms-modal--setup`). */
   className?: string;
-  appearance?: AppearanceTheme;
   /** Ignore Escape / backdrop / close button (e.g. while saving). */
   closeDisabled?: boolean;
 };
@@ -28,7 +25,7 @@ function focusables(root: HTMLElement) {
 }
 
 /**
- * Accessible dialog: portaled backdrop + Rs3Frame chrome. Handles Escape,
+ * Accessible dialog: portaled backdrop. Handles Escape,
  * initial focus, focus restore on close and a Tab focus trap.
  */
 export function Modal({
@@ -38,7 +35,6 @@ export function Modal({
   title,
   children,
   className,
-  appearance = 'modern',
   closeDisabled = false,
 }: ModalProps) {
   const frameRef = useRef<HTMLDivElement>(null);
@@ -99,37 +95,33 @@ export function Modal({
   return createPortal(
     <div
       className="gms-modal-backdrop"
-      data-appearance={appearance}
       role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !closeDisabled) onClose();
       }}
     >
-      <Rs3Frame
+      <div
         ref={frameRef}
-        appearance={appearance}
         className={frameClass}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        header={
-          <header className="gms-modal-head">
-            <h3 id={titleId}>{title}</h3>
-            <button
-              type="button"
-              className="gms-modal-close"
-              aria-label="Close"
-              disabled={closeDisabled}
-              onClick={onClose}
-            >
-              ×
-            </button>
-          </header>
-        }
       >
+        <header className="gms-modal-head">
+          <h3 id={titleId}>{title}</h3>
+          <button
+            type="button"
+            className="gms-modal-close"
+            aria-label="Close"
+            disabled={closeDisabled}
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </header>
         {children}
-      </Rs3Frame>
+      </div>
     </div>,
     document.body,
   );

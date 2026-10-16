@@ -22,6 +22,47 @@ export function dayBounds(day: string): { from: string; to: string } | null {
   };
 }
 
+const FULL_DATE = new Intl.DateTimeFormat(undefined, {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+});
+
+/**
+ * Sticky day-header label. Today and yesterday keep their date alongside the
+ * word, so a header is never ambiguous once it has scrolled away from the
+ * picker: "Today · 16 Oct 2026", else "14 Oct 2026".
+ */
+export function dayLabel(iso: string, now = new Date()): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return '';
+  const day = toDayInput(at);
+  const date = FULL_DATE.format(at);
+  if (day === toDayInput(now)) return `Today · ${date}`;
+  if (day === shiftDay(toDayInput(now), -1)) return `Yesterday · ${date}`;
+  return date;
+}
+
+/** `day` is whatever the calendar last picked; the rest are rolling windows. */
+export type DateRange = '24h' | 'today' | '30d' | 'all' | 'day';
+
+export const DATE_RANGES: DateRange[] = ['24h', 'today', '30d', 'all', 'day'];
+
+const DAY_MS = 86_400_000;
+
+/** Instants a range covers, or null for everything. */
+export function rangeBounds(
+  range: DateRange,
+  day: string,
+  today: string,
+): { from: string; to?: string } | null {
+  if (range === 'all') return null;
+  if (range === 'today') return dayBounds(today);
+  if (range === 'day') return day ? dayBounds(day) : null;
+  const span = range === '24h' ? DAY_MS : 30 * DAY_MS;
+  return { from: new Date(Date.now() - span).toISOString() };
+}
+
 /** Move a `YYYY-MM-DD` value by whole days, rolling months/years correctly. */
 export function shiftDay(day: string, days: number): string {
   const [y, m, d] = day.split('-').map(Number);

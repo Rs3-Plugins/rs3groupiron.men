@@ -1,16 +1,9 @@
-import { readAppearance } from '../lib/appearance';
-
 const CARDS = [0, 1, 2, 3, 4];
 const TABS = [0, 1, 2, 3, 4, 5];
 
 export function GroupSkeleton() {
   return (
-    <div
-      className="skel-shell"
-      data-appearance={readAppearance()}
-      role="status"
-      aria-busy="true"
-    >
+    <div className="skel-shell" role="status" aria-busy="true">
       <span className="sr-only">Loading group…</span>
 
       <div className="skel-chrome" aria-hidden>

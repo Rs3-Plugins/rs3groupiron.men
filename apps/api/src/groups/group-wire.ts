@@ -7,9 +7,11 @@
  * mapping is written out rather than derived from the models.
  */
 import type { Member, MemberSkill } from '@prisma/client';
+import { isFullScope, type ShareScope } from './group-access.service';
 import { SHARED_MEMBER } from './group.types';
 import {
   WIRE_INVENTORIES,
+  WORLD_STAT_INDEX,
   rowsToPairs,
   statsFromArray,
   statsToArray,
@@ -168,7 +170,7 @@ export function toSharedWireMember(
     use_discord_avatar: false,
     online: false,
     last_updated: updatedAt.toISOString(),
-    stats: statsToArray({ ...statsFromArray([]), world: 0 }),
+    stats: statsToArray({ ...statsFromArray([]), world: 0, weight: 0 }),
     coordinates: [0, 0, 0],
     ...inventoriesToWire(inventories),
     skills: skillsToWire([]),
@@ -180,3 +182,31 @@ export type WireEntry =
   | { name: string }
   | ReturnType<typeof toWireMember>
   | ReturnType<typeof toPartialWireMember>;
+
+export function redactWireEntries(
+  entries: WireEntry[],
+  scope: ShareScope,
+): WireEntry[] {
+  if (isFullScope(scope)) return entries;
+  return entries.map((entry) => {
+    if (!('last_updated' in entry)) return entry;
+    const hidden: Record<string, unknown> = {};
+    if (!scope.map) {
+      hidden.coordinates = [];
+      hidden.target = undefined;
+      if (Array.isArray(entry.stats)) {
+        const stats = [...(entry.stats as number[])];
+        stats[WORLD_STAT_INDEX] = 0;
+        hidden.stats = stats;
+      }
+    }
+    if (!scope.items && 'bank' in entry) {
+      hidden.inventory = [];
+      hidden.bank = [];
+      hidden.equipment = [];
+      hidden.inventories = undefined;
+    }
+    if (!scope.skills && 'skills' in entry) hidden.skills = {};
+    return { ...entry, ...hidden };
+  });
+}

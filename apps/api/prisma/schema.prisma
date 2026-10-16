@@ -20,15 +20,42 @@ model Group {
   /// Coin value at or above which a drop is announced even when the item is
   /// not listed. 0 leaves the lists in sole charge.
   dropThreshold Int            @default(20000000) @map("drop_threshold")
+  visibility  GroupVisibility  @default(private)
+  publicMap          Boolean @default(false) @map("public_map")
+  publicSkills       Boolean @default(true) @map("public_skills")
+  publicItems        Boolean @default(true) @map("public_items")
+  publicQuests       Boolean @default(true) @map("public_quests")
+  publicAchievements Boolean @default(true) @map("public_achievements")
+  viewsTotal  Int              @default(0) @map("views_total")
   createdAt   DateTime         @default(now()) @map("created_at")
   members     Member[]
+  viewDays    GroupViewDay[]
   /// Group-owned inventories, i.e. the shared bank.
   inventories GroupInventory[]
   sharedBankEntries SharedBankEntry[]
   achievements Achievement[]
   rareItems   GroupRareItem[]
 
+  @@index([visibility, nameKey])
   @@map("groups")
+}
+
+enum GroupVisibility {
+  private
+  public
+}
+
+model GroupViewDay {
+  id      String   @id @default(cuid())
+  groupId String   @map("group_id")
+  day     DateTime @db.Date
+  views   Int      @default(0)
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, day])
+  @@index([day])
+  @@map("group_view_days")
 }
 
 /**
@@ -41,6 +68,11 @@ model GroupRareItem {
   groupId   String   @map("group_id")
   itemId    Int      @map("item_id")
   include   Boolean  @default(true)
+  /// Only announce a drop of this item when the stack falls in [minQty, maxQty].
+  /// Null is open-ended, so both null means any amount. Only meaningful on an
+  /// included row: an excluded item is silent at every size.
+  minQty    Int?     @map("min_qty")
+  maxQty    Int?     @map("max_qty")
   createdAt DateTime @default(now()) @map("created_at")
 
   group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
@@ -72,6 +104,10 @@ model Achievement {
   skillId    String?         @map("skill_id")
   /// Item id for drops.
   itemId     Int?            @map("item_id")
+  /// Stack size for drops, so the feed can draw the item the way the game
+  /// does. Null for anything that is not a drop, or a drop from before this
+  /// was stored; the title still carries "xN" for the reader.
+  quantity   Int?
   /// RS3 gameval name for quests/diaries (e.g. quest_cooks_assistant).
   /// Stored instead of the cache id because names survive renumbering.
   gameval    String?
@@ -157,6 +193,9 @@ model Member {
   prayerMax     Int @default(0) @map("prayer_max")
   summonCurrent Int @default(0) @map("summon_current")
   summonMax     Int @default(0) @map("summon_max")
+  /// Carried weight in kilograms, as the game shows it. Float because it has a
+  /// decimal, and signed because weight-reducing gear takes it below zero.
+  weight        Float @default(0)
   world         Int @default(0)
   x     Int @default(0)
   y     Int @default(0)

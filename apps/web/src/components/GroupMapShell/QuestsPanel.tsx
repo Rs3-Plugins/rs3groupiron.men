@@ -13,10 +13,10 @@ import {
   type QuestDef,
   type QuestState,
 } from '../../lib/quests';
-import { IconSelect } from './IconSelect';
-import { memberOptions, type MemberBadge } from './memberOptions';
+import { colorForName } from '../../lib/items';
+import type { MemberBadge } from './memberOptions';
 import { PanelStatus } from './PanelChrome';
-import { SearchField } from './SearchField';
+import { Segmented } from './Segmented';
 import { WikiIcon } from './icons';
 
 type Progress = 'all' | 'finished' | 'started' | 'not_started';
@@ -71,11 +71,11 @@ export function QuestsPanel({
   error = null,
 }: QuestsPanelProps) {
   const [query, setQuery] = useUrlText('q');
-  const [memberFilter, setMemberFilter] = useUrlState('member', 'all');
+  const [memberFilter] = useUrlState('member', 'all');
   const [progress, setProgress] = useUrlState<Progress>('progress', 'all', {
     allowed: PROGRESS_VALUES,
   });
-  const [category, setCategory] = useUrlState<QuestCategory | 'all'>('category', 'quest', {
+  const [category] = useUrlState<QuestCategory | 'all'>('category', 'quest', {
     allowed: CATEGORY_VALUES,
   });
 
@@ -85,10 +85,10 @@ export function QuestsPanel({
     [memberNames, memberFilter],
   );
 
-  const memberChoices = useMemo(
-    () => memberOptions(memberNames, members),
-    [memberNames, members],
-  );
+  const colorOf = useMemo(() => {
+    const byName = new Map(members.map((m) => [m.name, m.color]));
+    return (name: string) => byName.get(name) ?? colorForName(name);
+  }, [members]);
 
   const pool = useMemo(() => questsInCategory(category), [category]);
   const poolPoints = useMemo(() => pool.reduce((sum, q) => sum + q.questPoints, 0), [pool]);
@@ -136,64 +136,42 @@ export function QuestsPanel({
     <section className="gms-quests gms-panel" aria-label="Group quests" aria-busy={loading}>
       <header className="gms-quests-head">
         <div className="gms-quests-heading">
-          <h2 className="gms-panel-title">Quests</h2>
-          <p className="gms-quests-subtitle">
+          <h1 className="gms-page-title">Quests</h1>
+          <span className="gms-panel-sub">
             {pool.length} {typeLabel}
             {poolPoints > 0 ? ` · ${poolPoints} quest points` : ''}
-          </p>
+          </span>
         </div>
-        <div className="gms-quests-controls">
-          <SearchField
-            className="gms-quests-search"
-            label="Search quests"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <select
-            className="gms-quests-select"
-            aria-label="Quest type"
-            value={category}
-            onChange={(e) => setCategory(e.target.value as QuestCategory | 'all')}
-          >
-            {QUEST_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {QUEST_CATEGORY_LABEL[c]}
-              </option>
-            ))}
-            <option value="all">Everything</option>
-          </select>
-          <IconSelect
-            label="Member"
-            hideLabel
-            value={memberFilter}
-            options={memberChoices}
-            onChange={setMemberFilter}
-          />
-        </div>
+        <input
+          className="gms-input gms-quests-search"
+          value={query}
+          placeholder="Search quests"
+          aria-label="Search quests"
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </header>
 
       <div className="gms-quests-filters">
-        <div className="gms-quests-segmented" role="group" aria-label="Filter by progress">
-          {PROGRESS.map(({ key, label, groupHint }) => (
-            <button
-              key={key}
-              type="button"
-              className={`gms-quests-seg gms-quests-seg--${key}`}
-              aria-pressed={progress === key}
-              title={singleMember ? undefined : groupHint}
-              onClick={() => setProgress(key)}
-            >
-              {label}
-              <span className="gms-quests-seg-count">{progressCounts[key]}</span>
-            </button>
-          ))}
-        </div>
+        <Segmented
+          ariaLabel="Filter by progress"
+          value={progress}
+          options={PROGRESS.map(({ key, label, groupHint }) => ({
+            id: key,
+            label,
+            count: progressCounts[key],
+            title: singleMember ? undefined : groupHint,
+          }))}
+          onChange={setProgress}
+        />
         <ul className="gms-quests-legend" aria-hidden>
           <li>
             <Mark state="finished" /> Finished
           </li>
           <li>
             <Mark state="started" /> In progress
+          </li>
+          <li>
+            <Mark state={null} /> Not started
           </li>
         </ul>
       </div>
@@ -220,6 +198,11 @@ export function QuestsPanel({
                   return (
                     <th key={name} scope="col" className="gms-quests-th gms-quests-th--member">
                       <span className="gms-quests-th-name" title={name}>
+                        <span
+                          className="gms-dot"
+                          style={{ background: colorOf(name) }}
+                          aria-hidden
+                        />
                         {name}
                       </span>
                       <span

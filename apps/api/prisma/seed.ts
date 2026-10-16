@@ -47,6 +47,7 @@ function stats(statsArr: number[] | undefined) {
     summonCurrent: statsArr?.[4] ?? 0,
     summonMax: statsArr?.[5] ?? 0,
     world: statsArr?.[6] ?? 0,
+    weight: statsArr?.[7] ?? 0,
   };
 }
 

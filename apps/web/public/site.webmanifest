@@ -1,11 +1,15 @@
 {
   "name": "RS3 Group Ironman",
   "short_name": "RS3 GIM",
-  "description": "Track your RuneScape 3 Group Ironman: live map, shared bank, skills and XP graphs.",
+  "description": "Group Ironman tracker for RuneScape 3. Live member stats, shared bank, quests, achievements, rare drops, map and XP graphs for your whole group.",
+  "lang": "en-GB",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#14171a",
-  "theme_color": "#1c2024",
+  "orientation": "any",
+  "background_color": "#0d0d0d",
+  "theme_color": "#0d0d0d",
+  "categories": ["games", "utilities"],
   "icons": [
     {
       "src": "/icon-192.png",
@@ -28,6 +32,18 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Open my group",
+      "short_name": "My group",
+      "url": "/group"
+    },
+    {
+      "name": "Try the demo",
+      "short_name": "Demo",
+      "url": "/demo"
     }
   ]
 }

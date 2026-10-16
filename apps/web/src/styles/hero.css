@@ -1,0 +1,898 @@
+/*
+ * The four pre-app screens: landing, login, create group and group created.
+ *
+ * From the handoff's 01-landing / 02-login / 03-create-group / 04-group-created.
+ * One rule runs through all of them: the backdrop is always the dark theme
+ * (`heroVars` in the prototype is `THEMES.dark` whatever the user picked), and
+ * only the form card follows the chosen theme — hence `.theme-dark` on the
+ * shell and the resolved theme class on `.hero-card`.
+ */
+
+.hero {
+  /* Hero chrome sits on the dark backdrop in both themes; only the card flips. */
+  --heroBtnLine: #3b3428;
+  --heroBtnBg: color-mix(in srgb, #151514 85%, transparent);
+  --heroBtnInk: #ece6d6;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+}
+
+.hero--light {
+  --heroBtnLine: #a5926a;
+  --heroBtnBg: rgba(236, 229, 214, 0.95);
+  --heroBtnInk: #1c1912;
+}
+
+/* Inset so the blur has material to pull from instead of fading at the edges. */
+.hero-bg {
+  position: absolute;
+  inset: -30px;
+  z-index: 0;
+  pointer-events: none;
+  filter: blur(5px) saturate(0.85);
+}
+
+.hero-bg-canvas,
+.hero-bg-canvas.rs3-map {
+  width: 100%;
+  height: 100% !important; /* overrides Rs3Map's inline height */
+  min-height: 100vh;
+  cursor: default;
+  /* Mounts after first paint (lazy Leaflet chunk), so ease it in rather than pop. */
+  animation: hero-fade-in 450ms ease-out both;
+}
+
+.hero-bg .leaflet-control-container {
+  display: none !important; /* Leaflet injects its own rules */
+}
+
+.hero-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: var(--heroVeil);
+}
+
+.hero-top {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px;
+}
+
+.hero-top--split {
+  justify-content: space-between;
+}
+
+.hero-top .hero-back {
+  margin-bottom: 0;
+}
+
+.hero-main {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+}
+
+/* ——— Landing ——— */
+
+.hero-hello {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+}
+
+.hero-logo {
+  width: clamp(110px, 14vw, 150px);
+  height: auto;
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.55));
+}
+
+/* The negative margin cancels the trailing letter-space so the word stays centred. */
+.hero-kicker {
+  margin: 6px -0.5em -8px 0;
+  color: var(--gold);
+  font: 400 clamp(14px, 1.8vw, 18px) / 1 var(--font-display);
+  letter-spacing: 0.5em;
+}
+
+.hero-wordmark {
+  font: 400 clamp(28px, 4vw, 40px) / 1 var(--font-display);
+  color: var(--text);
+}
+
+.hero-wordmark em {
+  color: var(--goldHi);
+  font-style: normal;
+}
+
+/* The visible wordmark is decorative; the real h1 stays for screen readers. */
+.hero-h1 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.hero-rule {
+  width: 220px;
+  height: 5px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--band) 0 1px,
+    transparent 1px 7px
+  );
+  mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+}
+
+.hero-tagline {
+  margin: 0;
+  font-size: 18px;
+  color: var(--muted);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.hero-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 18px;
+}
+
+.hero-links a {
+  color: var(--goldLink);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.hero-links a:hover {
+  color: var(--goldHi);
+}
+
+/* ——— Buttons ——— */
+
+.hero-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 24px;
+  border: 1px solid var(--heroBtnLine);
+  border-radius: 6px;
+  background: var(--heroBtnBg);
+  color: var(--heroBtnInk);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.hero-btn:hover {
+  border-color: var(--gold);
+}
+
+.hero-btn--primary {
+  border-color: var(--pillEdge);
+  background: var(--pillA);
+  color: var(--goldInk);
+  font-weight: 600;
+}
+
+.hero-btn--small {
+  height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.hero-btn--icon {
+  gap: 6px;
+}
+
+.hero-btn--icon svg {
+  flex: none;
+}
+
+/* ——— Login / create column ——— */
+
+.hero-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 400px;
+}
+
+.hero-col--wide {
+  max-width: 560px;
+}
+
+.hero-back {
+  align-self: flex-start;
+  margin-bottom: 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.hero-back:hover {
+  color: var(--text);
+}
+
+.hero-brand {
+  font: 400 22px/1.1 var(--font-display);
+  color: var(--goldHi);
+}
+
+.hero-title {
+  margin: 0;
+  font: 400 34px/1.1 var(--font-display);
+  color: var(--text);
+}
+
+.hero-lead {
+  margin: 4px 0 14px;
+  color: var(--muted);
+}
+
+.hero-foot {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.hero-foot a {
+  color: var(--goldLink);
+}
+
+/* ——— Form card ——— */
+
+.hero-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(6px);
+  color: var(--text);
+}
+
+.hero-card h1 {
+  margin: 0;
+  font: 400 30px/1.1 var(--font-display);
+  color: var(--text);
+}
+
+/* Sits directly under the card's own heading, so it tucks up against it. */
+.hero-card-lead {
+  margin: -6px 0 0;
+  color: var(--muted);
+}
+
+.hero-card-lead strong {
+  color: var(--text);
+}
+
+.hero-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.hero-field--grow {
+  flex: 1 1 240px;
+}
+
+.hero-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.hero-input input {
+  width: 100%;
+  height: 46px;
+  box-sizing: border-box;
+  padding: 0 64px 0 14px;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0;
+  outline: none;
+}
+
+.hero-input input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--band);
+}
+
+.hero-count {
+  position: absolute;
+  right: 12px;
+  color: var(--dim);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  pointer-events: none;
+}
+
+.hero-reveal {
+  position: absolute;
+  right: 8px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.hero-reveal:hover {
+  color: var(--text);
+}
+
+.hero-hint {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+.hero-error {
+  margin: -6px 0 0;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--emberText);
+}
+
+/*
+ * The submit reads as inert until the form is valid, so the page answers
+ * "what is missing?" before it answers "did that work?".
+ */
+.hero-submit {
+  height: 46px;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  background: var(--surface2);
+  color: var(--dim);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: default;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.hero-submit--ready {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 28%, var(--surface2));
+  color: var(--text);
+  cursor: pointer;
+}
+
+.hero-submit:disabled {
+  cursor: default;
+}
+
+/* ——— Create group ——— */
+
+.hero-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hero-seg {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line2);
+  border-radius: 7px;
+  background: var(--bg);
+}
+
+.hero-seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hero-seg button img {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  object-fit: contain;
+}
+
+.hero-seg button[aria-checked='true'] {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 22%, var(--surface2));
+  color: var(--text);
+}
+
+.hero-sizes {
+  display: flex;
+  gap: 8px;
+}
+
+.hero-size {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hero-size[aria-checked='true'] {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 26%, var(--surface2));
+}
+
+.hero-players {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+
+/* ——— Visibility ——— */
+
+.hero-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.hero-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line2);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hero-choice--active {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 16%, var(--surface2));
+}
+
+.hero-choice-radio {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 3px;
+  border: 1px solid var(--line2);
+  border-radius: 50%;
+  background: var(--surface2);
+}
+
+.hero-choice--active .hero-choice-radio {
+  border-color: var(--gold);
+  background: var(--gold);
+  box-shadow: inset 0 0 0 3px var(--surface2);
+}
+
+.hero-choice-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.hero-choice-text strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.hero-choice-text em,
+.hero-share-text em {
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+.hero-choice-text .hero-choice-next {
+  margin-top: 2px;
+  color: var(--goldHi);
+}
+
+.hero-shares {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.hero-share {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 7px;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.hero-share input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--gold);
+}
+
+.hero-share-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hero-share-text strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hero-steps {
+  display: flex;
+  gap: 10px;
+}
+
+.hero-steps .hero-submit {
+  flex: 1;
+}
+
+.hero-step-back {
+  flex: none;
+  height: 46px;
+  padding: 0 18px;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  background: var(--surface2);
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hero-step-back:hover:not(:disabled) {
+  border-color: var(--goldHi);
+  color: var(--text);
+}
+
+.hero-step-back:disabled {
+  cursor: default;
+}
+
+/* ——— Group directory ——— */
+
+.hero-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hero-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid var(--line2);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.hero-result:hover {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 12%, var(--surface2));
+}
+
+.hero-result-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hero-result-text strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.hero-result-text em {
+  font-size: 12px;
+  font-style: normal;
+  letter-spacing: 0;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hero-result-go {
+  flex: none;
+  color: var(--gold);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* ——— Leaderboard ——— */
+
+.hero-board {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hero-board-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line2);
+  border-radius: 7px;
+  background: var(--bg);
+}
+
+.hero-board-tab {
+  flex: 1;
+  height: 36px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hero-board-tab--active {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 22%, var(--surface2));
+  color: var(--text);
+}
+
+.hero-board-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+/* Tabular so the ranks and scores line up down the column rather than
+   drifting with the width of each number. */
+.hero-board-rank {
+  flex: none;
+  min-width: 28px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.hero-board-rank--top {
+  font-size: 17px;
+}
+
+.hero-board-score {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.hero-board-score strong {
+  color: var(--goldHi);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-board-score em {
+  font-size: 11px;
+  font-style: normal;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+/* ——— Group created ——— */
+
+.hero-token {
+  display: flex;
+  gap: 8px;
+}
+
+.hero-token code {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  height: 46px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--goldHi);
+  font: 13px/1 ui-monospace, Menlo, Consolas, monospace;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hero-token button {
+  height: 46px;
+  padding: 0 20px;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  background: var(--surface2);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hero-token button:hover {
+  border-color: var(--gold);
+}
+
+.hero-video {
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.hero-video iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* ——— Entrance ——— */
+
+@keyframes hero-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes hero-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/*
+ * One rule rather than a class per delay: children of a stagger container come
+ * in 60-90ms apart, in source order.
+ */
+.hero-stagger > * {
+  animation: hero-up 0.75s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.hero-stagger > *:nth-child(1) { animation-delay: 0s; }
+.hero-stagger > *:nth-child(2) { animation-delay: 0.06s; }
+.hero-stagger > *:nth-child(3) { animation-delay: 0.12s; }
+.hero-stagger > *:nth-child(4) { animation-delay: 0.18s; }
+.hero-stagger > *:nth-child(5) { animation-delay: 0.26s; }
+.hero-stagger > *:nth-child(6) { animation-delay: 0.34s; }
+.hero-stagger > *:nth-child(7) { animation-delay: 0.42s; }
+.hero-stagger > *:nth-child(8) { animation-delay: 0.5s; }
+
+@media (max-width: 560px) {
+  .hero-actions {
+    width: min(18rem, 100%);
+    flex-direction: column;
+  }
+
+  .hero-actions .hero-btn {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-stagger > *,
+  .hero-bg-canvas {
+    animation: none;
+  }
+}

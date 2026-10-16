@@ -19,7 +19,7 @@ import { MAX_QUEST_UPDATES, QUEST_STATE_INPUTS } from './quests';
 
 /**
  * RS3 group member vitals packed as:
- * [hpCur, hpMax, prayCur, prayMax, summonCur, summonMax, world?]
+ * [hpCur, hpMax, prayCur, prayMax, summonCur, summonMax, world?, weightKg?]
  */
 export type MemberStats = number[];
 
@@ -105,6 +105,28 @@ export const MAX_GAMEVAL_NAME = 128;
 /** Postgres Int4 upper bound; larger values would 500 inside Prisma. */
 const MAX_INT32 = 2_147_483_647;
 
+export class GroupSharesInput {
+  @IsOptional()
+  @IsBoolean()
+  map?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  skills?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  items?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  quests?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  achievements?: boolean;
+}
+
 export class CreateGroupBody {
   @IsString()
   @MaxLength(MAX_INPUT_NAME)
@@ -114,6 +136,15 @@ export class CreateGroupBody {
   @IsOptional()
   @IsIn(['normal', 'competitive'])
   mode?: 'normal' | 'competitive';
+
+  @IsOptional()
+  @IsIn(['private', 'public'])
+  visibility?: 'private' | 'public';
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => GroupSharesInput)
+  shares?: GroupSharesInput;
 
   /** Fixed capacity 2–5; must match member_names length when provided. */
   @IsOptional()
@@ -136,12 +167,16 @@ export class UpdateMemberBody {
   @MaxLength(MAX_INPUT_NAME)
   name!: string;
 
-  /** Vitals may arrive as doubles from the plugin; rounded server-side. */
+  /**
+   * Vitals may arrive as doubles from the plugin; rounded server-side. The
+   * floor is signed because the weight slot goes negative with weight-reducing
+   * gear; every other slot is clamped back to zero by `statsFromArray`.
+   */
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(MAX_STATS)
   @IsNumber({ allowNaN: false, allowInfinity: false }, { each: true })
-  @Min(0, { each: true })
+  @Min(-MAX_INT32, { each: true })
   @Max(MAX_INT32, { each: true })
   stats?: MemberStats;
 
@@ -339,6 +374,33 @@ export class SetLocationSharingBody {
   shared!: boolean;
 }
 
+/**
+ * A stack-size window for one tracked item: only announce a drop of it when
+ * the quantity falls inside. Either end may be null, which clears that end,
+ * so both null means "any amount".
+ */
+export class DropQuantityInput {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(MAX_INT32)
+  item_id!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(MAX_INT32)
+  min?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(MAX_INT32)
+  max?: number | null;
+}
+
 /** Per-group drop rules: a value threshold plus item opinions. */
 export class DropRulesBody {
   /** Coin value at or above which any drop counts. 0 turns the rule off. */
@@ -375,6 +437,17 @@ export class DropRulesBody {
   @Min(1, { each: true })
   @Max(MAX_INT32, { each: true })
   clear?: number[];
+
+  /**
+   * Stack-size windows. Setting one on an item the group does not track yet
+   * adds it, so the range and the item can arrive in one request.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_DROP_RULES)
+  @ValidateNested({ each: true })
+  @Type(() => DropQuantityInput)
+  quantities?: DropQuantityInput[];
 }
 
 /** NPC names a member has killed since the last report, with counts. */
@@ -483,7 +556,20 @@ export class UpdateGroupSettingsBody {
   @IsString()
   @MaxLength(MAX_INPUT_NAME)
   name?: string;
+
+  @IsOptional()
+  @IsIn(['private', 'public'])
+  visibility?: 'private' | 'public';
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => GroupSharesInput)
+  shares?: GroupSharesInput;
 }
+
+export const MAX_SEARCH_QUERY = 50;
+export const PUBLIC_GROUPS_LIMIT = 24;
+export const MAX_PUBLIC_GROUPS_LIMIT = 50;
 
 export class RenameMemberBody {
   @IsString()

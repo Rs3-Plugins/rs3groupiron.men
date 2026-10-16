@@ -1,17 +1,27 @@
 import { useCallback, useMemo, useState } from 'react';
 import { DEMO_GROUP, fetchBankLedger, type BankLedgerEntry } from '../../api/groupClient';
-import { useUrlState } from '../../hooks/useUrlState';
-import { dayBounds, toDayInput } from '../../lib/day';
+import { useUrlState, useUrlText } from '../../hooks/useUrlState';
+import {
+  DATE_RANGES,
+  dayLabel,
+  rangeBounds,
+  toDayInput,
+  type DateRange,
+} from '../../lib/day';
 import { colorForName, formatQty, itemName } from '../../lib/items';
-import { formatGp } from '../../lib/itemPrices';
-import { timestamp } from '../../lib/time';
+import { useItemNames } from '../../lib/itemNames';
+import { formatGp, getItemPrices } from '../../lib/itemPrices';
+import { timestamp, toUnix } from '../../lib/time';
 import { usePagedHistory } from '../../hooks/usePagedHistory';
-import { DayPicker, ShowAllTimeButton } from './DayPicker';
-import { IconSelect } from './IconSelect';
+import { DayNav, RANGE_OPTIONS } from './DayNav';
+import { Dropdown, type DropdownOption } from './Dropdown';
+import { downloadCsv, downloadJson } from '../../lib/exportTable';
+import { BankGlyph, EmptyState, SearchGlyph } from './EmptyState';
+import { ExportMenu, type ExportFormat } from './ExportMenu';
 import { ItemIcon } from './ItemIcon';
-import { memberOptions, type MemberBadge } from './memberOptions';
-import { LoadMoreButton, PanelStatus, PanelToolbar } from './PanelChrome';
-import { SelectField, type SelectOption } from './SelectField';
+import type { MemberBadge } from './memberOptions';
+import { LoadMoreButton, PanelStatus } from './PanelChrome';
+import { Segmented, type SegmentedOption } from './Segmented';
 
 const PAGE_SIZE = 100;
 const MINUS = '−';
@@ -20,11 +30,22 @@ type Direction = 'all' | 'in' | 'out';
 
 const DIRECTION_VALUES: Direction[] = ['all', 'in', 'out'];
 
-const DIRECTIONS: SelectOption[] = [
-  { value: 'all', label: 'All movements' },
-  { value: 'in', label: 'Deposits only' },
-  { value: 'out', label: 'Withdrawals only' },
+const DIRECTIONS: Array<DropdownOption<Direction>> = [
+  { id: 'all', label: 'All movements' },
+  { id: 'in', label: 'Deposits' },
+  { id: 'out', label: 'Withdrawals' },
 ];
+
+type LedgerView = 'list' | 'tiles';
+
+const VIEW_VALUES: LedgerView[] = ['list', 'tiles'];
+
+const VIEWS: Array<SegmentedOption<LedgerView>> = [
+  { id: 'list', label: 'List' },
+  { id: 'tiles', label: 'Tiles' },
+];
+
+const EXPORT_FORMATS: ExportFormat[] = ['csv', 'json'];
 
 function compactQty(n: number) {
   const abs = Math.abs(n);
@@ -36,6 +57,8 @@ type LedgerPanelProps = {
   groupToken?: string;
   dataRevision?: number;
   members?: ReadonlyArray<MemberBadge>;
+  /** ISO instant the group was created; the calendar stops there. */
+  createdAt?: string;
   injected?: ReadonlyArray<BankLedgerEntry>;
 };
 
@@ -44,6 +67,7 @@ export function LedgerPanel({
   groupToken = '',
   dataRevision,
   members = [],
+  createdAt,
   injected,
 }: LedgerPanelProps) {
   const [direction, setDirection] = useUrlState<Direction>('dir', 'all', {
@@ -52,10 +76,16 @@ export function LedgerPanel({
   const [memberFilter, setMemberFilter] = useUrlState('member', 'all');
   const [today] = useState(() => toDayInput(new Date()));
   const [day, setDay] = useUrlState('day', today);
+  // Subscribes to the item catalogue: without it nothing starts the fetch and
+  // every row stays on its "Item 1623" fallback.
+  useItemNames();
+  const [query, setQuery] = useUrlText('q');
+  const [range, setRange] = useUrlState<DateRange>('range', '24h', { allowed: DATE_RANGES });
+  const [view, setView] = useUrlState<LedgerView>('view', 'list', { allowed: VIEW_VALUES });
 
   const fetchPage = useCallback(
     ({ before, limit, signal }: { before?: string; limit: number; signal: AbortSignal }) => {
-      const bounds = day ? dayBounds(day) : null;
+      const bounds = rangeBounds(range, day, today);
       return fetchBankLedger(groupName, groupToken, {
         limit,
         before,
@@ -64,7 +94,7 @@ export function LedgerPanel({
         signal,
       });
     },
-    [groupName, groupToken, day],
+    [groupName, groupToken, range, day, today],
   );
 
   const {
@@ -84,110 +114,242 @@ export function LedgerPanel({
 
   const entries = useMemo(() => {
     if (!injected?.length) return fetched;
-    const bounds = day ? dayBounds(day) : null;
+    const bounds = rangeBounds(range, day, today);
     const extra = injected.filter(
-      (entry) => !bounds || (entry.at >= bounds.from && entry.at < bounds.to),
+      (entry) =>
+        !bounds ||
+        (entry.at >= bounds.from && (bounds.to === undefined || entry.at < bounds.to)),
     );
     return extra.length ? [...extra, ...fetched] : fetched;
-  }, [injected, fetched, day]);
+  }, [injected, fetched, range, day, today]);
 
-  const memberChoices = useMemo(() => {
+  const memberChoices = useMemo<Array<DropdownOption<string>>>(() => {
+    const byName = new Map(members.map((m) => [m.name, m.color]));
     const names = [...new Set(entries.map((e) => e.name))].sort((a, b) => a.localeCompare(b));
-    return memberOptions(names, members);
+    return [
+      { id: 'all', label: 'All members' },
+      ...names.map((name) => ({
+        id: name,
+        label: name,
+        icon: (
+          <span
+            className="gms-dot"
+            style={{ background: byName.get(name) ?? colorForName(name) }}
+            aria-hidden
+          />
+        ),
+      })),
+    ];
   }, [entries, members]);
 
-  const summary = useMemo(() => {
-    const byMember = new Map<string, { deposited: number; withdrawn: number }>();
-    for (const entry of entries) {
-      const row = byMember.get(entry.name) ?? { deposited: 0, withdrawn: 0 };
-      if (entry.delta >= 0) row.deposited += entry.delta;
-      else row.withdrawn += -entry.delta;
-      byMember.set(entry.name, row);
-    }
-    return [...byMember.entries()]
-      .map(([name, totals]) => ({ name, ...totals }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [entries]);
+  // Days with movement get a dot in the calendar.
+  const markedDays = useMemo(
+    () => new Set(entries.map((entry) => toDayInput(new Date(entry.at)))),
+    [entries],
+  );
 
-  const visible = useMemo(
-    () =>
-      entries.filter((entry) => {
-        if (memberFilter !== 'all' && entry.name !== memberFilter) return false;
-        if (direction === 'in') return entry.delta >= 0;
-        if (direction === 'out') return entry.delta < 0;
-        return true;
-      }),
-    [entries, direction, memberFilter],
+  // Nothing exists before the group did, so the calendar stops there. Older
+  // API builds omit created_at, in which case the picker stays unbounded.
+  const earliest = useMemo(() => {
+    if (!createdAt) return undefined;
+    const at = new Date(createdAt);
+    return Number.isNaN(at.getTime()) ? undefined : toDayInput(at);
+  }, [createdAt]);
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return entries.filter((entry) => {
+      if (memberFilter !== 'all' && entry.name !== memberFilter) return false;
+      if (q && !itemName(entry.item_id).toLowerCase().includes(q)) return false;
+      if (direction === 'in') return entry.delta >= 0;
+      if (direction === 'out') return entry.delta < 0;
+      return true;
+    });
+  }, [entries, direction, memberFilter, query]);
+
+  const groups = useMemo(() => {
+    const out: Array<{ day: string; rows: BankLedgerEntry[] }> = [];
+    for (const entry of visible) {
+      const label = dayLabel(entry.at);
+      const last = out[out.length - 1];
+      if (last && last.day === label) last.rows.push(entry);
+      else out.push({ day: label, rows: [entry] });
+    }
+    return out;
+  }, [visible]);
+
+  const allTime = range === 'all';
+  const searching = query.trim().length > 0;
+
+  // Exports what is on screen, filters and all, rather than the raw page.
+  const runExport = useCallback(
+    (format: ExportFormat) => {
+      const rows = visible.map((entry) => ({
+        at: toUnix(entry.at),
+        member: entry.name,
+        operation: entry.delta >= 0 ? 'deposit' : 'withdrawal',
+        item: itemName(entry.item_id),
+        item_id: entry.item_id,
+        quantity: Math.abs(entry.delta),
+        value: getItemPrices(entry.item_id).ge * Math.abs(entry.delta),
+      }));
+      const filename = `${groupName}-bank-ledger-${range}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-');
+
+      if (format === 'json') {
+        downloadJson(filename, rows);
+        return;
+      }
+      downloadCsv({
+        filename,
+        sheet: 'Bank ledger',
+        headers: [
+          'Time (unix)',
+          'Member',
+          'Operation',
+          'Item',
+          'Item ID',
+          'Quantity',
+          'Value',
+        ],
+        rows: rows.map((r) => [
+          r.at,
+          r.member,
+          r.operation,
+          r.item,
+          r.item_id,
+          r.quantity,
+          r.value,
+        ]),
+      });
+    },
+    [visible, groupName, range],
   );
 
   return (
     <section className="gms-ledger gms-panel" aria-label="Shared bank ledger" aria-busy={loading}>
-      <PanelToolbar title="Shared bank ledger">
-        <SelectField label="Show" value={direction} options={DIRECTIONS} onChange={setDirection} />
-        <IconSelect
-          label="Member"
+      <div className="gms-panel-head">
+        <div className="gms-panel-head-text">
+          <h1 className="gms-page-title">Shared bank ledger</h1>
+          <span className="gms-panel-sub">Deposits and withdrawals from the group bank</span>
+        </div>
+
+        <input
+          className="gms-input gms-ledger-search"
+          value={query}
+          placeholder="Search items"
+          aria-label="Search items"
+          onChange={(e) => setQuery(e.target.value)}
+        />
+
+        <Dropdown
+          className="gms-ledger-dd"
+          options={DIRECTIONS}
+          value={direction}
+          ariaLabel="Show"
+          onChange={setDirection}
+        />
+
+        <Dropdown
+          ariaLabel="Member"
           value={memberFilter}
           options={memberChoices}
           onChange={setMemberFilter}
         />
-        <DayPicker day={day} today={today} onChange={setDay} />
-      </PanelToolbar>
 
-      {summary.length > 0 && (
-        <ul className="gms-panel-summary" aria-label="Net movement per member">
-          {summary.map((row) => (
-            <li key={row.name} className="gms-panel-summary-chip">
-              <span
-                className="gms-ledger-dot"
-                style={{ background: colorForName(row.name) }}
-                aria-hidden
-              />
-              <span className="gms-panel-summary-name">{row.name}</span>
-              <span className="gms-ledger-summary-in" title="Deposited">
-                {'↑'}+{formatQty(row.deposited)}
-              </span>
-              <span className="gms-ledger-summary-out" title="Withdrawn">
-                {'↓'}
-                {MINUS}
-                {formatQty(row.withdrawn)}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <Segmented
+          options={RANGE_OPTIONS}
+          value={range}
+          ariaLabel="Range"
+          onChange={setRange}
+        />
+
+        <DayNav
+          day={day || today}
+          today={today}
+          earliest={earliest}
+          marked={markedDays}
+          picked={range === 'day'}
+          onChange={(next) => {
+            setDay(next);
+            setRange('day');
+          }}
+        />
+
+        <Segmented options={VIEWS} value={view} ariaLabel="View" onChange={setView} />
+
+        <ExportMenu
+          busy={null}
+          disabled={visible.length === 0}
+          formats={EXPORT_FORMATS}
+          onExport={runExport}
+        />
+      </div>
+
+      {/* Outside the scroller so it stays put while the sticky day headers
+          move past it. Labels only — each row reads out in full on its own. */}
+      {visible.length > 0 && view === 'list' && (
+        <div className="gms-ledger-cols" aria-hidden>
+          <span>Operation</span>
+          <span>Time</span>
+          <span>Item</span>
+          <span />
+          <span className="gms-ledger-col-right">Amount</span>
+          <span className="gms-ledger-col-right">Cost</span>
+          <span>Player</span>
+        </div>
       )}
 
-      <div className="gms-panel-body">
+      <div className="gms-panel-body gms-ledger-body">
         <PanelStatus
           error={error}
           loading={loading && entries.length === 0}
           refreshing={refreshing}
-          empty={!loading && visible.length === 0}
-          emptyText={
-            <>
-              {day ? 'No shared bank movements on this day' : 'No shared bank movements yet'}
-              {day && <ShowAllTimeButton onClick={() => setDay('')} />}
-            </>
-          }
         />
 
-        {visible.length > 0 && (
-          <>
-            {/* Visual column labels only — each row already reads out in full. */}
-            <div className="gms-ledger-head" aria-hidden>
-              <span />
-              <span>Member</span>
-              <span />
-              <span>Item</span>
-              <span className="gms-ledger-head-amount">Amount</span>
-              <span className="gms-ledger-head-time">{day ? 'Time' : 'Date'}</span>
-            </div>
-            <ul className="gms-panel-list">
-              {visible.map((entry) => (
-                <LedgerRow key={entry.id} entry={entry} showDate={!day} />
-              ))}
-            </ul>
-          </>
+        {!loading && !error && visible.length === 0 && searching && (
+          <EmptyState
+            icon={<SearchGlyph />}
+            title={`No items match “${query.trim()}”`}
+            body="Check the spelling or clear the search to see every movement."
+          >
+            <button type="button" className="gms-btn" onClick={() => setQuery('')}>
+              Clear search
+            </button>
+          </EmptyState>
         )}
+
+        {!loading && !error && visible.length === 0 && !searching && (
+          <EmptyState
+            icon={<BankGlyph />}
+            title="No bank movements"
+            body="Deposits and withdrawals from the shared bank will be listed here, grouped by day."
+          >
+            <button
+              type="button"
+              className="gms-btn"
+              onClick={() => setRange(allTime ? '24h' : 'all')}
+            >
+              {allTime ? 'Back to the last 24 hours' : 'Show all time'}
+            </button>
+          </EmptyState>
+        )}
+
+        {groups.map((group) => (
+          <div key={group.day} className="gms-ledger-group">
+            <div className="gms-day-head">{group.day}</div>
+            <div className={`gms-ledger-${view}`}>
+              {group.rows.map((entry) =>
+                view === 'list' ? (
+                  <LedgerRow key={entry.id} entry={entry} />
+                ) : (
+                  <LedgerCard key={entry.id} entry={entry} />
+                ),
+              )}
+            </div>
+          </div>
+        ))}
 
         {hasMore && (
           <LoadMoreButton loading={loading} disabled={!oldest} onClick={loadMore} />
@@ -197,41 +359,84 @@ export function LedgerPanel({
   );
 }
 
-function LedgerRow({ entry, showDate }: { entry: BankLedgerEntry; showDate: boolean }) {
+/** Compact tile: the border carries the direction, green in and red out. */
+function LedgerCard({ entry }: { entry: BankLedgerEntry }) {
   const deposited = entry.delta >= 0;
-  const amount = `${deposited ? '+' : MINUS}${formatQty(Math.abs(entry.delta))}`;
-  const { absolute, stamp, ago } = timestamp(entry.at, showDate);
+  const { absolute, stamp } = timestamp(entry.at, false);
+  const qty = Math.abs(entry.delta);
+  const value = getItemPrices(entry.item_id).ge * qty;
+  const name = itemName(entry.item_id);
 
   return (
-    <li className={`gms-ledger-row gms-ledger-row--${deposited ? 'in' : 'out'}`}>
-      <span
-        className="gms-ledger-dot"
-        style={{ background: colorForName(entry.name) }}
-        aria-hidden
-      />
-      <span className="gms-ledger-name">{entry.name}</span>
-      <ItemIcon itemId={entry.item_id} size={24} className="gms-ledger-icon" />
-      <span className="gms-ledger-item">
-        {itemName(entry.item_id)}
-        <span
-          className="gms-ledger-amount"
-          title={`${formatQty(Math.abs(entry.delta))} ${deposited ? 'deposited' : 'removed'}`}
-        >
-          {' '}
-          (x{compactQty(entry.delta)})
+    <article
+      className={`gms-ledger-card gms-ledger-card--${deposited ? 'in' : 'out'}`}
+      title={`${entry.name} · ${deposited ? 'deposited' : 'withdrew'} ${formatQty(qty)} ${name} · ${absolute}`}
+    >
+      <span className="gms-ledger-card-art">
+        <ItemIcon itemId={entry.item_id} quantity={qty} />
+        <span className="gms-ledger-badge">
+          <span aria-hidden>{deposited ? '+' : MINUS}</span>
         </span>
       </span>
+
+      <span className="gms-ledger-card-name">{name}</span>
+
       <span className="gms-ledger-delta">
-        <span className="gms-ledger-arrow" aria-hidden>
-          {deposited ? '↑' : '↓'}
-        </span>
-        <span className="sr-only">{deposited ? 'Deposited ' : 'Withdrew '}</span>
-        {amount}
+        {deposited ? '+' : MINUS}
+        {compactQty(qty)}
       </span>
-      <time className="gms-panel-time" dateTime={entry.at} title={absolute}>
-        <span className="gms-panel-clock">{stamp}</span>
-        <span className="gms-panel-ago">{ago}</span>
-      </time>
-    </li>
+
+      <span className="gms-ledger-card-meta">
+        <span className="gms-ledger-name">
+          <span
+            className="gms-dot"
+            style={{ background: colorForName(entry.name) }}
+            aria-hidden
+          />
+          {entry.name}
+        </span>
+        <span className="gms-ledger-value">{value > 0 ? formatGp(value) : '—'}</span>
+      </span>
+
+      <span className="gms-ledger-time">{stamp}</span>
+    </article>
+  );
+}
+
+function LedgerRow({ entry }: { entry: BankLedgerEntry }) {
+  const deposited = entry.delta >= 0;
+  const { absolute, stamp } = timestamp(entry.at, false);
+  const qty = Math.abs(entry.delta);
+  const value = getItemPrices(entry.item_id).ge * qty;
+
+  return (
+    <div className={`gms-ledger-row gms-ledger-row--${deposited ? 'in' : 'out'}`}>
+      <span className="gms-ledger-badge">
+        <span className="sr-only">{deposited ? 'Deposited' : 'Withdrew'}</span>
+        <span aria-hidden>{deposited ? '+' : MINUS}</span>
+      </span>
+      <span className="gms-ledger-time" title={absolute}>
+        {stamp}
+      </span>
+      <span className="gms-ledger-item">
+        <ItemIcon itemId={entry.item_id} quantity={qty} className="gms-ledger-icon" />
+        <span>{itemName(entry.item_id)}</span>
+      </span>
+      {/* Splits the row into a left and a right group. */}
+      <span />
+      <span className="gms-ledger-delta">
+        {deposited ? '+' : MINUS}
+        {compactQty(qty)}
+      </span>
+      <span className="gms-ledger-value">{value > 0 ? formatGp(value) : '—'}</span>
+      <span className="gms-ledger-name">
+        <span
+          className="gms-dot"
+          style={{ background: colorForName(entry.name) }}
+          aria-hidden
+        />
+        {entry.name}
+      </span>
+    </div>
   );
 }

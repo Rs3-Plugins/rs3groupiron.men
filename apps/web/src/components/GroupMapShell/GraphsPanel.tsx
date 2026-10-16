@@ -35,21 +35,21 @@ import { IconSelect, type IconOption } from './IconSelect';
 import { SkillIcon } from './MemberAvatar';
 import { memberOptions, type MemberBadge } from './memberOptions';
 import { PanelStatus } from './PanelChrome';
-import { RefreshIcon } from './icons';
-import { SelectField, type SelectOption } from './SelectField';
+import { Segmented, type SegmentedOption } from './Segmented';
+import { toUnix } from '../../lib/time';
 import { XpChart, type ChartRow, type Slice } from './XpChart';
 
-const PERIODS: SelectOption[] = [
-  { value: '24h', label: '24 Hours' },
-  { value: '7d', label: '7 Days' },
-  { value: '30d', label: '30 Days' },
-  { value: '365d', label: '12 Months' },
+const PERIOD_OPTIONS: Array<SegmentedOption<XpHistoryPeriod>> = [
+  { id: '24h', label: '24 hours' },
+  { id: '7d', label: '7 days' },
+  { id: '30d', label: '30 days' },
+  { id: '365d', label: 'Year' },
 ];
 
 const PERIOD_TITLE: Record<XpHistoryPeriod, string> = {
-  '24h': 'Day',
-  '7d': 'Week',
-  '30d': 'Month',
+  '24h': '24 hours',
+  '7d': '7 days',
+  '30d': '30 days',
   '365d': 'Year',
 };
 
@@ -119,7 +119,9 @@ export function GraphsPanel({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [range, setRange] = useState<{ start: number; end: number } | null>(null);
-  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
+  // Pointing at a legend name emphasises that member's series; it is a
+  // read-only highlight, so nothing is ever hidden from the chart.
+  const [highlight, setHighlight] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ from: number; to: number } | null>(null);
   const [saving, setSaving] = useState<ExportFormat | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
@@ -303,19 +305,7 @@ export function GraphsPanel({
   useEffect(() => setRange(null), [period, skill, mode]);
 
   const seriesNames = useMemo(() => visibleSeries.map((s) => s.name), [visibleSeries]);
-  const shownNames = seriesNames.filter((name) => !hidden.has(name));
-
-  const toggleSeries = useCallback(
-    (name: string) => {
-      setHidden((prev) => {
-        const next = new Set(prev);
-        if (next.has(name)) next.delete(name);
-        else if (seriesNames.length - next.size > 1) next.add(name);
-        return next;
-      });
-    },
-    [seriesNames.length],
-  );
+  const shownNames = seriesNames;
 
   const endDrag = useCallback(() => {
     setDrag((current) => {
@@ -335,9 +325,9 @@ export function GraphsPanel({
       return {
         filename: baseName,
         sheet: `${skillLabel} ${PERIOD_TITLE[period]}`,
-        headers: ['Time', ...shownNames],
+        headers: ['Time (unix)', ...shownNames],
         rows: chartRows.map((row) => [
-          new Date(String(row.t)),
+          toUnix(String(row.t)),
           ...shownNames.map((name) => Number(row[name] ?? 0)),
         ]),
       };
@@ -392,51 +382,33 @@ export function GraphsPanel({
   return (
     <section className="gms-graphs gms-panel" aria-label="XP graphs" aria-busy={loading}>
       <div className="gms-graphs-toolbar">
-        <button
-          type="button"
-          className="gms-graphs-refresh"
-          aria-label="Refresh"
-          title="Refresh"
-          disabled={loading}
-          onClick={() => void load(true)}
-        >
-          <img
-            className="gms-graphs-refresh-rs3 gms-graphs-refresh-rs3--n"
-            src="/sprites/refresh.png"
-            alt=""
-            width={32}
-            height={32}
-            draggable={false}
-          />
-          <img
-            className="gms-graphs-refresh-rs3 gms-graphs-refresh-rs3--h"
-            src="/sprites/refresh_hover.png"
-            alt=""
-            width={32}
-            height={32}
-            draggable={false}
-          />
-          <RefreshIcon />
-        </button>
-
-        <SelectField
-          label="Period"
+        <span className="gms-graphs-label">Period</span>
+        <Segmented
+          options={PERIOD_OPTIONS}
           value={period}
-          options={PERIODS}
-          onChange={(value) => patch({ period: value as XpHistoryPeriod })}
+          ariaLabel="Period"
+          onChange={(value) => patch({ period: value })}
         />
+
+        <span className="gms-graphs-label">Skill</span>
         <IconSelect
           label="Skill"
+          hideLabel
           value={skill}
           options={SKILL_OPTIONS}
           onChange={(value) => patch({ skill: value })}
         />
+
+        <span className="gms-graphs-label">Player</span>
         <IconSelect
           label="Player"
+          hideLabel
           value={playerFilter}
           options={playerOptions}
           onChange={(value) => patch({ player: value })}
         />
+
+        <span className="gms-graphs-spacer" />
 
         {/* Only while it applies — an always-there disabled button is noise. */}
         {zoomed && (
@@ -470,7 +442,7 @@ export function GraphsPanel({
 
       <div className="gms-graphs-chart-wrap">
         <h2 className="gms-graphs-title">
-          {`${skillLabel} - ${PERIOD_TITLE[period]}`}
+          {`${skillLabel} · ${PERIOD_TITLE[period]}`}
           {isTimeChart && mode === 'interval' && (
             <span className="gms-graphs-title-tag">per step</span>
           )}
@@ -496,8 +468,7 @@ export function GraphsPanel({
                   rows={chartRows}
                   slices={slices}
                   seriesNames={seriesNames}
-                  hidden={hidden}
-                  onToggleSeries={toggleSeries}
+                  highlight={highlight}
                   start={start}
                   end={end}
                   drag={drag}
@@ -515,10 +486,7 @@ export function GraphsPanel({
         )}
 
         {!loading && hasChart && (
-          <p className="gms-graphs-hint">
-            {chartHint(chart, playerFilter === 'all')}
-            {isTimeChart && hidden.size > 0 ? ` · ${hidden.size} hidden` : ''}
-          </p>
+          <p className="gms-graphs-hint">{chartHint(chart, playerFilter === 'all')}</p>
         )}
       </div>
 
@@ -534,14 +502,23 @@ export function GraphsPanel({
         ) : (
           <div className="gms-graphs-totals">
             {visiblePlayers.map((player) => (
-              <div key={player.name} className="gms-graphs-total-chip">
+              <span
+                key={player.name}
+                className={
+                  highlight === player.name
+                    ? 'gms-graphs-total-chip gms-graphs-total-chip--on'
+                    : 'gms-graphs-total-chip'
+                }
+                onMouseEnter={() => setHighlight(player.name)}
+                onMouseLeave={() => setHighlight(null)}
+              >
                 <span
                   className="gms-graphs-player-dot"
                   style={{ background: colorForName(player.name) }}
                 />
                 <span className="gms-graphs-total-name">{player.name}</span>
                 <span className="gms-graphs-player-total">+{formatQty(player.totalGain)}</span>
-              </div>
+              </span>
             ))}
           </div>
         )}
@@ -552,7 +529,7 @@ export function GraphsPanel({
 
 function chartHint(chart: ChartKind, wholeGroup: boolean) {
   if (TIME_CHARTS.includes(chart)) {
-    return 'Drag across the chart to zoom · click a name to hide that line';
+    return 'Drag across the chart to zoom · scroll to zoom · drag the timeline to pan · double-click to reset · hover a name to highlight it';
   }
   if (chart === 'pie') {
     return wholeGroup

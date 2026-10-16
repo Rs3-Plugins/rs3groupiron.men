@@ -1,0 +1,322 @@
+/*
+ * Design tokens for the dark-gold UI.
+ *
+ * Taken from the design handoff (tokens.css, extracted from the prototype's
+ * THEMES object). The theme class goes on <html>; absent any class, the
+ * prefers-color-scheme block below makes "system" follow the OS live.
+ *
+ * Marcellus SC is self-hosted rather than loaded from Google's CDN, so the
+ * site has no third-party font dependency at runtime.
+ */
+
+@font-face {
+  font-family: 'Marcellus SC';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/marcellus-sc-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Marcellus SC';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/marcellus-sc-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root,
+.theme-dark {
+  --hdrBg: linear-gradient(180deg, rgba(27, 26, 24, 0.97), rgba(13, 13, 13, 0.97));
+  --hdrLine: #2a2620;
+  --hdrLine2: #3b3428;
+  --hdrText: #ece6d6;
+  --hdrMuted: #a69e8a;
+  --hdrDim: #8a8270;
+  --hdrGold: #caa44d;
+  --hdrGoldHi: #e8c874;
+  --hdrBand: rgba(202, 164, 77, 0.35);
+  --bg: #0d0d0d;
+  --surface: #151514;
+  --surface2: #1b1a18;
+  --raise: #23211d;
+  --segA: #26231e;
+  --line: #2a2620;
+  --line2: #3b3428;
+  --text: #ece6d6;
+  --muted: #a69e8a;
+  --dim: #7a7262;
+  --gold: #caa44d;
+  --goldHi: #e8c874;
+  --goldLink: #d9b862;
+  --goldInk: #17120a;
+  --pillA: linear-gradient(180deg, #e8c874, #c49b3f);
+  --pillEdge: #7a5c22;
+  --emberText: #e35d6f;
+  --grid: #24221d;
+  --hover: #1d1c19;
+  --sheen: rgba(255, 240, 200, 0.04);
+  --band: rgba(202, 164, 77, 0.35);
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --card: 0 0 0 transparent;
+  --rank1: #e8c874;
+  --rank2: #c9c9c9;
+  --rank3: #c98a4f;
+  --rowHover: rgba(202, 164, 77, 0.12);
+  --ok: #5aa04a;
+  --pr: #3f7fc4;
+  --sm: #b8902c;
+  --veil: rgba(10, 9, 8, 0.76);
+  --heroVeil: radial-gradient(
+    ellipse at 50% 45%,
+    rgba(13, 13, 13, 0.5),
+    rgba(13, 13, 13, 0.92) 70%
+  );
+  /*
+   * Accents that are not part of the gold scale. They were literals in the
+   * component CSS, which meant one value serving both themes: a white vitals
+   * trail and a cream max-XP glow simply vanish on parchment.
+   */
+  --geAccent: #c0803c;
+  --maxXp: #ffe9b0;
+  --trail: #ffffff;
+  --trailHp: var(--emberText);
+  /* Dim behind a modal. Black works on a dark page; on parchment it composites
+     to a flat grey, so the light theme dims with a warm brown instead. */
+  --scrim: rgba(0, 0, 0, 0.55);
+  /*
+   * How sprite art is presented. The PNGs are the game's own artwork, drawn
+   * for its dark UI: on a dark surface a black shadow seats them and dimming
+   * reads as "inactive", but on parchment the same treatment reads as faded
+   * or dirty. The light theme therefore shows them exactly as painted and
+   * lets the gold underline carry the active state on its own.
+   */
+  --spriteShade: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+  --spriteShadeStrong: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.75));
+  --spriteIdle: 0.7;
+  --spriteHover: 0.9;
+  color-scheme: dark;
+}
+
+.theme-light {
+  --hdrBg: linear-gradient(180deg, rgba(221, 213, 195, 0.97), rgba(210, 201, 180, 0.97));
+  --hdrLine: #bcae8e;
+  --hdrLine2: #a5926a;
+  --hdrText: #1c1912;
+  --hdrMuted: #4c4437;
+  --hdrDim: #5f5543;
+  --hdrGold: #8f6a1a;
+  --hdrGoldHi: #7a5a12;
+  --hdrBand: rgba(163, 123, 34, 0.4);
+  --bg: #cec4ab;
+  --surface: #e5ddcc;
+  --surface2: #ddd4c1;
+  --raise: #ebe5d7;
+  --segA: #f2ede2;
+  --line: #b8a989;
+  --line2: #a5926a;
+  --text: #1c1912;
+  --muted: #4c4437;
+  --dim: #5f5543;
+  --gold: #a37b22;
+  --goldHi: #7a5a12;
+  --goldLink: #7a5a12;
+  --goldInk: #f0d68a;
+  --pillA: #1f1c17;
+  --pillEdge: #1f1c17;
+  --emberText: #a6192e;
+  --grid: #d0c5ad;
+  --hover: #d2c7ac;
+  --sheen: rgba(255, 250, 235, 0.6);
+  --band: rgba(163, 123, 34, 0.4);
+  --shadow: 0 8px 24px rgba(60, 40, 10, 0.18);
+  --rank1: #8f6a1a;
+  --rank2: #6b6459;
+  --rank3: #9a5f2c;
+  --rowHover: rgba(163, 123, 34, 0.14);
+  --card:
+    0 1px 2px rgba(60, 40, 10, 0.14), 0 6px 18px rgba(60, 40, 10, 0.12);
+  --ok: #3d7a2c;
+  --pr: #2f64a6;
+  --sm: #8a6a12;
+  /* A light wash, not a dark one: the veil mutes the world map behind the
+     content, and darkening it on parchment turned the page grey. */
+  --veil: rgba(206, 196, 171, 0.8);
+  --heroVeil: radial-gradient(
+    ellipse at 50% 45%,
+    rgba(12, 10, 6, 0.3),
+    rgba(12, 10, 6, 0.78) 75%
+  );
+  --heroCard: rgba(236, 229, 214, 0.92);
+  --heroCardLine: #a5926a;
+  --heroCardShadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  --geAccent: #8a5a1e;
+  --maxXp: #8a6a12;
+  --trail: #4c4437;
+  --trailHp: #8f1222;
+  --scrim: rgba(46, 36, 18, 0.5);
+  --spriteShade: none;
+  --spriteShadeStrong: none;
+  --spriteIdle: 1;
+  --spriteHover: 1;
+  color-scheme: light;
+}
+
+/* "System" is the absence of an explicit class, so it tracks the OS live. */
+@media (prefers-color-scheme: light) {
+  :root:not(.theme-dark) {
+    --hdrBg: linear-gradient(180deg, rgba(221, 213, 195, 0.97), rgba(210, 201, 180, 0.97));
+    --hdrLine: #bcae8e;
+    --hdrLine2: #a5926a;
+    --hdrText: #1c1912;
+    --hdrMuted: #4c4437;
+    --hdrDim: #5f5543;
+    --hdrGold: #8f6a1a;
+    --hdrGoldHi: #7a5a12;
+    --hdrBand: rgba(163, 123, 34, 0.4);
+    --bg: #cec4ab;
+    --surface: #e5ddcc;
+    --surface2: #ddd4c1;
+    --raise: #ebe5d7;
+    --segA: #f2ede2;
+    --line: #b8a989;
+    --line2: #a5926a;
+    --text: #1c1912;
+    --muted: #4c4437;
+    --dim: #5f5543;
+    --gold: #a37b22;
+    --goldHi: #7a5a12;
+    --goldLink: #7a5a12;
+    --goldInk: #f0d68a;
+    --pillA: #1f1c17;
+    --pillEdge: #1f1c17;
+    --emberText: #a6192e;
+    --grid: #d0c5ad;
+    --hover: #d2c7ac;
+    --sheen: rgba(255, 250, 235, 0.6);
+    --band: rgba(163, 123, 34, 0.4);
+    --shadow: 0 8px 24px rgba(60, 40, 10, 0.18);
+    --card:
+      0 1px 2px rgba(60, 40, 10, 0.14), 0 6px 18px rgba(60, 40, 10, 0.12);
+    --ok: #3d7a2c;
+    --pr: #2f64a6;
+    --sm: #8a6a12;
+    /* A light wash, not a dark one: the veil mutes the world map behind the
+       content, and darkening it on parchment turned the page grey. */
+    --veil: rgba(206, 196, 171, 0.8);
+    --heroVeil: radial-gradient(
+      ellipse at 50% 45%,
+      rgba(12, 10, 6, 0.3),
+      rgba(12, 10, 6, 0.78) 75%
+    );
+    --heroCard: rgba(236, 229, 214, 0.92);
+    --heroCardLine: #a5926a;
+    --heroCardShadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    --geAccent: #8a5a1e;
+    --maxXp: #8a6a12;
+    --trail: #4c4437;
+    --trailHp: #8f1222;
+    --scrim: rgba(46, 36, 18, 0.5);
+    --spriteShade: none;
+    --spriteShadeStrong: none;
+    --spriteIdle: 1;
+    --spriteHover: 1;
+    color-scheme: light;
+  }
+}
+
+/*
+ * Names from the pre-redesign theme that GroupMapShell.css still uses in ~150
+ * places. They resolved to nothing, so those rules fell back to inherited or
+ * transparent — invisible in dark, where the inherited colour happened to be
+ * light, and unreadable in light, where it is near-black on a dark panel.
+ *
+ * Aliases rather than a find-and-replace: the values are substituted where
+ * they are used, so each one follows whichever theme is active.
+ */
+:root {
+  --ink: var(--text);
+  --border: var(--line);
+  --border-strong: var(--line2);
+  --gold-dim: var(--gold);
+  --gold-bright: var(--goldHi);
+}
+
+/*
+ * Text painted on top of sprite artwork — stack amounts in an inventory slot,
+ * levels on a skill tab. The art underneath is the game's own and does not
+ * change with the theme, so neither can this: following the theme made it
+ * dark gold on dark art in light mode. Declared outside every theme block on
+ * purpose, so there is nowhere to accidentally override it.
+ */
+:root {
+  --onSprite: #e8c874;
+}
+
+:root {
+  --font-display: 'Marcellus SC', serif;
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif;
+
+  --fs-body: 14px;
+  --lh-body: 1.45;
+  --fs-small: 12px;
+  /* micro = uppercase labels, letter-spacing .1em */
+  --fs-micro: 11px;
+  --fs-h3: 16px;
+  --fs-h2: 18px;
+  --fs-h1: 26px;
+  --fs-empty-title: 20px;
+
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 999px;
+
+  /* Panel opacity, 60-100%. Panels use
+     color-mix(in srgb, var(--surface) var(--pa), transparent). */
+  --pa: 94%;
+}
+
+@keyframes rsUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes gpFloat {
+  0% {
+    opacity: 0;
+    transform: translate(0, 6px);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0, -34px);
+  }
+}
+
+@keyframes gpBump {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.25) rotate(-8deg);
+  }
+  100% {
+    transform: scale(1);
+  }
+}

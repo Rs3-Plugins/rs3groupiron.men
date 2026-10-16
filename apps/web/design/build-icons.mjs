@@ -1,6 +1,11 @@
 // Generates favicons, PWA icons and the Open Graph share image from
 // design/gim-logo-source.png. Run with a sharp install on the NODE_PATH:
 //   node apps/web/design/build-icons.mjs
+//
+// WARNING: public/ currently holds hand-made art from the SEO pack, which this
+// script would overwrite. Only run it after updating gim-logo-source.png, and
+// check the diff. site.webmanifest is no longer written here — it carries
+// search copy now and is maintained by hand.
 import { createRequire } from 'node:module';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -112,8 +117,9 @@ async function main() {
   const fav16 = await logoSquare(16, 0);
   const fav32 = await logoSquare(32, 0);
   const fav48 = await logoSquare(48, 0);
-  await write('favicon-16x16.png', fav16);
-  await write('favicon-32x32.png', fav32);
+  await write('favicon-16.png', fav16);
+  await write('favicon-32.png', fav32);
+  await write('favicon-48.png', fav48);
   await write('favicon.ico', icoFromPngs([
     { size: 16, png: fav16 },
     { size: 32, png: fav32 },
@@ -129,24 +135,8 @@ async function main() {
   await write('icon-maskable-192.png', await logoSquare(192, 0.18, BG));
   await write('icon-maskable-512.png', await logoSquare(512, 0.18, BG));
 
-  // Share image
+  // Share images. The 2:1 crop is what X renders for summary_large_image.
   await write('og-image.png', await ogImage());
-
-  await write('site.webmanifest', JSON.stringify({
-    name: 'RS3 Group Ironman',
-    short_name: 'RS3 GIM',
-    description: 'Track your RuneScape 3 Group Ironman: live map, shared bank, skills and XP graphs.',
-    start_url: '/',
-    display: 'standalone',
-    background_color: BG,
-    theme_color: '#1c2024',
-    icons: [
-      { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-      { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-      { src: '/icon-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-      { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-    ],
-  }, null, 2) + '\n');
 
   console.log('icons written to', OUT);
 }

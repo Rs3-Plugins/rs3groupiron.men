@@ -1,4 +1,14 @@
-/** Temporary fake GE / high-alch prices until a real price feed is wired up. */
+import { hasAlchValues, lookupAlch } from './alchValues';
+import { hasGePrices, lookupGePrice } from './gePrices';
+
+/**
+ * GE prices come from the RuneScape Wiki real-time feed, refreshed by the API
+ * twice a day. High alch comes from the item catalogue: the wiki publishes it
+ * for traded items, and the rest are derived from the cache value the game
+ * bases them on.
+ *
+ * The small table below only backs the first render, before either has loaded.
+ */
 
 const KNOWN: Record<number, { ge: number; alch: number }> = {
   995: { ge: 1, alch: 1 }, // Coins
@@ -33,14 +43,30 @@ export type ItemPrices = {
   alch: number;
 };
 
-/** Per-item GE + high alch (fake for now). */
+/**
+ * Per-item GE (real) and high alch (still placeholder).
+ *
+ * An item absent from the GE feed is untradeable, so it reports 0 rather than
+ * a guess. Until the feed has loaded there is nothing to report, so the old
+ * placeholder still backs the first render and keeps the panel from flashing
+ * every price to zero.
+ */
 export function getItemPrices(itemId: number): ItemPrices {
   const known = KNOWN[itemId];
-  if (known) return known;
+  const ge = hasGePrices()
+    ? lookupGePrice(itemId)
+    : (known?.ge ?? 50 + (hashPrice(itemId, 1) % 250_000));
+  const alch = hasAlchValues() ? lookupAlch(itemId).high : (known?.alch ?? 0);
+  return { ge, alch };
+}
 
-  const geBase = 50 + (hashPrice(itemId, 1) % 250_000);
-  const alchBase = Math.max(1, Math.floor(geBase * (0.12 + (hashPrice(itemId, 2) % 40) / 100)));
-  return { ge: geBase, alch: alchBase };
+const GP_SUFFIX: Record<string, number> = { k: 1e3, m: 1e6, b: 1e9 };
+
+/** Accepts `50`, `2k`, `1.5m`, `1,000`. Returns null for anything else. */
+export function parseGp(input: string): number | null {
+  const m = input.trim().toLowerCase().replace(/,/g, '').match(/^(\d+(?:\.\d+)?)\s*([kmb])?$/);
+  if (!m) return null;
+  return Math.round(Number(m[1]) * (m[2] ? GP_SUFFIX[m[2]]! : 1));
 }
 
 export function formatGp(n: number) {

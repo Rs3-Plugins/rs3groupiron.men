@@ -1,7 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
 import { RareItemsService } from './rare-items.service';
 
-@Controller('api/items')
+// main.ts sets a global 'api' prefix, so this must not repeat it.
+@Controller('items')
 export class RareItemsController {
   constructor(private readonly rare: RareItemsService) {}
 

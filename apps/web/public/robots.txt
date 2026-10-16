@@ -1,4 +1,13 @@
 User-agent: *
-Allow: /
+Allow: /$
+Allow: /get-started
+Allow: /login
+Allow: /discover
+
+# Group dashboards are private and the demo is a sandbox, so there is nothing
+# to index and crawling them only costs API calls.
+Disallow: /group
+Disallow: /g/
+Disallow: /demo
 
 Sitemap: https://rs3groupiron.men/sitemap.xml

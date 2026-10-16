@@ -2,61 +2,86 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="/favicon.ico" sizes="any" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="manifest" href="/site.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RS3 Group Ironman</title>
+
+    <!-- Primary -->
+    <title>RS3 Group Ironman — Group tracker for RuneScape 3</title>
     <meta
       name="description"
-      content="Track your RuneScape 3 Group Ironman: live player locations, shared banks, skills and XP graphs."
+      content="Group Ironman tracker for RuneScape 3. Live member stats, shared bank, quests, achievements, rare drops, map and XP graphs for your whole group."
     />
-    <meta name="theme-color" content="#1c2024" />
-    <meta property="og:title" content="RS3 Group Ironman" />
+    <meta
+      name="keywords"
+      content="RS3, RuneScape 3, Group Ironman, GIM, group tracker, shared bank, XP tracker, rare drops, RuneScape group"
+    />
+    <link rel="canonical" href="https://rs3groupiron.men/" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#cec4ab" media="(prefers-color-scheme: light)" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="application-name" content="RS3 Group Ironman" />
+    <meta name="apple-mobile-web-app-title" content="RS3 GIM" />
+
+    <!-- Icons -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="icon" href="/favicon-16.png" sizes="16x16" type="image/png" />
+    <link rel="icon" href="/favicon-48.png" sizes="48x48" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="RS3 Group Ironman" />
+    <meta property="og:title" content="RS3 Group Ironman — Track your group. Share the grind." />
     <meta
       property="og:description"
-      content="Track your group. Share the grind. Live map, banks, skills and XP graphs for RS3 Group Ironman."
+      content="Track your group. Share the grind. Live stats, shared bank, quests, drops and XP for your RS3 Group Ironman team."
     />
-    <meta property="og:type" content="website" />
     <meta property="og:url" content="https://rs3groupiron.men/" />
-    <meta property="og:site_name" content="RS3 Group Ironman" />
     <meta property="og:locale" content="en_GB" />
     <meta property="og:image" content="https://rs3groupiron.men/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="RS3 Group Ironman — live map, banks, skills and XP graphs for your group"
+      content="RS3 Group Ironman shield logo with the tagline: Track your group. Share the grind."
     />
+
+    <!-- X / Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="RS3 Group Ironman" />
     <meta
       name="twitter:description"
-      content="Track your group. Share the grind. Live map, banks, skills and XP graphs for RS3 Group Ironman."
+      content="Track your group. Share the grind. Live stats, shared bank, quests, drops and XP for your RS3 Group Ironman team."
     />
-    <meta name="twitter:image" content="https://rs3groupiron.men/og-image.png" />
+    <meta name="twitter:image" content="https://rs3groupiron.men/twitter-card.png" />
+    <meta
+      name="twitter:image:alt"
+      content="RS3 Group Ironman shield logo with the tagline: Track your group. Share the grind."
+    />
+    <!-- Small-card shares: swap to twitter:card=summary + /twitter-summary.png -->
+
+    <!-- Structured data -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "WebApplication",
         "name": "RS3 Group Ironman",
+        "alternateName": "RS3 GIM",
         "url": "https://rs3groupiron.men/",
-        "description": "Track your RuneScape 3 Group Ironman: live player locations, shared banks, skills and XP graphs.",
+        "description": "Group Ironman tracker for RuneScape 3. Live member stats, shared bank, quests, achievements, rare drops, map and XP graphs for your whole group.",
         "applicationCategory": "GameApplication",
-        "operatingSystem": "Web",
+        "operatingSystem": "Any",
         "image": "https://rs3groupiron.men/og-image.png",
-        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "GBP" }
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
       }
     </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Map tiles sit behind the landing page, so warm that connection early.
+         Fonts are self-hosted in styles/tokens.css: no third-party font request. -->
     <link rel="preconnect" href="https://chisel.weirdgloop.org" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Sora:wght@400;600;700&display=swap"
-      rel="stylesheet"
-    />
   </head>
   <body>
     <div id="root"></div>

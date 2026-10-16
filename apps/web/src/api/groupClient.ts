@@ -5,6 +5,15 @@ const DEMO_GROUP = 'Demo Group';
 export type GroupMode = 'normal' | 'competitive';
 export type AppearanceTheme = 'rs3' | 'modern';
 export type XpHistoryPeriod = '24h' | '7d' | '30d' | '365d';
+export type GroupVisibility = 'private' | 'public';
+
+export type GroupShares = {
+  map: boolean;
+  skills: boolean;
+  items: boolean;
+  quests: boolean;
+  achievements: boolean;
+};
 
 export type GroupInfo = {
   ok: boolean;
@@ -14,6 +23,46 @@ export type GroupInfo = {
   appearance: AppearanceTheme;
   member_count: number;
   member_slots: number;
+  /** ISO instant the group was created; absent on older API builds. */
+  created_at?: string;
+  visibility?: GroupVisibility;
+  shares?: GroupShares;
+  visible?: GroupShares;
+};
+
+export type PublicGroup = {
+  name: string;
+  mode: GroupMode;
+  views: number;
+  member_count: number;
+  member_slots: number;
+  member_names: string[];
+  shares: GroupShares;
+  created_at: string;
+};
+
+export type PublicGroupsResponse = {
+  groups: PublicGroup[];
+};
+
+export type LeaderboardMetric = 'views' | 'total_level';
+export type LeaderboardPeriod = '7d' | '30d' | 'all';
+
+export type LeaderboardEntry = {
+  rank: number;
+  name: string;
+  mode: GroupMode;
+  member_count: number;
+  views: number;
+  recent_views: number;
+  total_level: number;
+  created_at: string;
+};
+
+export type LeaderboardResponse = {
+  metric: LeaderboardMetric;
+  period: LeaderboardPeriod;
+  entries: LeaderboardEntry[];
 };
 
 export type XpHistoryResponse = {
@@ -197,6 +246,8 @@ export type Achievement = {
   detail: string | null;
   skill_id: string | null;
   item_id: number | null;
+  /** Stack size for drops; null on older entries, which the title still shows. */
+  quantity?: number | null;
   /** RS3 gameval name for quests/diaries, e.g. quest_cooks_assistant. */
   gameval: string | null;
   image_url: string | null;
@@ -323,7 +374,38 @@ export type GroupSettingsResult = {
   mode: GroupMode;
   appearance: AppearanceTheme;
   member_slots: number;
+  visibility: GroupVisibility;
+  shares: GroupShares;
 };
+
+export async function fetchPublicGroups(
+  query = '',
+  opts: { limit?: number; signal?: AbortSignal } = {},
+): Promise<PublicGroupsResponse> {
+  const params = new URLSearchParams();
+  if (query.trim()) params.set('q', query.trim());
+  if (opts.limit) params.set('limit', String(opts.limit));
+  const suffix = params.size ? `?${params}` : '';
+  return api(`/api/public-groups${suffix}`, { signal: opts.signal });
+}
+
+export async function fetchLeaderboard(
+  metric: LeaderboardMetric = 'views',
+  opts: { period?: LeaderboardPeriod; limit?: number; signal?: AbortSignal } = {},
+): Promise<LeaderboardResponse> {
+  const params = new URLSearchParams({ metric });
+  if (opts.period) params.set('period', opts.period);
+  if (opts.limit) params.set('limit', String(opts.limit));
+  return api(`/api/leaderboard?${params}`, { signal: opts.signal });
+}
+
+export async function recordGroupView(groupName: string): Promise<void> {
+  try {
+    await api(groupPath(groupName, 'view'), { method: 'POST' });
+  } catch {
+    /* a missed view is not worth a visible error */
+  }
+}
 
 /** How many of each NPC each member has killed, biggest first. */
 export type NpcKills = {
@@ -364,10 +446,19 @@ export async function fetchAchievementProgress(
  * the group's own additions and silences, plus a value threshold for anything
  * nobody listed. `items` is the resolved set the plugin filters on.
  */
+/** A stack-size window on a tracked item; null means that end is open. */
+export type DropQuantity = {
+  item_id: number;
+  min: number | null;
+  max: number | null;
+};
+
 export type DropRules = {
   threshold: number;
   include: number[];
   exclude: number[];
+  /** Only the included items that carry a window. */
+  quantities?: DropQuantity[];
   items: number[];
   shared_list_size: number;
 };
@@ -381,8 +472,9 @@ export async function fetchDropRules(
 }
 
 /**
- * Partial update: omitted fields are left alone. `clear` runs first, so one
- * call can move an item from include to exclude.
+ * Partial update: omitted fields are left alone. `clear` runs first and
+ * `quantities` last, so one call can move an item between lists, or add it and
+ * give it a window. A null end on a window clears that end.
  */
 export async function updateDropRules(
   groupName: string,
@@ -392,6 +484,7 @@ export async function updateDropRules(
     include?: number[];
     exclude?: number[];
     clear?: number[];
+    quantities?: Array<{ item_id: number; min: number | null; max: number | null }>;
   },
 ): Promise<DropRules> {
   return api(groupPath(groupName, 'drop-rules'), {
@@ -414,6 +507,59 @@ export async function fetchRareItemCatalogue(
   return api('/api/items/rare', { signal });
 }
 
+/** Item id -> display name for every item in the game. */
+export type ItemNameCatalogue = {
+  updated: string;
+  count: number;
+  names: Record<number, string>;
+};
+
+export async function fetchItemNames(
+  signal?: AbortSignal,
+): Promise<ItemNameCatalogue> {
+  return api('/api/items/names', { signal });
+}
+
+/** Items whose icon changes with stack size: id -> [[fromQuantity, file]]. */
+export type ItemStackCatalogue = {
+  updated: string;
+  count: number;
+  base: string;
+  stacks: Record<number, Array<[number, string]>>;
+};
+
+export async function fetchItemStacks(
+  signal?: AbortSignal,
+): Promise<ItemStackCatalogue> {
+  return api('/api/items/stacks', { signal });
+}
+
+/** High/low alchemy values: id -> [high, low?]. */
+export type AlchCatalogue = {
+  updated: string;
+  count: number;
+  alch: Record<number, [number, number?]>;
+};
+
+export async function fetchAlchValues(
+  signal?: AbortSignal,
+): Promise<AlchCatalogue> {
+  return api('/api/items/alch', { signal });
+}
+
+/** Grand Exchange prices, refreshed server-side from the wiki feed. */
+export type GePriceCatalogue = {
+  updated: string;
+  count: number;
+  prices: Record<number, number>;
+};
+
+export async function fetchGePrices(
+  signal?: AbortSignal,
+): Promise<GePriceCatalogue> {
+  return api('/api/items/prices', { signal });
+}
+
 export async function updateGroupSettings(
   groupName: string,
   token: string,
@@ -421,6 +567,8 @@ export async function updateGroupSettings(
     appearance?: AppearanceTheme;
     mode?: GroupMode;
     name?: string;
+    visibility?: GroupVisibility;
+    shares?: Partial<GroupShares>;
   },
 ): Promise<GroupSettingsResult> {
   return api(groupPath(groupName, 'update-group-settings'), {
@@ -436,6 +584,8 @@ export type CreateGroupResult = {
   appearance: AppearanceTheme;
   member_slots: number;
   member_names: string[];
+  visibility: GroupVisibility;
+  shares: GroupShares;
   token: string;
 };
 
@@ -444,6 +594,8 @@ export async function createGroup(body: {
   mode: GroupMode;
   member_slots: number;
   member_names: string[];
+  visibility?: GroupVisibility;
+  shares?: Partial<GroupShares>;
 }): Promise<CreateGroupResult> {
   return api('/api/create-group', {
     method: 'POST',

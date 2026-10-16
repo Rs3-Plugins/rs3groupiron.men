@@ -1,49 +1,146 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { useUiPrefs } from '../../hooks/useUiPrefs';
+import type { ItemsView } from '../../lib/uiPrefs';
 import { useUrlState, useUrlText } from '../../hooks/useUrlState';
 import { formatGp, getItemPrices } from '../../lib/itemPrices';
-import { formatQty, type GroupItem } from '../../lib/items';
-import { IconSelect } from './IconSelect';
+import {
+  aggregateGroupItems,
+  colorForName,
+  formatQty,
+  ITEM_SOURCES,
+  type GroupItem,
+  type ItemSource,
+  type WireMember,
+} from '../../lib/items';
+import { useAlchValues } from '../../lib/alchValues';
+import { useGePrices } from '../../lib/gePrices';
+import { useItemNames } from '../../lib/itemNames';
+import { Dropdown, type DropdownOption } from './Dropdown';
 import { ItemIcon } from './ItemIcon';
-import { memberOptions, type MemberBadge } from './memberOptions';
-import { SearchField } from './SearchField';
-
-const BAR_COLORS = ['#c47a2c', '#c44b4b', '#4a9e58', '#5a8fd4', '#9b6bc9', '#b8a03a'];
+import { BoxGlyph, EmptyState, SearchGlyph } from './EmptyState';
+import type { MemberBadge } from './memberOptions';
+import { Segmented, type SegmentedOption } from './Segmented';
+import { ItemTooltip, useItemTooltip } from './ItemTooltip';
 
 type PriceMode = 'each' | 'stack';
 type Sort = 'qty' | 'name' | 'ge' | 'alch';
 type PricedItem = GroupItem & { stackGe: number; stackAlch: number };
 
-const SORTS: Array<{ value: Sort; label: string }> = [
-  { value: 'qty', label: 'Sort: Total Quantity' },
-  { value: 'name', label: 'Sort: Name' },
-  { value: 'ge', label: 'Sort: GE value' },
-  { value: 'alch', label: 'Sort: Alch value' },
+const SORTS: Array<DropdownOption<Sort>> = [
+  { id: 'qty', label: 'Sort: Quantity' },
+  { id: 'ge', label: 'Sort: GE value' },
+  { id: 'alch', label: 'Sort: Alch value' },
+  { id: 'name', label: 'Sort: Name' },
 ];
 
-const SORT_VALUES: Sort[] = SORTS.map((s) => s.value);
+const SORT_VALUES: Sort[] = SORTS.map((s) => s.id);
 const PRICE_MODES: PriceMode[] = ['each', 'stack'];
 
+const PRICE_OPTIONS: Array<SegmentedOption<PriceMode>> = [
+  { id: 'stack', label: '× Qty', title: 'Price × quantity' },
+  { id: 'each', label: 'Each', title: 'Unit price' },
+];
+
+const VIEW_OPTIONS: Array<SegmentedOption<Exclude<ItemsView, ''>>> = [
+  { id: 'cards', label: 'Cards' },
+  { id: 'tiles', label: 'Tiles' },
+  { id: 'list', label: 'List' },
+];
+
+type Scope = 'all' | ItemSource;
+
+const SCOPES: Array<DropdownOption<Scope>> = [
+  { id: 'all', label: 'All items' },
+  { id: 'bank', label: 'Banks' },
+  { id: 'inventory', label: 'Inventories' },
+  { id: 'equipment', label: 'Equipment' },
+];
+
+const SCOPE_VALUES: Scope[] = SCOPES.map((s) => s.id);
+
+/** What the heading calls each scope, for one player and for the group. */
+const SCOPE_TITLE: Record<Scope, { all: string; one: string }> = {
+  all: { all: 'All items', one: 'items' },
+  bank: { all: 'All banks', one: 'bank' },
+  inventory: { all: 'All inventories', one: 'inventory' },
+  equipment: { all: 'All equipment', one: 'equipment' },
+};
+
+/** Label the aggregation uses for the group's own bank. */
+const SHARED_BANK = 'Shared bank';
+
+function viewingTitle(playerFilter: string, scope: Scope) {
+  const label = SCOPE_TITLE[scope];
+  if (playerFilter === 'all') return `Viewing: ${label.all}`;
+  if (playerFilter === SHARED_BANK) return `Viewing: ${SHARED_BANK}`;
+  return `Viewing: ${playerFilter}’s ${label.one}`;
+}
+
+/** Tint colours are the handoff's, not the generic status palette. */
 const BADGES = {
-  ge: { label: 'Grand Exchange', src: '/item-prices/ge.png?v=3', text: 'GE' },
-  alch: { label: 'High alchemy', src: '/item-prices/high-alch.png?v=3', text: 'Alch' },
-  qty: { label: 'Quantity', src: '/item-prices/qty.png?v=3', text: 'Qty' },
+  qty: { label: 'Total quantity', src: '/item-prices/qty.png?v=3', accent: 'var(--gold)' },
+  ge: { label: 'GE value', src: '/item-prices/ge.png?v=3', accent: '#c0803c' },
+  alch: { label: 'High alch value', src: '/item-prices/high-alch.png?v=3', accent: 'var(--ok)' },
 } as const;
 
 type BadgeKind = keyof typeof BADGES;
 
-export function ItemsPanel({
-  items,
-  members = [],
-}: {
-  items: GroupItem[];
+type ItemsPanelProps = {
+  /** Raw members, so the scope filter can re-aggregate without a round trip. */
+  rawMembers: WireMember[];
   members?: ReadonlyArray<MemberBadge>;
-}) {
+};
+
+export function ItemsPanel({ rawMembers, members = [] }: ItemsPanelProps) {
   const [query, setQuery] = useUrlText('q');
   const [playerFilter, setPlayerFilter] = useUrlState('member', 'all');
+  const [scope, setScope] = useUrlState<Scope>('scope', 'all', { allowed: SCOPE_VALUES });
   const [sort, setSort] = useUrlState<Sort>('sort', 'qty', { allowed: SORT_VALUES });
   const [priceMode, setPriceMode] = useUrlState<PriceMode>('price', 'stack', {
     allowed: PRICE_MODES,
   });
+  const { prefs, setPref } = useUiPrefs();
+
+  const isSingleBank = playerFilter !== 'all';
+  // Cards for the group, tiles for a single bank — until the viewer picks
+  // something, which is remembered on this device.
+  const view = prefs.itemsView || (isSingleBank ? 'tiles' : 'cards');
+
+  // Switching player hands the view back to that context's default. Compared
+  // against a remembered value rather than just letting the effect fire,
+  // because setPref's identity is not stable across renders.
+  const lastPlayer = useRef(playerFilter);
+  useEffect(() => {
+    if (lastPlayer.current === playerFilter) return;
+    lastPlayer.current = playerFilter;
+    setPref('itemsView', '');
+  }, [playerFilter, setPref]);
+
+  // Names, prices and alch values all land after the first render, so their
+  // versions are memo dependencies or the list keeps its placeholder labels.
+  const itemNamesVersion = useItemNames();
+  const gePricesVersion = useGePrices();
+  const alchVersion = useAlchValues();
+
+  // The shared bank is only ever a bank, so the source choice is meaningless
+  // there — it is pinned and the control disabled rather than left to offer
+  // inventories and equipment that cannot exist.
+  const sharedOnly = playerFilter === SHARED_BANK;
+  const effectiveScope: Scope = sharedOnly ? 'bank' : scope;
+
+  const items = useMemo(
+    () =>
+      aggregateGroupItems(
+        rawMembers,
+        effectiveScope === 'all' ? ITEM_SOURCES : [effectiveScope],
+      ),
+    [rawMembers, effectiveScope, itemNamesVersion, gePricesVersion, alchVersion],
+  );
+
+  const colorOf = useMemo(() => {
+    const byName = new Map(members.map((m) => [m.name, m.color]));
+    return (name: string) => byName.get(name) ?? colorForName(name);
+  }, [members]);
 
   const players = useMemo(() => {
     const names = new Set<string>();
@@ -53,9 +150,18 @@ export function ItemsPanel({
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [items]);
 
-  const playerChoices = useMemo(
-    () => memberOptions(players, members, 'All Players'),
-    [players, members],
+  const playerChoices = useMemo<Array<DropdownOption<string>>>(
+    () => [
+      { id: 'all', label: 'All players' },
+      ...players.map((name) => ({
+        id: name,
+        label: name,
+        icon: (
+          <span className="gms-dot" style={{ background: colorOf(name) }} aria-hidden />
+        ),
+      })),
+    ],
+    [players, colorOf],
   );
 
   const filtered = useMemo(() => {
@@ -108,100 +214,168 @@ export function ItemsPanel({
     [filtered],
   );
 
-  const isSingleBank = playerFilter !== 'all';
+  const tooltip = useItemTooltip();
+  const searching = query.trim().length > 0;
+
+  // Removing a hovered element never fires mouseleave, so changing the source,
+  // player or search would otherwise strand its tooltip on screen.
+  const { hide } = tooltip;
+  useEffect(() => {
+    hide();
+  }, [filtered, view, hide]);
 
   return (
     <section className="gms-items" aria-label="Group items">
-      <div className="gms-items-heading">
-        <div className="gms-items-heading-main">
-          <h2 className="gms-items-title">{bankTitle(playerFilter)}</h2>
-          <div className="gms-items-totals" aria-label="Bank totals">
-            <span className="gms-items-stat">
-              <em>Items</em>
-              <strong>{totals.types.toLocaleString()}</strong>
-            </span>
-            <span className="gms-items-stat gms-items-stat--qty">
-              <img src={BADGES.qty.src} alt="" width={16} height={16} />
-              <strong>{formatQty(totals.quantity)}</strong>
-            </span>
-            <span className="gms-items-stat gms-items-stat--ge">
-              <img src={BADGES.ge.src} alt="" width={16} height={16} />
-              <strong>{formatGp(totals.ge)}</strong>
-            </span>
-            <span className="gms-items-stat gms-items-stat--alch">
-              <img src={BADGES.alch.src} alt="" width={16} height={16} />
-              <strong>{formatGp(totals.alch)}</strong>
-            </span>
-          </div>
+      <div className="gms-panel-head">
+        <div className="gms-panel-head-text">
+          <h1 className="gms-page-title">{viewingTitle(playerFilter, effectiveScope)}</h1>
         </div>
+
+        <div className="gms-items-totals" aria-label="Bank totals">
+          <span className="gms-stat gms-stat--items" title="Items">
+            <em>Items</em>
+            <strong>{totals.types.toLocaleString()}</strong>
+          </span>
+          <StatBadge kind="qty" value={totals.quantity} format="qty" />
+          <StatBadge kind="ge" value={totals.ge} />
+          <StatBadge kind="alch" value={totals.alch} />
+        </div>
+
+        {!isSingleBank && players.length > 0 && (
+          <ul className="gms-mkey" aria-label="Member colours">
+            {players.map((name) => (
+              <li key={name} className="gms-mkey-item">
+                <span className="gms-mkey-sw" style={{ background: colorOf(name) }} aria-hidden />
+                {name}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
-      <div className="gms-items-toolbar">
-        <SearchField
-          className="gms-items-search"
-          label="Search items"
+      <div className="gms-items-toolbar gms-panel-toolbar">
+        <input
+          className="gms-input gms-items-search"
           value={query}
+          placeholder="Search items"
+          aria-label="Search items"
           onChange={(e) => setQuery(e.target.value)}
         />
 
-        <div className="gms-items-price-mode" role="group" aria-label="Price display">
-          {(['each', 'stack'] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              className={
-                priceMode === mode
-                  ? 'gms-items-mode-btn gms-items-mode-btn--active'
-                  : 'gms-items-mode-btn'
-              }
-              onClick={() => setPriceMode(mode)}
-            >
-              {mode === 'each' ? 'Each' : '× Qty'}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          options={PRICE_OPTIONS}
+          value={priceMode}
+          ariaLabel="Price display"
+          onChange={setPriceMode}
+        />
 
-        <select
-          className="gms-items-select"
+        <Dropdown
+          className="gms-items-scope"
+          ariaLabel="Source"
+          value={effectiveScope}
+          options={SCOPES}
+          disabled={sharedOnly}
+          title={sharedOnly ? 'The shared bank only holds bank items' : undefined}
+          onChange={setScope}
+        />
+
+        <Dropdown
+          className="gms-items-sort"
+          ariaLabel="Sort"
           value={sort}
-          onChange={(e) => setSort(e.target.value as Sort)}
-          aria-label="Sort"
-        >
-          {SORTS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          options={SORTS}
+          onChange={setSort}
+        />
 
-        <IconSelect
-          label="Filter player"
-          hideLabel
+        <Dropdown
+          className="gms-items-player"
+          ariaLabel="Player"
           value={playerFilter}
           options={playerChoices}
-          onChange={(value) => setPlayerFilter(value)}
+          onChange={setPlayerFilter}
+        />
+
+        <Segmented
+          options={VIEW_OPTIONS}
+          value={view}
+          ariaLabel="Item view"
+          onChange={(next) => setPref('itemsView', next)}
         />
       </div>
 
-      {/* Every match is rendered; the list scrolls rather than paging. */}
-      <div className={isSingleBank ? 'gms-items-tiles' : 'gms-items-grid'}>
-        {filtered.map((item) =>
-          isSingleBank ? (
-            <ItemTile key={item.id} item={item} priceMode={priceMode} />
+      <div className="gms-panel-body gms-items-body">
+        {filtered.length === 0 &&
+          (searching ? (
+            <EmptyState
+              icon={<SearchGlyph />}
+              title={`No items match “${query.trim()}”`}
+              body="Check the spelling or clear the search to see everything."
+            />
           ) : (
-            <ItemCard key={item.id} item={item} priceMode={priceMode} />
-          ),
+            <EmptyState
+              icon={<BoxGlyph />}
+              title="Your bank is empty"
+              body="Items appear here once a group member syncs with the plugin."
+            />
+          ))}
+
+        {filtered.length > 0 && view === 'cards' && (
+          <div className="gms-items-grid">
+            {filtered.map((item) => (
+              <ItemCard
+                key={item.id}
+                item={item}
+                priceMode={priceMode}
+                colorOf={colorOf}
+              />
+            ))}
+          </div>
         )}
-        {filtered.length === 0 && <p className="gms-items-empty">No items match.</p>}
+
+        {filtered.length > 0 && view === 'tiles' && (
+          <div className="gms-items-tiles">
+            {filtered.map((item) => (
+              <ItemTile
+                key={item.id}
+                item={item}
+                priceMode={priceMode}
+                onHover={tooltip.show}
+                onLeave={tooltip.hide}
+              />
+            ))}
+          </div>
+        )}
+
+        {filtered.length > 0 && view === 'list' && (
+          <table className="gms-items-list">
+            <thead>
+              <tr>
+                <th scope="col">Item</th>
+                <th scope="col">Qty</th>
+                <th scope="col">GE</th>
+                <th scope="col">Alch</th>
+                <th scope="col">Held by</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((item) => (
+                <ItemRow
+                  key={item.id}
+                  item={item}
+                  priceMode={priceMode}
+                  colorOf={colorOf}
+                  onHover={tooltip.show}
+                  onLeave={tooltip.hide}
+                />
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
+
+      <ItemTooltip state={tooltip.state} colorOf={colorOf} />
     </section>
   );
-}
-
-function bankTitle(playerFilter: string) {
-  if (playerFilter === 'all') return 'Viewing: All banks';
-  if (playerFilter === 'Shared bank') return 'Viewing: Shared bank';
-  return `Viewing: ${playerFilter}'s bank`;
 }
 
 function displayPrices(item: GroupItem, priceMode: PriceMode) {
@@ -210,74 +384,201 @@ function displayPrices(item: GroupItem, priceMode: PriceMode) {
   return { ge: ge * mult, alch: alch * mult };
 }
 
-function PriceBadge({
+function StatBadge({
   kind,
   value,
-  showLabel = false,
   format = 'gp',
 }: {
   kind: BadgeKind;
   value: number;
-  showLabel?: boolean;
   format?: 'gp' | 'qty';
 }) {
   const meta = BADGES[kind];
   return (
-    <span className={`gms-item-price-badge gms-item-price-badge--${kind}`} title={meta.label}>
+    <span className={`gms-stat gms-stat--${kind}`} title={meta.label}>
       <img src={meta.src} alt="" width={16} height={16} />
-      {showLabel && <em>{meta.text}</em>}
       <strong>{format === 'qty' ? formatQty(value) : formatGp(value)}</strong>
     </span>
   );
 }
 
-function ItemTile({ item, priceMode }: { item: GroupItem; priceMode: PriceMode }) {
+/**
+ * One segment per member, sized by their share of the stack — the only place
+ * the split between banks is visible at a glance.
+ */
+function SplitBar({
+  item,
+  colorOf,
+  inline = false,
+}: {
+  item: GroupItem;
+  colorOf: (name: string) => string;
+  /** Inline sits in a table cell; otherwise it pins to the card's bottom edge. */
+  inline?: boolean;
+}) {
+  if (item.shares.length === 0) return null;
+  return (
+    <span
+      className={inline ? 'gms-split-bar gms-split-bar--inline' : 'gms-split-bar'}
+      aria-hidden
+    >
+      {item.shares.map((share) => (
+        <span
+          key={share.player}
+          className="gms-split-seg"
+          style={{ flex: share.quantity || 0.0001, background: colorOf(share.player) }}
+        />
+      ))}
+    </span>
+  );
+}
+
+/**
+ * No tooltip here: a card already shows the totals, the prices and every
+ * holder on its face, so hovering one would only repeat it back.
+ */
+function ItemCard({
+  item,
+  priceMode,
+  colorOf,
+}: {
+  item: GroupItem;
+  priceMode: PriceMode;
+  colorOf: (name: string) => string;
+}) {
   const prices = displayPrices(item, priceMode);
   return (
-    <article className="gms-item-tile" title={item.name}>
-      <ItemIcon itemId={item.id} size={32} />
-      <h3 className="gms-item-tile-name">{item.name}</h3>
-      <div className="gms-item-tile-prices">
-        <PriceBadge kind="qty" value={item.quantity} format="qty" />
-        <PriceBadge kind="ge" value={prices.ge} />
-        <PriceBadge kind="alch" value={prices.alch} />
+    <article className="gms-item-card">
+      <div className="gms-item-card-row">
+        <span className="gms-item-card-art">
+          <ItemIcon itemId={item.id} quantity={item.quantity} size={34} />
+        </span>
+        <div className="gms-item-card-text">
+          <h3 className="gms-item-card-name">{item.name}</h3>
+          <p className="gms-item-card-prices">
+            GE <span>{formatGp(prices.ge)}</span> · Alch <span>{formatGp(prices.alch)}</span>
+          </p>
+        </div>
+        <span className="gms-item-card-qty">{formatQty(item.quantity)}</span>
       </div>
+      <ShareBars item={item} colorOf={colorOf} />
     </article>
   );
 }
 
-function ItemCard({ item, priceMode }: { item: GroupItem; priceMode: PriceMode }) {
+/**
+ * One bar per holder, each filled to that member's share of the stack and
+ * labelled with their amount — so a card says who has what, not just how the
+ * total splits.
+ */
+function ShareBars({
+  item,
+  colorOf,
+}: {
+  item: GroupItem;
+  colorOf: (name: string) => string;
+}) {
+  if (item.shares.length === 0) return null;
+  const top = Math.max(...item.shares.map((s) => s.quantity), 1);
+
+  return (
+    <ul className="gms-item-shares">
+      {item.shares.map((share) => (
+        <li key={share.player} className="gms-item-share">
+          <span className="gms-item-share-name">{share.player}</span>
+          <span className="gms-item-share-track">
+            <span
+              className="gms-item-share-fill"
+              style={{
+                width: `${Math.max(3, Math.round((share.quantity / top) * 100))}%`,
+                background: colorOf(share.player),
+              }}
+            />
+          </span>
+          <span className="gms-item-share-qty">{formatQty(share.quantity)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ItemTile({
+  item,
+  priceMode,
+  onHover,
+  onLeave,
+}: {
+  item: GroupItem;
+  priceMode: PriceMode;
+  onHover: (item: GroupItem, rect: DOMRect) => void;
+  onLeave: () => void;
+}) {
   const prices = displayPrices(item, priceMode);
   return (
-    <article className="gms-item-card">
-      <header className="gms-item-card-head">
-        <ItemIcon itemId={item.id} size={32} />
-        <h3 className="gms-item-card-name">{item.name}</h3>
-        <p className="gms-item-card-qty">Quantity: {formatQty(item.quantity)}</p>
-      </header>
-
-      <div className="gms-item-card-prices">
-        <PriceBadge kind="ge" value={prices.ge} showLabel />
-        <PriceBadge kind="alch" value={prices.alch} showLabel />
-      </div>
-
-      <ul className="gms-item-shares">
-        {item.shares.map((share, index) => (
-          <li key={share.player}>
-            <span className="gms-share-name">{share.player}</span>
-            <span className="gms-share-qty">{formatQty(share.quantity)}</span>
-            <div className="gms-share-track">
-              <div
-                className="gms-share-fill"
-                style={{
-                  width: `${item.quantity ? Math.max(6, Math.round((share.quantity / item.quantity) * 100)) : 0}%`,
-                  background: BAR_COLORS[index % BAR_COLORS.length],
-                }}
-              />
-            </div>
-          </li>
-        ))}
-      </ul>
+    <article
+      className="gms-item-tile"
+      onMouseEnter={(e) => onHover(item, e.currentTarget.getBoundingClientRect())}
+      onMouseLeave={onLeave}
+    >
+      <span className="gms-item-tile-art">
+        <ItemIcon itemId={item.id} quantity={item.quantity} />
+      </span>
+      <h3 className="gms-item-tile-name">{item.name}</h3>
+      <TilePill kind="qty" value={formatQty(item.quantity)} />
+      <TilePill kind="ge" value={formatGp(prices.ge)} />
+      <TilePill kind="alch" value={formatGp(prices.alch)} />
     </article>
+  );
+}
+
+function TilePill({ kind, value }: { kind: BadgeKind; value: string }) {
+  const meta = BADGES[kind];
+  return (
+    <span className={`gms-tile-pill gms-tile-pill--${kind}`} title={meta.label}>
+      <img src={meta.src} alt="" width={14} height={14} />
+      {value}
+    </span>
+  );
+}
+
+function ItemRow({
+  item,
+  priceMode,
+  colorOf,
+  onHover,
+  onLeave,
+}: {
+  item: GroupItem;
+  priceMode: PriceMode;
+  colorOf: (name: string) => string;
+  onHover: (item: GroupItem, rect: DOMRect) => void;
+  onLeave: () => void;
+}) {
+  const prices = displayPrices(item, priceMode);
+  // Past a couple of holders the exact numbers stop fitting, so the line
+  // abbreviates and the full figures move to the hover title.
+  const compact = item.shares.length > 2;
+  const heldBy = item.shares
+    .map((share) => `${share.player} ${compact ? formatGp(share.quantity) : formatQty(share.quantity)}`)
+    .join(' · ');
+  return (
+    <tr className="gms-items-row">
+      <th scope="row" className="gms-items-cell-name">
+        <ItemIcon itemId={item.id} quantity={item.quantity} />
+        <span>{item.name}</span>
+      </th>
+      <td>{formatQty(item.quantity)}</td>
+      <td>{formatGp(prices.ge)}</td>
+      <td>{formatGp(prices.alch)}</td>
+      <td
+        onMouseEnter={(e) => onHover(item, e.currentTarget.getBoundingClientRect())}
+        onMouseLeave={onLeave}
+      >
+        <span className="gms-items-held">
+          <span className="gms-items-held-text">{heldBy}</span>
+          <SplitBar item={item} colorOf={colorOf} inline />
+        </span>
+      </td>
+    </tr>
   );
 }

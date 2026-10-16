@@ -123,6 +123,14 @@ export function PlusIcon() {
   );
 }
 
+export function MinusIcon() {
+  return (
+    <svg {...BASE}>
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
 export function SaveIcon() {
   return (
     <svg {...BASE}>
@@ -269,6 +277,52 @@ export function MenuIcon() {
   return (
     <svg {...NAV}>
       <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  );
+}
+
+export function BracesIcon() {
+  return (
+    <svg {...CHIP}>
+      <path d="M8 3H7a2 2 0 0 0-2 2v3a2 2 0 0 1-2 2 2 2 0 0 1 2 2v3a2 2 0 0 0 2 2h1" />
+      <path d="M16 3h1a2 2 0 0 1 2 2v3a2 2 0 0 0 2 2 2 2 0 0 0-2 2v3a2 2 0 0 1-2 2h-1" />
+    </svg>
+  );
+}
+
+export function CalendarIcon() {
+  return (
+    <svg {...SMALL} className="gms-cal-icon">
+      <rect x="2" y="3" width="12" height="11" rx="2" />
+      <path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3" />
+    </svg>
+  );
+}
+
+export function CaretIcon() {
+  return (
+    <svg
+      className="gms-caret"
+      viewBox="0 0 10 10"
+      width={10}
+      height={10}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.4}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable="false"
+    >
+      <path d="M2 3.5L5 6.5L8 3.5" />
+    </svg>
+  );
+}
+
+export function BurgerIcon() {
+  return (
+    <svg {...SMALL} className="gms-burger">
+      <path d="M2.5 4h11M2.5 8h11M2.5 12h11" />
     </svg>
   );
 }

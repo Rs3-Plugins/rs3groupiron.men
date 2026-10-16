@@ -23,6 +23,7 @@ import { allowDevReset } from '../config/env';
 import { GroupAccessService } from './group-access.service';
 import { GroupEventsService } from './group-events.service';
 import { GroupsSeedService } from './groups-seed.service';
+import { redactWireEntries, type WireEntry } from './group-wire';
 import {
   AddMemberBody,
   CreateAchievementBody,
@@ -61,6 +62,32 @@ export class GroupsPublicController {
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   createGroup(@Body() body: CreateGroupBody) {
     return this.groups.createGroup(body);
+  }
+
+  @Get('public-groups')
+  @Header('Cache-Control', 'no-store')
+  publicGroups(@Query('q') query?: string, @Query('limit') limit?: string) {
+    return this.groups.findPublicGroups(query, limit);
+  }
+
+  @Get('leaderboard')
+  @Header('Cache-Control', 'no-store')
+  leaderboard(
+    @Query('metric') metric?: string,
+    @Query('period') period?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.groups.getLeaderboard(metric, period, limit);
+  }
+
+  @Post('group/:groupName/view')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  recordGroupView(
+    @Param('groupName') groupName: string,
+    @Headers('authorization') authorization: string | undefined,
+  ) {
+    return this.groups.recordGroupView(groupName, authorization);
   }
 
   /** Wipes the DB and reloads seed.json. Off unless ALLOW_DEV_RESET=1, never in production. */
@@ -122,9 +149,14 @@ export class GroupsAuthedController {
     if (!this.events$.hasCapacityFor(group.id)) {
       throw new ServiceUnavailableException('Too many open streams');
     }
-    return this.events$
-      .stream(group.id)
-      .pipe(map((event) => ({ type: event.type, data: event })));
+    return this.events$.stream(group.id).pipe(
+      map((event) => {
+        const data = Array.isArray(event.data)
+          ? redactWireEntries(event.data as WireEntry[], group.scope)
+          : event.data;
+        return { type: event.type, data: { ...event, data } };
+      }),
+    );
   }
 
   /**

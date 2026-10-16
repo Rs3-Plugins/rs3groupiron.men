@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DEMO_GROUP, updateGroupSettings, type AppearanceTheme } from '../../api/groupClient';
+import { DEMO_GROUP, updateGroupSettings } from '../../api/groupClient';
 import { TOKEN_HINT } from '../../lib/constants';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
 import { Modal } from '../Modal';
@@ -9,7 +9,6 @@ import { Banner } from './PanelChrome';
 
 type SetupModalProps = {
   open: boolean;
-  appearance?: AppearanceTheme;
   groupName?: string;
   groupToken?: string;
   onClose: () => void;
@@ -32,7 +31,6 @@ export function SetupModal(props: SetupModalProps) {
 }
 
 function SetupModalBody({
-  appearance = 'rs3',
   groupName = DEMO_GROUP,
   groupToken = '',
   onClose,
@@ -71,7 +69,6 @@ function SetupModalBody({
       titleId="gms-setup-title"
       title="Setup"
       className="gms-modal--setup"
-      appearance={appearance}
       closeDisabled={isBusy}
     >
       <div className="gms-modal-body gms-setup-body">

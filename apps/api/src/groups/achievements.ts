@@ -282,6 +282,8 @@ export type AchievementEntry = {
   detail: string | null;
   skill_id: string | null;
   item_id: number | null;
+  /** Stack size for drops, so the feed can draw the item as the game does. */
+  quantity: number | null;
   /** RS3 gameval name for quests/diaries (stable across cache revisions). */
   gameval: string | null;
   image_url: string | null;
@@ -296,6 +298,7 @@ export function toAchievementEntry(row: {
   detail: string | null;
   skillId: string | null;
   itemId: number | null;
+  quantity?: number | null;
   gameval?: string | null;
   imageUrl: string | null;
   achievedAt: Date;
@@ -308,6 +311,7 @@ export function toAchievementEntry(row: {
     detail: row.detail ?? null,
     skill_id: row.skillId ?? null,
     item_id: row.itemId ?? null,
+    quantity: row.quantity ?? null,
     gameval: row.gameval ?? null,
     image_url: row.imageUrl ?? null,
     at: row.achievedAt.toISOString(),

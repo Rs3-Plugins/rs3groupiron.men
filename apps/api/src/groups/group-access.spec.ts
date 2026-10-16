@@ -20,6 +20,7 @@ function groupRow(name: string, token: string) {
     mode: GroupMode.normal,
     appearance: AppearanceTheme.rs3,
     memberSlots: 5,
+    createdAt: new Date('2026-01-15T12:00:00.000Z'),
     members: [{ id: 'm1', name: 'IronJackery' }],
   };
 }

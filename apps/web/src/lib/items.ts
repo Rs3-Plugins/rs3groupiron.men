@@ -1,3 +1,4 @@
+import { lookupItemName } from './itemNames';
 import {
   LIFE_POINTS_PER_LEVEL,
   SKILLS,
@@ -154,6 +155,8 @@ export type PlayerView = {
   health: { current: number; max: number };
   prayer: { current: number; max: number };
   summoning: { current: number; max: number };
+  /** Carried weight in kilograms; negative with weight-reducing gear. */
+  weight: number;
   coordinates: number[];
   inventory: ItemStack[];
   bank: ItemStack[];
@@ -204,12 +207,23 @@ const ITEM_NAMES: Record<number, string> = {
   23354: 'Holy agony',
 };
 
+/**
+ * Served by our API rather than straight from the renderer: that origin sends
+ * no Cache-Control, ETag or Last-Modified, so a browser re-fetches every icon
+ * on every page load. The API fetches each once and serves it with cache
+ * headers.
+ */
 export function itemIconUrl(itemId: number) {
-  return `https://chisel.weirdgloop.org/gazproj/icons/png/${itemId}.png`;
+  return `/api/items/icon/${itemId}`;
 }
 
+/**
+ * The catalogue covers every item in the game but arrives asynchronously, so
+ * the small built-in table above still backs the first render. Components that
+ * show names call useItemNames() to redraw once it has loaded.
+ */
 export function itemName(itemId: number) {
-  return ITEM_NAMES[itemId] ?? `Item ${itemId}`;
+  return lookupItemName(itemId) ?? ITEM_NAMES[itemId] ?? `Item ${itemId}`;
 }
 
 /** Backpack capacity: the panel always draws this many slots. */
@@ -354,6 +368,7 @@ export function toPlayerView(member: WireMember): PlayerView | null {
     health: healthFromStats(stats, skills),
     prayer: { current: stats[2] ?? 0, max: stats[3] ?? 0 },
     summoning: { current: stats[4] ?? 0, max: stats[5] ?? 0 },
+    weight: stats[7] ?? 0,
     coordinates: member.coordinates ?? [],
     inventory: unpackPairs(member.inventory),
     bank: unpackPairs(member.bank),
@@ -413,24 +428,40 @@ export function membersToPlayers(
   return out;
 }
 
+export type ItemSource = 'bank' | 'inventory' | 'equipment';
+
+export const ITEM_SOURCES: ItemSource[] = ['bank', 'inventory', 'equipment'];
+
+const SOURCE_FIELD: Record<ItemSource, keyof WireMember> = {
+  bank: 'bank',
+  inventory: 'inventory',
+  equipment: 'equipment',
+};
+
 /**
- * Aggregate the banks across members for the Items tab, plus the group's
- * shared bank. Backpack and worn items are deliberately left out: the tab is
- * presented as a bank view, and carried items would quietly pad every total.
+ * Aggregate items across members for the Items tab, plus the group's shared
+ * bank. `sources` picks which containers count, so a total can mean the bank
+ * alone or everything a group owns.
  */
-export function aggregateGroupItems(members: WireMember[]): GroupItem[] {
+export function aggregateGroupItems(
+  members: WireMember[],
+  sources: ReadonlyArray<ItemSource> = ITEM_SOURCES,
+): GroupItem[] {
   const map = new Map<number, Map<string, number>>();
 
   for (const member of members) {
-    const stacks = unpackPairs(member.bank);
     const label = member.name === SHARED ? 'Shared bank' : member.name;
-    for (const stack of stacks) {
-      let byPlayer = map.get(stack.id);
-      if (!byPlayer) {
-        byPlayer = new Map();
-        map.set(stack.id, byPlayer);
+    for (const source of sources) {
+      // Only the shared bank has a bank; carried items belong to a member.
+      const stacks = unpackPairs(member[SOURCE_FIELD[source]] as number[] | undefined);
+      for (const stack of stacks) {
+        let byPlayer = map.get(stack.id);
+        if (!byPlayer) {
+          byPlayer = new Map();
+          map.set(stack.id, byPlayer);
+        }
+        byPlayer.set(label, (byPlayer.get(label) ?? 0) + stack.quantity);
       }
-      byPlayer.set(label, (byPlayer.get(label) ?? 0) + stack.quantity);
     }
   }
 
@@ -452,4 +483,14 @@ export function aggregateGroupItems(members: WireMember[]): GroupItem[] {
 
 export function formatQty(n: number) {
   return n.toLocaleString();
+}
+
+/**
+ * Stack count as the game draws it in a slot: plain below 100K, then K, then M.
+ * Keeps the overlay inside a 38px slot without truncating.
+ */
+export function formatStack(n: number) {
+  if (n < 100_000) return String(n);
+  if (n < 10_000_000) return `${Math.floor(n / 1000)}K`;
+  return `${Math.floor(n / 1_000_000)}M`;
 }

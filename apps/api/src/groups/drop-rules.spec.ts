@@ -13,7 +13,7 @@ const SHARED_ID = 20171;
 const UNLISTED_ID = 4151;
 
 function build(options: {
-  override?: { include: boolean } | null;
+  override?: { include: boolean; minQty?: number | null; maxQty?: number | null } | null;
   threshold?: number;
 }) {
   const created: Array<Record<string, unknown>> = [];
@@ -139,5 +139,54 @@ describe('drop rules', () => {
       value: 999_999_999,
     });
     expect(out.recorded).toBe(false);
+  });
+});
+
+/** "Only tell me about 100+ blood runes", for noted and stackable drops. */
+describe('quantity range', () => {
+  const report = (groups: GroupsService, quantity?: number) =>
+    groups.reportDrop('Testing', 't', {
+      name: 'Swan Swear',
+      item_id: UNLISTED_ID,
+      quantity,
+    });
+
+  it('keeps a stack inside the window', async () => {
+    const { groups } = build({ override: { include: true, minQty: 100, maxQty: 500 } });
+    expect((await report(groups, 250)).recorded).toBe(true);
+  });
+
+  it('keeps a stack on either boundary', async () => {
+    const { groups } = build({ override: { include: true, minQty: 100, maxQty: 500 } });
+    expect((await report(groups, 100)).recorded).toBe(true);
+    expect((await report(groups, 500)).recorded).toBe(true);
+  });
+
+  it('drops a stack below the minimum', async () => {
+    const { groups } = build({ override: { include: true, minQty: 100 } });
+    expect((await report(groups, 99)).recorded).toBe(false);
+  });
+
+  it('drops a stack above the maximum', async () => {
+    const { groups } = build({ override: { include: true, maxQty: 10 } });
+    expect((await report(groups, 11)).recorded).toBe(false);
+  });
+
+  // A report with no quantity is one item, so a minimum above 1 rules it out.
+  it('treats a missing quantity as one', async () => {
+    const { groups } = build({ override: { include: true, minQty: 2 } });
+    expect((await report(groups)).recorded).toBe(false);
+  });
+
+  it('ignores a window on an excluded item', async () => {
+    const { groups } = build({ override: { include: false, minQty: 1, maxQty: 999 } });
+    expect((await report(groups, 5)).recorded).toBe(false);
+  });
+
+  // An item with no window set behaves exactly as it did before ranges existed.
+  it('keeps any amount when both ends are open', async () => {
+    const { groups } = build({ override: { include: true, minQty: null, maxQty: null } });
+    expect((await report(groups, 1)).recorded).toBe(true);
+    expect((await report(groups, 1_000_000)).recorded).toBe(true);
   });
 });
