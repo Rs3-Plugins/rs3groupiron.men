@@ -931,6 +931,12 @@
   color: #d9c89c;
 }
 
+.gms-target--none .gms-target-name {
+  font-size: 0.72rem;
+  color: #d9c89c;
+  opacity: 0.5;
+}
+
 .gms-target-name {
   overflow: hidden;
   white-space: nowrap;

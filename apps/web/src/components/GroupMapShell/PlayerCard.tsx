@@ -189,7 +189,14 @@ export const PlayerCard = memo(function PlayerCard({
           </div>
         )}
 
-        {tracked && player.target && <TargetBar target={player.target} />}
+        {tracked &&
+          (player.target ? (
+            <TargetBar target={player.target} />
+          ) : (
+            <div className="gms-target gms-target--none">
+              <span className="gms-target-name">No Target</span>
+            </div>
+          ))}
       </div>
 
       {tracked && (
