@@ -39,7 +39,7 @@ export const COPY_FEEDBACK_MS = 1600;
 
 // TODO: replace placeholder video
 export const SETUP_VIDEO_URL =
-  'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ';
+  'https://www.youtube-nocookie.com/embed/Qtv9AhfjA1Y';
 
 export const TOKEN_HINT =
   'Use this token in the plugin Authorization header to sync your group.';
